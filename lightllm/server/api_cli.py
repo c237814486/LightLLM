@@ -296,6 +296,7 @@ def make_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cache_capacity", type=int, default=200, help="cache server capacity for multimodal resources"
     )
+    parser.add_argument("--enable_concurrent_alloc", action="store_true", help="alloc multimodal resources in threadpool to save time")
     parser.add_argument(
         "--data_type",
         type=str,
