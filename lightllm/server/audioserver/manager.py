@@ -6,6 +6,7 @@ import uvloop
 import rpyc
 import inspect
 from typing import List
+import pickle
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 from lightllm.utils.log_utils import init_logger
@@ -96,7 +97,9 @@ class AudioManager:
                     multimodal_params = group_req_indexes.multimodal_params
 
                     audio_uuids = [audio.uuid for audio in multimodal_params.audios]
-                    ready_audio = obtain(self.cache_client.root.get_items_embed(audio_uuids))
+                    audio_uuids = pickle.dumps(audio_uuids)
+                    ready_audio = self.cache_client.root.get_items_embed_v2(audio_uuids)
+                    ready_audio = pickle.loads(ready_audio)
 
                     for audio, ready in zip(multimodal_params.audios, ready_audio):
                         if not ready:
