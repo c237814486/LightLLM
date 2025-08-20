@@ -21,7 +21,7 @@ from lightllm.models.qwen2_5_vl.qwen2_5_visual import Qwen2_5_VisionTransformerP
 from lightllm.models.tarsier2.tarsier2_visual import TarsierVisionTransformerPretrainedModel
 from lightllm.server.embed_cache.utils import tensor2bytes, read_shm, create_shm, get_shm_name_data, get_shm_name_embed
 from lightllm.utils.infer_utils import set_random_seed
-from lightllm.utils.infer_utils import calculate_time, mark_start, mark_end, calculate_cpu_time_sync
+from lightllm.utils.infer_utils import calculate_time, mark_start, mark_end
 from lightllm.utils.dist_utils import init_vision_distributed_env
 from lightllm.utils.graceful_utils import graceful_registry
 from lightllm.utils.envs_utils import get_env_start_args
@@ -69,6 +69,8 @@ class VisualModelRpcServer(rpyc.Service):
                 self.model = TarsierVisionTransformerPretrainedModel(**model_cfg).eval().bfloat16()
             elif self.model_type == "llava":
                 self.model = LlavaVisionModel()
+            # elif self.model_type == "llavaqwen2":
+            #     self.model = LlavaQwen25AvgpoolVisionModelAnyRes()
             elif self.model_type == "internvl_chat":
                 self.model = VisionTransformer(kvargs)
                 # self.model = InternVLVisionModel()
@@ -95,12 +97,11 @@ class VisualModelRpcServer(rpyc.Service):
     def forward(self, images: List[ImageItem]):
         return self.model.encode(images)
 
-    @calculate_cpu_time_sync(show=True)
     def alloc_img_embed_resources(self, all_img_embeds, uuids, valid_ids):
         if self.tp_rank_id == 0:
-            uuids = pickle.dumps(uuids)
-            ready_flags = self.cache_client.root.get_items_embed_v2(uuids)
-            ready_flags = pickle.dumps(ready_flags)
+            uuids_blob = pickle.dumps(uuids)
+            ready_flags_status = self.cache_client.root.get_items_embed_v2(uuids_blob)
+            ready_flags = pickle.loads(ready_flags_status)
 
             ids_to_set = []
             for i, ready in enumerate(ready_flags):
