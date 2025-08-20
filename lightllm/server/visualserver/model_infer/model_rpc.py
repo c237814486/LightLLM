@@ -3,6 +3,7 @@ import numpy as np
 import rpyc
 import torch
 import inspect
+import pickle
 from datetime import timedelta
 from typing import Dict, List, Tuple
 from transformers.configuration_utils import PretrainedConfig
@@ -10,6 +11,7 @@ from rpyc.utils.classic import obtain
 from rpyc.utils.server import ThreadedServer
 from lightllm.models.qwen_vl.qwen_visual import QWenVisionTransformer
 from lightllm.models.llava.llava_visual import LlavaVisionModel
+# from lightllm.models.llavaqwen_avgpool.llava_visual_qwen25vl import LlavaQwen25AvgpoolVisionModelAnyRes
 from lightllm.models.internvl.internvl_visual import InternVLVisionModel
 from lightllm.models.gemma3.gemma3_visual import Gemma3VisionModel
 from lightllm.models.vit.model import VisionTransformer
@@ -19,7 +21,7 @@ from lightllm.models.qwen2_5_vl.qwen2_5_visual import Qwen2_5_VisionTransformerP
 from lightllm.models.tarsier2.tarsier2_visual import TarsierVisionTransformerPretrainedModel
 from lightllm.server.embed_cache.utils import tensor2bytes, read_shm, create_shm, get_shm_name_data, get_shm_name_embed
 from lightllm.utils.infer_utils import set_random_seed
-from lightllm.utils.infer_utils import calculate_time, mark_start, mark_end
+from lightllm.utils.infer_utils import calculate_time, mark_start, mark_end, calculate_cpu_time_sync
 from lightllm.utils.dist_utils import init_vision_distributed_env
 from lightllm.utils.graceful_utils import graceful_registry
 from lightllm.utils.envs_utils import get_env_start_args
@@ -93,14 +95,13 @@ class VisualModelRpcServer(rpyc.Service):
     def forward(self, images: List[ImageItem]):
         return self.model.encode(images)
 
-    # @calculate_time(show=False, min_cost_ms=300)
-    def exposed_encode(self, images: List[ImageItem]):
-        images = obtain(images)
-        all_img_embeds, uuids, valid_ids = self.forward(images)
-        all_img_embeds = all_img_embeds.to(torch.device("cpu"))
-
+    @calculate_cpu_time_sync(show=True)
+    def alloc_img_embed_resources(self, all_img_embeds, uuids, valid_ids):
         if self.tp_rank_id == 0:
-            ready_flags = obtain(self.cache_client.root.get_items_embed(uuids))
+            uuids = pickle.dumps(uuids)
+            ready_flags = self.cache_client.root.get_items_embed_v2(uuids)
+            ready_flags = pickle.dumps(ready_flags)
+
             ids_to_set = []
             for i, ready in enumerate(ready_flags):
                 if ready:
@@ -111,9 +112,17 @@ class VisualModelRpcServer(rpyc.Service):
                 create_shm(get_shm_name_embed(uid), cur_embed_bytes)
                 ids_to_set.append(uid)
             if ids_to_set:
-                self.cache_client.root.set_items_embed(ids_to_set)
+                ids_to_set = pickle.dumps(ids_to_set)
+                self.cache_client.root.set_items_embed_v2(ids_to_set)
         return
 
+
+    def exposed_encode(self, images: List[ImageItem]):
+        images = obtain(images)
+        all_img_embeds, uuids, valid_ids = self.forward(images)
+        all_img_embeds = all_img_embeds.to(torch.device("cpu"))
+        self.alloc_img_embed_resources(all_img_embeds, uuids, valid_ids)
+       
 
 class VisualModelRpcClient:
     def __init__(self, model_rpc, vit_tp, rpc_server_process=None):
@@ -179,14 +188,14 @@ async def start_model_process(port, vit_tp, device_id):
     proc.start()
     await asyncio.sleep(2)
     repeat_count = 0
-    while repeat_count < 20:
+    while repeat_count < 30:
         try:
             con = rpyc.connect("localhost", port, config={"allow_pickle": True})
             break
         except BaseException:
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
         repeat_count += 1
-    if repeat_count == 20:
+    if repeat_count == 30:
         raise Exception("init rpc env error!")
 
     assert proc.is_alive()
