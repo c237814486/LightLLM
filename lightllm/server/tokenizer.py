@@ -26,6 +26,7 @@ from ..models.tarsier2.model import Tarsier2Tokenizer
 
 logger = init_logger(__name__)
 from ..models.llava.model import LlavaTokenizer
+from ..models.llavaqwen_avgpool.model import LlavaQWen25AudioVLTokenizer
 from ..models.qwen_vl.model import QWenVLTokenizer
 from ..models.qwen2_vl.model import QWen2VLTokenizer
 from ..models.internvl.model import InternvlTokenizer
@@ -96,5 +97,8 @@ def get_tokenizer(
         tokenizer = InternvlTokenizer(tokenizer, model_cfg, weight_dir=tokenizer_name)
     elif model_type == "gemma3":
         tokenizer = Gemma3Tokenizer(tokenizer, model_cfg)
+
+    elif model_type == "llavaqwen2":
+        tokenizer = LlavaQWen25AudioVLTokenizer(tokenizer, model_cfg)
 
     return tokenizer

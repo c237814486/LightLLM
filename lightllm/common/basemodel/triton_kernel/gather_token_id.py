@@ -26,7 +26,9 @@ def _fwd_kernel_scatter(
     cur_next_token_id = tl.load(next_token_ids + block_range, mask=block_mask)
 
     if not HAS_OUT_IS_NONE:
+        
         cur_has_out = tl.load(b_has_out + block_range, mask=block_mask, other=False)
+
         tl.store(
             req_to_next_token_ids + cur_req_idx * req_to_next_token_ids_stride + cur_mtp_index,
             cur_next_token_id,
@@ -64,7 +66,7 @@ def scatter_token(
 
     grid = (triton.cdiv(batch_size, BLOCK),)
     num_warps = 1
-
+   
     _fwd_kernel_scatter[grid](
         next_token_ids=next_token_ids,
         req_to_next_token_ids=req_to_next_token_ids,

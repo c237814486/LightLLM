@@ -79,7 +79,7 @@ def _get_system_shm_size_gb():
         return 0
 
 
-def _get_recommended_shm_size_gb(args, max_image_resolution=(3940, 2160), dtype_size=2):
+def _get_recommended_shm_size_gb(args, max_image_resolution=(1288, 728), dtype_size=2):
     """
     获取所需的 /dev/shm 大小(以GB为单位)。
     """

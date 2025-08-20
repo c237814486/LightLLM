@@ -33,6 +33,9 @@ class LlavaTokenizer(BaseMultiModalTokenizer):
             image_size = model_cfg.get("img_size", default_img_size)
             image_size = model_cfg.get("mm_image_size", image_size)
         # (image_size // patch_size) ** 2: (336 // 14) ** 2 = 576
+            if isinstance(image_size, dict):
+                image_size = image_size["height"]
+                
         self.image_length = (image_size // patch_size) ** 2
         self.skip_start = model_cfg.get("skip_start", True)
 
@@ -53,7 +56,7 @@ class LlavaTokenizer(BaseMultiModalTokenizer):
         raise NotImplementedError
 
     # only change the impl of the encode func:
-    def encode(self, prompt, multimodal_params: MultimodalParams = None):
+    def encode(self, prompt, multimodal_params: MultimodalParams = None, **kwargs):
 
         # split prompt by <image>, and merge parts by [pad_id] * 576
         ids_chunks = [self.tokenizer(x).input_ids for x in prompt.split(self.image_token)]

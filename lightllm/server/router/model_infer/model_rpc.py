@@ -253,7 +253,7 @@ async def start_model_process(
         ),
     )
     proc.start()
-    success_event.wait(timeout=40)
+    success_event.wait(timeout=100)
     assert proc.is_alive()
 
     return None
