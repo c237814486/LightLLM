@@ -124,8 +124,9 @@ class HttpServerManager:
     async def _alloc_resource(self, items, md5sums, token_nums, datas):
 
         while True:
+            t1 = time.time()
             records = obtain(self.cache_client.root.alloc(md5sums, token_nums))
-
+            logger.info(f"cache manager batch alloc time: {(time.time() - t1)*1000} ms")
             if records is None:
                 await asyncio.sleep(0.1)
                 continue
