@@ -11,7 +11,7 @@ from rpyc.utils.classic import obtain
 from rpyc.utils.server import ThreadedServer
 from lightllm.models.qwen_vl.qwen_visual import QWenVisionTransformer
 from lightllm.models.llava.llava_visual import LlavaVisionModel
-# from lightllm.models.llavaqwen_avgpool.llava_visual_qwen25vl import LlavaQwen25AvgpoolVisionModelAnyRes
+from lightllm.models.llavaqwen_avgpool.llava_visual_qwen25vl import LlavaQwen25AvgpoolVisionModelAnyRes
 from lightllm.models.internvl.internvl_visual import InternVLVisionModel
 from lightllm.models.gemma3.gemma3_visual import Gemma3VisionModel
 from lightllm.models.vit.model import VisionTransformer
@@ -69,8 +69,8 @@ class VisualModelRpcServer(rpyc.Service):
                 self.model = TarsierVisionTransformerPretrainedModel(**model_cfg).eval().bfloat16()
             elif self.model_type == "llava":
                 self.model = LlavaVisionModel()
-            # elif self.model_type == "llavaqwen2":
-            #     self.model = LlavaQwen25AvgpoolVisionModelAnyRes()
+            elif self.model_type == "llavaqwen2":
+                self.model = LlavaQwen25AvgpoolVisionModelAnyRes()
             elif self.model_type == "internvl_chat":
                 self.model = VisionTransformer(kvargs)
                 # self.model = InternVLVisionModel()
@@ -117,13 +117,12 @@ class VisualModelRpcServer(rpyc.Service):
                 self.cache_client.root.set_items_embed_v2(ids_to_set)
         return
 
-
     def exposed_encode(self, images: List[ImageItem]):
         images = obtain(images)
         all_img_embeds, uuids, valid_ids = self.forward(images)
         all_img_embeds = all_img_embeds.to(torch.device("cpu"))
         self.alloc_img_embed_resources(all_img_embeds, uuids, valid_ids)
-       
+
 
 class VisualModelRpcClient:
     def __init__(self, model_rpc, vit_tp, rpc_server_process=None):
