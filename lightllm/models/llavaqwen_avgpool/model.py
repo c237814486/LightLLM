@@ -18,7 +18,6 @@ from lightllm.utils.infer_utils import calculate_cpu_time_sync
 
 # Warp of the origal tokenizer
 
-    
 
 class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
     def __init__(self, tokenizer, model_cfg):
@@ -38,7 +37,7 @@ class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
         # height, width = 364, 644
         # h, w = self.get_adaptive_pool_size(height, width, scale=int(self.model_cfg.get("mm_downsample_ratio", 16)))
         # self.image_length = h * w // 2
-        
+
     @lru_cache(maxsize=10)
     def get_adaptive_pool_size(self, h, w, scale=16):
         M = h / self.patch_size / self.merge_size
@@ -52,12 +51,12 @@ class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
         width = img.image_w
         height = img.image_h
         h, w = self.get_adaptive_pool_size(height, width, scale=self.model_cfg["mm_downsample_ratio"])
-        image_length = h * w // 2# 每两张图需要合并
+        image_length = h * w // 2  # 每两张图需要合并
         return image_length
 
     def get_audio_token_length(self, audio: AudioItem):
         feature_len = audio.audio_length // self.audio_frame_length
-        token_num = (feature_len + self.audio_downsample_ratio - 1)// self.audio_downsample_ratio
+        token_num = (feature_len + self.audio_downsample_ratio - 1) // self.audio_downsample_ratio
         return token_num
 
     def init_imageitem_extral_params(
@@ -68,10 +67,10 @@ class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
     def init_audioitem_extral_params(
         self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
     ):
-        raise NotImplementedError
+        return
 
     def encode(self, prompt, multimodal_params: MultimodalParams = None, **kwargs):
-   
+
         pattern = f"({re.escape(self.image_token)}|{re.escape(self.audio_token)})"
         chunks = re.split(pattern, prompt)
         input_ids = []
@@ -92,32 +91,42 @@ class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
             if idx < len(chunks):
                 token = chunks[idx]
                 if token == self.image_token:
-                    assert multimodal_params is not None and image_id < len(multimodal_params.images), "Not enough images in multimodal_params"
+                    assert multimodal_params is not None and image_id < len(
+                        multimodal_params.images
+                    ), "Not enough images in multimodal_params"
                     token_id = multimodal_params.images[image_id].token_id
                     token_num = multimodal_params.images[image_id].token_num
-                    # assert token_num == self.image_length, f"invalid image token num: {token_num} vs {self.image_length}!"
                     input_ids.extend(range(token_id, token_id + token_num))
                     image_id += 1
                 elif token == self.audio_token:
-                    assert multimodal_params is not None and audio_id < len(multimodal_params.audios), "Not enough audios in multimodal_params"
+                    assert multimodal_params is not None and audio_id < len(
+                        multimodal_params.audios
+                    ), "Not enough audios in multimodal_params"
                     token_id = multimodal_params.audios[audio_id].token_id
                     token_num = multimodal_params.audios[audio_id].token_num
                     if self.audio_start_id is not None and self.audio_end_id is not None:
-                        audio_input_ids = [self.audio_start_id] + list(range(token_id, token_id + token_num)) + [self.audio_end_id]
+                        audio_input_ids = (
+                            [self.audio_start_id] + list(range(token_id, token_id + token_num)) + [self.audio_end_id]
+                        )
                     else:
                         audio_input_ids = list(range(token_id, token_id + token_num))
                     input_ids.extend(audio_input_ids)
                     audio_id += 1
                 idx += 1
         if multimodal_params:
-            assert image_id == len(multimodal_params.images), f"invalid image tag num: {len(multimodal_params.images)} vs {image_id}!"
-            assert audio_id == len(multimodal_params.audios), f"invalid audio tag num: {len(multimodal_params.audios)} vs {audio_id}!"
+            assert image_id == len(
+                multimodal_params.images
+            ), f"invalid image tag num: {len(multimodal_params.images)} vs {image_id}!"
+            assert audio_id == len(
+                multimodal_params.audios
+            ), f"invalid audio tag num: {len(multimodal_params.audios)} vs {audio_id}!"
         return input_ids
 
     def __getattr__(self, name):
         if name != "encode":
             return getattr(self.tokenizer, name)
         return self.encode
+
 
 @ModelRegistry("llavaqwen2", is_multimodal=True)
 class LlavaQwen2TpPartModel(Qwen2TpPartModel):
@@ -138,23 +147,19 @@ class LlavaQwen2TpPartModel(Qwen2TpPartModel):
 
 
 if __name__ == "__main__":
-  
 
-    tokenizer_path = "/mnt/afs/yangdeyu/GameMLLM/LLaVA_hub/checkpoints/omni_models/0728_llava_omni_qwen25vl_14B_16x_4k_st2_kimiwhisper_10x_unfreezeaudio_omnidata_text500w_lr2e-6/checkpoint-6000"
+    tokenizer_path = "0728_llava_omni_qwen25vl_14B_16x_4k_st2_kimiwhisper_10x_unfreezeaudio_omnidata_text500w_lr2e-6"
     config_path = f"{tokenizer_path}/config.json"
 
-    
     with open(config_path, "r") as f:
         model_cfg = json.load(f)
 
-    
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     multimodal_params = {
-                "images": [{"type": "base64", "data":"dGVzdF9pbWFnZV9kYXRh"}],
-                "audios": [{"type": "base64", "data":"dGVzdF9pbWFnZV9kYXRh"}]
-                }
-    
-    
+        "images": [{"type": "base64", "data": "dGVzdF9pbWFnZV9kYXRh"}],
+        "audios": [{"type": "base64", "data": "dGVzdF9pbWFnZV9kYXRh"}],
+    }
+
     multimodal_params = MultimodalParams(**multimodal_params)
     for img in multimodal_params.images:
         img.uuid = 1
@@ -165,7 +170,7 @@ if __name__ == "__main__":
         audio.uuid = 2
         audio.token_id = 60000
         audio.token_num = 10
-  
+
     prompt = "这是一段文本<image>然后是图片后的文本<audio>最后是音频后的文本"
 
     my_tokenizer = LlavaQWen25AudioVLTokenizer(tokenizer, model_cfg)

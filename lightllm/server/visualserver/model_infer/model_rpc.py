@@ -188,7 +188,7 @@ async def start_model_process(port, vit_tp, device_id):
     proc.start()
     await asyncio.sleep(2)
     repeat_count = 0
-    while repeat_count < 30:
+    while repeat_count < 60:
         try:
             con = rpyc.connect("localhost", port, config={"allow_pickle": True})
             break

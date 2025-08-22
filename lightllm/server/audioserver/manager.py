@@ -6,7 +6,6 @@ import uvloop
 import rpyc
 import inspect
 from typing import List
-import pickle
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 from lightllm.utils.log_utils import init_logger
@@ -61,6 +60,7 @@ class AudioManager:
                 "rank_id": rank_id,
                 "cache_port": self.cache_port,
                 "data_type": self.args.data_type,
+                "audio_gpu_ids": self.args.audio_gpu_ids,
             }
             init_model_ret.append(self.model_rpcs[rank_id].init_model(kvargs))
         await asyncio.gather(*init_model_ret)
@@ -155,7 +155,7 @@ def start_audio_process(args, router_port, audio_port, cache_port, pipe_writer):
     pipe_writer.send("init ok")
 
     def handle_exception(loop, context):
-        logger.exception(f"VisualServer Caught exception: {str(context)}")
+        logger.exception(f"AudioServer Caught exception: {str(context)}")
 
     loop = asyncio.new_event_loop()
     loop.set_exception_handler(handle_exception)

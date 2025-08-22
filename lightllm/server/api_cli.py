@@ -296,7 +296,10 @@ def make_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cache_capacity", type=int, default=200, help="cache server capacity for multimodal resources"
     )
-    parser.add_argument("--enable_concurrent_alloc", action="store_true", help="alloc multimodal resources in threadpool to save time")
+    parser.add_argument(
+        "--enable_concurrent_alloc", action="store_true", help="alloc multimodal resources in threadpool to save time"
+    )
+    parser.add_argument("--concurrent_alloc_workers", type=int, default=4, help="max concurrent alloc workers")
     parser.add_argument(
         "--data_type",
         type=str,
@@ -332,8 +335,9 @@ def make_argument_parser() -> argparse.ArgumentParser:
         "--visual_infer_batch_size", type=int, default=1, help="number of images to process in each inference batch"
     )
     parser.add_argument(
-        "--visual_gpu_ids", nargs="+", type=int, default=None, help="List of GPU IDs to use, e.g., 0 1 2"
+        "--visual_gpu_ids", nargs="+", type=int, default=[0], help="List of GPU IDs to use, e.g., 0 1 2"
     )
+    parser.add_argument("--audio_gpu_ids", nargs="+", type=int, default=[0], help="List of GPU IDs to use, e.g., 0 1 2")
     parser.add_argument("--visual_tp", type=int, default=1, help="number of tensort parallel instances for ViT")
     parser.add_argument("--visual_dp", type=int, default=1, help="number of data parallel instances for ViT")
     parser.add_argument(
@@ -416,7 +420,7 @@ def make_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sampling_backend",
         type=str,
-        choices=["triton", "sglang_kernel"],
+        choices=["triton_top_pk", "triton_top_kp", "sglang_kernel"],
         default="sglang_kernel",
         help="""sampling used impl. 'triton' is use torch and triton kernel,
         sglang_kernel use sglang_kernel impl""",

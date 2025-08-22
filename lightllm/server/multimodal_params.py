@@ -41,9 +41,9 @@ class AudioItem:
 
             # check if valid audio bytes
             audio_values, _ = librosa.load(BytesIO(audio_data), sr=16000)
-            from lightllm.models.whisper.defaults import MIN_AUDIO_LEN
+            from lightllm.models.whisper.defaults import MIN_AUDIO_LEN, MAX_AUDIO_LEN
 
-            self.audio_length = max(audio_values.shape[0], MIN_AUDIO_LEN)  # 如果音频过短，会被pad到480的长度
+            self.audio_length = min(max(audio_values.shape[0], MIN_AUDIO_LEN), MAX_AUDIO_LEN)  # 如果音频过短或过长，会被截断或者pad
             self._preload_data = audio_data
             return
 

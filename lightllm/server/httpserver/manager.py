@@ -114,11 +114,12 @@ class HttpServerManager:
         # If the timemark is not updated for a pre-set time, a prob request will be sent to the backend.
         self.latest_success_infer_time_mark = SharedInt(f"{get_unique_server_name()}_latest_success_infer_time_mark")
         self.latest_success_infer_time_mark.set_value(int(time.time()))
-        
+
         # 线程池用于创建multimodal resource alloc
         self.enable_concurrent_alloc = self.args.enable_concurrent_alloc
+        self.max_concurrent = self.args.concurrent_alloc_workers * 32
         if self.enable_concurrent_alloc:
-            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.args.concurrent_alloc_workers)
         return
 
     async def _alloc_resource(self, items, md5sums, token_nums, datas):
@@ -168,24 +169,19 @@ class HttpServerManager:
                 item.token_id = rec["token_id"]
                 item.token_num = rec["token_num"]
                 uid_list.append(rec["id"])
-            
+
             uid_blob = pickle.dumps(uid_list)
             ready_flags = self.cache_client.root.get_items_data_v2(uid_blob)
             ready_flags = pickle.loads(ready_flags)
-            
 
-            max_concurrent_shm = min(len(items), 128)  # 限制最大并发
+            max_concurrent_shm = min(len(items), self.max_concurrent)  # 限制最大并发
             semaphore = asyncio.Semaphore(max_concurrent_shm)
 
             async def create_shm_with_limit(uid, data):
                 async with semaphore:
                     loop = asyncio.get_event_loop()
-                    return await loop.run_in_executor(
-                        self.executor, 
-                        create_shm, 
-                        get_shm_name_data(uid), 
-                        data
-                    )
+                    return await loop.run_in_executor(self.executor, create_shm, get_shm_name_data(uid), data)
+
             update_data_ids = []
             shm_tasks = []
             for uid, ready, data in zip(uid_list, ready_flags, datas):
@@ -213,13 +209,18 @@ class HttpServerManager:
             # 那么如果某一时刻shm中存在请求1的5张图和请求2的5张图，将会资源竞争产生死锁。
             async with self._resource_lock:
                 if self.enable_concurrent_alloc:
-                    await self._alloc_multimodal_resources_v2(multimodal_params, sampling_params)
+                    await asyncio.gather(
+                        self._alloc_multimodal_images(multimodal_params, sampling_params),
+                        self._alloc_multimodal_audios(multimodal_params, sampling_params),
+                    )
                 else:
                     await self._alloc_multimodal_resources_v1(multimodal_params, sampling_params)
-                
+
         return
 
-    async def _alloc_multimodal_resources_v1(self, multimodal_params: MultimodalParams, sampling_params: SamplingParams):
+    async def _alloc_multimodal_resources_v1(
+        self, multimodal_params: MultimodalParams, sampling_params: SamplingParams
+    ):
         items, md5sums, tokens_nums, datas = [], [], [], []
         for img in multimodal_params.images:
             self.tokenizer.init_imageitem_extral_params(img, multimodal_params, sampling_params)
@@ -244,46 +245,34 @@ class HttpServerManager:
         await self._alloc_resource(items, md5sums, tokens_nums, datas)
         return
 
-    async def _alloc_multimodal_resources_v2(self, multimodal_params: MultimodalParams, sampling_params: SamplingParams):
-       
-        all_items = multimodal_params.images + multimodal_params.audios
+    async def _alloc_multimodal_audios(self, multimodal_params: MultimodalParams, sampling_params: SamplingParams):
+
+        all_items = multimodal_params.audios
         if not all_items:
             return
         loop = asyncio.get_event_loop()
+
         def _process_item(item, multimodal_params, sampling_params):
             """初始化item参数、读取数据并计算MD5"""
-            if isinstance(item, ImageItem):  # 图片
-                self.tokenizer.init_imageitem_extral_params(item, multimodal_params, sampling_params)
-            elif isinstance(item, AudioItem):
-                self.tokenizer.init_audioitem_extral_params(item, multimodal_params, sampling_params)
-            
+            self.tokenizer.init_audioitem_extral_params(item, multimodal_params, sampling_params)
             data = item.read()
             md5sum = hashlib.md5(data).hexdigest() + "_" + str(hash(frozendict(item.extra_params)))
             return data, md5sum
 
-        chunk_size = 128  # 可以根据需要调整
+        chunk_size = self.max_concurrent  # 可以根据需要调整
         for i in range(0, len(all_items), chunk_size):
-            chunk = all_items[i:i + chunk_size]
+            chunk = all_items[i : i + chunk_size]
 
             # 并发处理chunk内的所有item
             process_tasks = [
-                loop.run_in_executor(
-                    self.executor, 
-                    _process_item, 
-                    item, 
-                    multimodal_params, 
-                    sampling_params
-                ) 
+                loop.run_in_executor(self.executor, _process_item, item, multimodal_params, sampling_params)
                 for item in chunk
             ]
             chunk_results = await asyncio.gather(*process_tasks)
             chunk_items, chunk_md5sums, chunk_tokens_nums, chunk_datas = [], [], [], []
             for j, item in enumerate(chunk):
                 data, md5sum = chunk_results[j]
-                if isinstance(item, ImageItem):
-                    token_num = self.tokenizer.get_image_token_length(item)
-                elif isinstance(item, AudioItem):
-                    token_num = self.tokenizer.get_audio_token_length(item)
+                token_num = self.tokenizer.get_audio_token_length(item)
                 chunk_items.append(item)
                 chunk_md5sums.append(md5sum)
                 chunk_tokens_nums.append(token_num)
@@ -291,7 +280,54 @@ class HttpServerManager:
 
             await self._alloc_resource_v2(chunk_items, chunk_md5sums, chunk_tokens_nums, chunk_datas)
 
-                    
+    async def _alloc_multimodal_images(self, multimodal_params: MultimodalParams, sampling_params: SamplingParams):
+
+        all_items = multimodal_params.images
+        if not all_items:
+            return
+        loop = asyncio.get_event_loop()
+
+        def _read_data(item):
+            """初始化item参数并读取数据"""
+            self.tokenizer.init_imageitem_extral_params(item, multimodal_params, sampling_params)
+            return item.read()
+
+        def _generate_pair_md5(data1, data2, position):
+            """生成配对MD5，position表示在配对中的位置(0或1)"""
+            position_bytes = str(position).encode("utf-8")
+            combined_data = data1 + data2 + position_bytes
+            return hashlib.md5(combined_data).hexdigest()
+
+        chunk_size = self.max_concurrent  # 可以根据需要调整
+        for i in range(0, len(all_items), chunk_size):
+            chunk = all_items[i : i + chunk_size]
+            read_tasks = [loop.run_in_executor(self.executor, _read_data, item) for item in chunk]
+            chunk_data_list = await asyncio.gather(*read_tasks)
+
+            # 并发计算chunk内所有item的MD5
+            md5_tasks = []
+
+            md5_tasks = []
+            for j in range(len(chunk)):
+                position_in_pair = j % 2  # 在配对中的位置 (0 或 1)
+                pair_start_idx = (j // 2) * 2  # 配对起始位置
+
+                data1 = chunk_data_list[pair_start_idx]
+                data2 = chunk_data_list[pair_start_idx + 1]
+                md5_task = loop.run_in_executor(self.executor, _generate_pair_md5, data1, data2, position_in_pair)
+                md5_tasks.append(md5_task)
+            md5_results = await asyncio.gather(*md5_tasks)
+
+            chunk_items, chunk_md5sums, chunk_tokens_nums, chunk_datas = [], [], [], []
+            for k, item in enumerate(chunk):
+                token_num = self.tokenizer.get_image_token_length(item)
+                chunk_items.append(item)
+                chunk_md5sums.append(md5_results[k])
+                chunk_tokens_nums.append(token_num)
+                chunk_datas.append(chunk_data_list[k])
+
+            await self._alloc_resource_v2(chunk_items, chunk_md5sums, chunk_tokens_nums, chunk_datas)
+
     async def _release_multimodal_resources(self, multimodal_params: MultimodalParams):
         # 只有 P 和 NORMAL 节点需要真的管理多模态资源
         if self.pd_mode.is_P_or_NORMAL():

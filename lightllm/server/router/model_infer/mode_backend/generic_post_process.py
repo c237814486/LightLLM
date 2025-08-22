@@ -61,9 +61,18 @@ def sample(logits: torch.Tensor, reqs: List[InferReq], eos_id: List[int] = [2]):
     logits.div_(b_temperatures.view((-1, 1)))
     probs = torch.softmax(logits, dim=-1)
 
-    if get_env_start_args().sampling_backend == "triton":
+    if get_env_start_args().sampling_backend == "triton_top_pk":
         probs_sort, probs_idx = _top_p_top_k(probs, b_top_ps, b_top_ks)
         sampled_index = torch.multinomial(probs_sort, num_samples=1, replacement=True)
+        next_token_ids = torch.gather(probs_idx, dim=1, index=sampled_index)
+        next_token_logprobs = torch.log(torch.gather(probs_sort, dim=1, index=sampled_index))
+        return next_token_ids.view(-1), next_token_logprobs.view(-1)
+
+    elif get_env_start_args().sampling_backend == "triton_top_kp":
+        probs_sort, probs_idx = _top_k_top_p(logits, b_top_ps, b_top_ks)
+        probs_sort = torch.softmax(probs_sort, dim=-1)
+        sampled_index = torch.multinomial(probs_sort, num_samples=1, replacement=False)
+
         next_token_ids = torch.gather(probs_idx, dim=1, index=sampled_index)
         next_token_logprobs = torch.log(torch.gather(probs_sort, dim=1, index=sampled_index))
         return next_token_ids.view(-1), next_token_logprobs.view(-1)
@@ -95,6 +104,25 @@ def _top_p_top_k(probs: torch.Tensor, top_ps: torch.Tensor, top_ks: torch.Tensor
     probs_sort[torch.arange(0, probs.shape[-1], device="cuda").view(1, -1) >= top_ks.view(-1, 1)] = 0.0
 
     return probs_sort, probs_idx
+
+
+def _top_k_top_p(
+    probs: torch.Tensor, top_ps: torch.Tensor, top_ks: torch.Tensor, filter_value=-float("inf"), min_tokens_to_keep=1
+):
+    # First apply top_k
+    top_ks = torch.clamp(top_ks, max=probs.size(-1) - 1)  # safetopk
+    sorted_probs, sorted_indices = probs.sort(dim=-1, descending=True)
+    top_k_mask = top_ks.to(torch.long)  # shape: B
+    top_k_mask = sorted_probs.gather(1, top_k_mask.unsqueeze(dim=1))
+    top_k_mask = sorted_probs < top_k_mask
+    sorted_probs.masked_fill_(top_k_mask, filter_value)
+
+    # Apply top-p.
+    cumulative_probs = sorted_probs.softmax(dim=-1).cumsum(dim=-1)
+    top_p_mask = cumulative_probs > top_ps.unsqueeze(dim=1)
+    top_p_mask[:, :min_tokens_to_keep] = False
+    sorted_probs.masked_fill_(top_p_mask, filter_value)
+    return sorted_probs, sorted_indices
 
 
 def _get_post_sample_tensors(reqs: List[InferReq]):

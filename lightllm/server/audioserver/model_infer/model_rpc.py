@@ -1,5 +1,8 @@
+import os
 import asyncio
 import rpyc
+import json
+import types
 import torch
 from typing import Dict, List, Tuple
 from transformers.configuration_utils import PretrainedConfig
@@ -17,16 +20,17 @@ class AudioModelRpcServer(rpyc.Service):
         graceful_registry(inspect.currentframe().f_code.co_name)
 
         weight_dir = kvargs["weight_dir"]
-        model_cfg, _ = PretrainedConfig.get_config_dict(weight_dir)
-        audio_config = model_cfg["audio_config"]
-
+        audio_gpu_ids = kvargs["audio_gpu_ids"]
+        rank_id = kvargs["rank_id"]
+        config_path = os.path.join(weight_dir, "config.json")
+        with open(config_path, "r") as f:
+            config_dict = json.load(f)
+        model_cfg = types.SimpleNamespace(**config_dict)
+        torch.cuda.set_device(audio_gpu_ids[rank_id])
         model_kvargs = {"cache_port": kvargs["cache_port"], "data_type": kvargs["data_type"]}
         try:
-            self.model_type = audio_config["model_type"]
-            if self.model_type == "clap_audio_model" or self.model_type == "whisper":
-                self.model = WhisperAudioModel(model_kvargs)
-            else:
-                raise Exception(f"can not support {self.model_type} now")
+
+            self.model = WhisperAudioModel(model_kvargs)
 
             self.model.load_model(weight_dir, model_cfg)
             self.model = self.model.cuda()
