@@ -40,9 +40,7 @@ class KVTransConnectObj:
     # 构建传输通信对象
     # ==================================================================================
 
-    def create(
-        self, decode_node_id: int, decode_node_ip: str, decode_node_rpyc_port: int, manager: "PrefillKVMoveManager"
-    ):
+    def create(self, decode_node_id: int, decode_node_ip: str, decode_node_rpyc_port: int, manager: "PrefillKVMoveManager"):
         device_index = manager.get_next_device_index()  # 分配使用的显卡index
         self.kv_trans_process = manager.kv_trans_processes[device_index]
         prefill_node_id = manager.args.pd_node_id
@@ -91,9 +89,7 @@ class KVTransConnectObj:
             self.max_kv_trans_token_num = max_kv_trans_token_num
             assert self.kv_trans_process.task_out_queue.get(timeout=60) == "nccl_ok"
 
-        self.request_kv_trans_task_queue = TaskQueue(
-            get_func=self._get_request_tasks, fail_func=self.manager.put_to_release_task_queue
-        )
+        self.request_kv_trans_task_queue = TaskQueue(get_func=self._get_request_tasks, fail_func=self.manager.put_to_release_task_queue)
         self.request_thread = threading.Thread(target=self.request_kv_trans_loop, daemon=True)
         self.request_thread.start()
 
@@ -126,9 +122,7 @@ class KVTransConnectObj:
         func_name = self.request_kv_trans_loop.__name__
 
         while not self.has_error:
-            move_tasks: List[KVMoveTask] = self.request_kv_trans_task_queue.get_tasks(
-                log_tag="request_kv_trans_task_queue"
-            )
+            move_tasks: List[KVMoveTask] = self.request_kv_trans_task_queue.get_tasks(log_tag="request_kv_trans_task_queue")
             if len(move_tasks) == 0:
                 self.timer_check_status(raise_exception=False)
                 time.sleep(0.01)
@@ -137,10 +131,7 @@ class KVTransConnectObj:
                 self.timer_check_status(raise_exception=True)
                 for move_task in move_tasks:
                     move_task.connect_id = self.connect_id
-                    logger.info(
-                        f"{func_name} get task {move_task.to_prefill_log_info()} "
-                        f"queue time {move_task.get_cost_time()} s "
-                    )
+                    logger.info(f"{func_name} get task {move_task.to_prefill_log_info()} " f"queue time {move_task.get_cost_time()} s ")
 
                 trans_move_tasks = [copy.copy(move_task) for move_task in move_tasks]
                 for trans_move_task in trans_move_tasks:
@@ -151,10 +142,7 @@ class KVTransConnectObj:
                 move_kv_lens = obtain(move_kv_lens)
                 request_data_transfer_cost_time = time.time() - mark_start
 
-                logger.info(
-                    f"{func_name} request_data_transfer ok, {move_tasks[0].to_prefill_log_info()}"
-                    f" cost time: {request_data_transfer_cost_time} s"
-                )
+                logger.info(f"{func_name} request_data_transfer ok, {move_tasks[0].to_prefill_log_info()}" f" cost time: {request_data_transfer_cost_time} s")
 
                 ok_trans_list = []
                 for i, move_task in enumerate(move_tasks.copy()):
@@ -166,9 +154,7 @@ class KVTransConnectObj:
                         logger.info(f"prefill node kv move task req_id: {move_task.id()} not send, decode is busy")
 
                 if ok_trans_list:
-                    self.ready_kv_trans_task_queue.put(
-                        ok_trans_list, error_handle_func=self.manager.put_to_release_task_queue
-                    )
+                    self.ready_kv_trans_task_queue.put(ok_trans_list, error_handle_func=self.manager.put_to_release_task_queue)
 
             except BaseException as e:
                 logger.exception(str(e))
@@ -193,18 +179,13 @@ class KVTransConnectObj:
             assert self.kv_trans_process.task_out_queue.get(timeout=60) == "ok"
             self.manager.put_to_release_task_queue(move_tasks)
 
-            logger.info(
-                f"_transfer_kv data ok, req_id: {move_tasks[0].id()}"
-                f" cost total time: {move_tasks[0].get_cost_time()} s"
-            )
+            logger.info(f"_transfer_kv data ok, req_id: {move_tasks[0].id()}" f" cost total time: {move_tasks[0].get_cost_time()} s")
             move_tasks.clear()
 
     def kv_trans_handle_loop(self):
         func_name = self.kv_trans_handle_loop.__name__
         while not self.has_error:
-            move_tasks: List[List[KVMoveTask]] = self.ready_kv_trans_task_queue.get_tasks(
-                log_tag="ready_kv_trans_task_queue"
-            )
+            move_tasks: List[List[KVMoveTask]] = self.ready_kv_trans_task_queue.get_tasks(log_tag="ready_kv_trans_task_queue")
             if len(move_tasks) == 0:
                 self.timer_check_status(raise_exception=False)
                 time.sleep(0.01)
@@ -219,10 +200,7 @@ class KVTransConnectObj:
             try:
                 self.timer_check_status(raise_exception=True)
                 for move_task in move_tasks:
-                    logger.info(
-                        f"{func_name} get task {move_task.to_prefill_log_info()} to start kv move"
-                        f"queue time {move_task.get_cost_time()} s "
-                    )
+                    logger.info(f"{func_name} get task {move_task.to_prefill_log_info()} to start kv move" f"queue time {move_task.get_cost_time()} s ")
 
                 if not kv_trans_use_p2p():
                     with self.manager.kv_trans_lock:
@@ -307,11 +285,7 @@ class KVTransConnectObj:
 
             # 传输进程清理掉 nccl 连接
             if self.connect_id is not None:
-                self.kv_trans_process.task_in_queue.put(
-                    PDTransLeaveInfo(
-                        decode_id=self.decode_node_id, prefill_id=self.prefill_node_id, connect_id=self.connect_id
-                    )
-                )
+                self.kv_trans_process.task_in_queue.put(PDTransLeaveInfo(decode_id=self.decode_node_id, prefill_id=self.prefill_node_id, connect_id=self.connect_id))
 
         except BaseException as e:
             logger.exception(str(e))
@@ -355,9 +329,9 @@ class KVTransProcess:
                 self.task_out_queue,
                 manager.mem_queues,
             )
-            assert self.task_out_queue.get(timeout=30) == "proc_start"
+            assert self.task_out_queue.get(timeout=100) == "proc_start"
             manager._put_mem_manager_to_mem_queue()
-            assert self.task_out_queue.get(timeout=60) == "get_mem_managers_ok"
+            assert self.task_out_queue.get(timeout=100) == "get_mem_managers_ok"
 
             return True
         except Exception as e:

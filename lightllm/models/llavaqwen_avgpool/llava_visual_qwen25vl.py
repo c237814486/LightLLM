@@ -52,9 +52,7 @@ class Qwen25ViTPretrainedModel(Qwen2_5_VisionTransformerPretrainedModel):
     def __init__(self, config, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
-        self.merger = Qwen2_5_VLPatchMerger(
-            context_dim=config.hidden_size, spatial_merge_size=config.spatial_merge_size
-        )
+        self.merger = Qwen2_5_VLPatchMerger(context_dim=config.hidden_size, spatial_merge_size=config.spatial_merge_size)
 
 
 class LlavaQwen25AvgpoolVisionModelAnyRes:
@@ -149,6 +147,7 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
 
     @calculate_cpu_time_sync(show=True)
     def get_image_tensor(self, images: List[ImageItem]):
+
         image_uuids = [img.uuid for img in images]
         uuids = []
         valid_id = 0
@@ -170,43 +169,50 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
                 flag = True
 
             images = []
-            for item in items:
-                if not isinstance(item, int):
-                    raise Exception("Unsupport input types: {} for {}".format(type(item), item))
-                uuids.append(item)
-                image_data = read_shm(get_shm_name_data(item))
-                image = Image.open(BytesIO(image_data)).convert("RGB")
-                print("image size", image.size)
-                images.append(image)
+            try:
+                for item in items:
+                    if not isinstance(item, int):
+                        raise Exception("Unsupport input types: {} for {}".format(type(item), item))
+                    uuids.append(item)
+                    image_data = read_shm(get_shm_name_data(item))
+                    image = Image.open(BytesIO(image_data)).convert("RGB")
+                    logger.info(f"image size: {image.size}")
+                    images.append(image)
 
-            # 一次性处理两张图
-            pixel_values, image_thw = self.process_image(images)
-            img_tensors.append(pixel_values)
-            img_grids.append(image_thw)
+                # 一次性处理两张图，添加错误处理
+                pixel_values, image_thw = self.process_image(images)
+                img_tensors.append(pixel_values)
+                img_grids.append(image_thw)
 
-            # 假设每组的尺寸一致
-            width, height = images[0].size
-            image_sizes.append((width, height))
+                # 假设每组的尺寸一致
+                width, height = images[0].size
+                image_sizes.append((width, height))
 
-            M = width / self.spatial_patch_size / self.spatial_merge_size
-            N = height / self.spatial_patch_size / self.spatial_merge_size
-            m, n = get_adaptive_pool_size(M, N, scale=self.mm_downsample_ratio)
+                M = width / self.spatial_patch_size / self.spatial_merge_size
+                N = height / self.spatial_patch_size / self.spatial_merge_size
+                m, n = get_adaptive_pool_size(M, N, scale=self.mm_downsample_ratio)
 
-            cur_num = int(m * n)
-            single_image_token_num = cur_num // 2
+                cur_num = int(m * n)
+                single_image_token_num = cur_num // 2
 
-            if not flag:
-                for _ in range(2):
+                if not flag:
+                    for _ in range(2):
+                        valid_ids.append([valid_id, valid_id + single_image_token_num])
+                        valid_id += single_image_token_num
+                else:
                     valid_ids.append([valid_id, valid_id + single_image_token_num])
                     valid_id += single_image_token_num
-            else:
-                valid_ids.append([valid_id, valid_id + single_image_token_num])
-                valid_id += single_image_token_num
+
+            except Exception as e:
+
+                error_msg = f"处理图片失败: {str(e)}"
+                logger.error(error_msg)
 
             i += 2
 
         if not img_tensors:
             return None
+
         if flag:
             uuids.pop()
         imgs = torch.cat(img_tensors, dim=0)
@@ -315,9 +321,7 @@ class BenchmarkRunner:
 
         images = []
         for _ in range(batch_size):
-            fake_img_np = np.random.randint(
-                0, 255, (self.config["image_height"], self.config["image_width"], 3), dtype=np.uint8
-            )
+            fake_img_np = np.random.randint(0, 255, (self.config["image_height"], self.config["image_width"], 3), dtype=np.uint8)
             images.append(Image.fromarray(fake_img_np))
         image_tensors, images_thw = image_processor(images)
         return image_tensors.cuda(), images_thw.cuda()
@@ -389,9 +393,7 @@ class BenchmarkRunner:
             return
 
         if baseline_name and baseline_name not in model_names:
-            self.console.print(
-                f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]"
-            )
+            self.console.print(f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]")
             baseline_name = None
 
         if baseline_name is None:
@@ -433,9 +435,7 @@ class BenchmarkRunner:
                     percentage = (module_flops / total_flops) * 100
                     if is_first_row:
                         # Show model name only on the first row for this model
-                        breakdown_table.add_row(
-                            f"[bold]{name}[/bold]", module_name, f"{flops_g:.2f}", f"{percentage:.1f}%"
-                        )
+                        breakdown_table.add_row(f"[bold]{name}[/bold]", module_name, f"{flops_g:.2f}", f"{percentage:.1f}%")
                         is_first_row = False
                     else:
                         breakdown_table.add_row("", module_name, f"{flops_g:.2f}", f"{percentage:.1f}%")

@@ -50,9 +50,7 @@ class AudioConvUpScaleProjector(nn.Module):
         # x: [bs, seq_len, audio_hidden_size]
         # feature length: List[int]
 
-        x = self.afeat_1d_conv(x.transpose(1, 2)).transpose(
-            1, 2
-        )  # Process Whisper features with 1D conv: (B x T x D) -> (B x T//2 x D')
+        x = self.afeat_1d_conv(x.transpose(1, 2)).transpose(1, 2)  # Process Whisper features with 1D conv: (B x T x D) -> (B x T//2 x D')
         bs, seq_len, audio_hidden_size = x.size()
 
         target_seq_len = (seq_len + self.compress_ratio - 1) // self.compress_ratio * self.compress_ratio
@@ -117,9 +115,7 @@ class WhisperAudioModel:
                 tensor_data = load_file(os.path.join(weight_dir, filename))
                 params_map[filename] = tensor_data
             if "audio_projector" in k:
-                audio_projector_weight[k.replace("model.audio_projector.", "")] = params_map[filename][k].to(
-                    self.data_type
-                )
+                audio_projector_weight[k.replace("model.audio_projector.", "")] = params_map[filename][k].to(self.data_type)
 
             elif "audio_encoder" in k:
                 audio_weight[k.replace("model.audio_encoder.model.", "")] = params_map[filename][k].to(self.data_type)
@@ -205,10 +201,7 @@ class WhisperAudioModel:
         if not tasks:
             return  # 所有items都已经embed了
 
-        futures = [
-            self.thread_pool.submit(self.create_shm_for_item, uuid, audio, token_num)
-            for uuid, audio, token_num in tasks
-        ]
+        futures = [self.thread_pool.submit(self.create_shm_for_item, uuid, audio, token_num) for uuid, audio, token_num in tasks]
 
         created_uuids = []
         for future in concurrent.futures.as_completed(futures):
@@ -311,9 +304,7 @@ class WhisperAudioBenchmarkRunner:
             return
 
         if baseline_name and baseline_name not in model_names:
-            self.console.print(
-                f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]"
-            )
+            self.console.print(f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]")
             baseline_name = None
 
         if baseline_name is None:
@@ -361,9 +352,10 @@ if __name__ == "__main__":
     import types
 
     TORCH_COMPILE_AVAILABLE = hasattr(torch, "compile")
+    root_path = "/mnt/afs/yangdeyu/GameMLLM/LLaVA_hub/checkpoints/omni_models"
     # --- 1. 配置中心 ---
     BENCHMARK_CONFIG = {
-        "model_path": "0803_llava_omni_qwen25vl_14B_16x_4k_st2_kimiwhisper_10x_unfreezeaudio_omnidata_text500w_8k",
+        "model_path": os.path.join(root_path, "0803_llava_omni_qwen25vl_14B_16x_4k_st2_kimiwhisper_10x_unfreezeaudio_omnidata_text500w_8k"),
         "batch_sizes": [1, 2, 4, 8, 16, 32],
         "warmup_runs": 5,
         "test_runs": 20,

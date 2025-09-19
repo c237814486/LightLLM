@@ -71,16 +71,12 @@ class HttpServerManager:
                     context = zmq.asyncio.Context(2)
                     self.multinode_req_manager.append(context.socket(zmq.PUSH))
                     self.multinode_req_manager[-1].connect(f"tcp://{child_ip}:{args.multinode_httpmanager_port}")
-                    logger.info(
-                        f"HttpServerManager connected to child node at {child_ip}:{args.multinode_httpmanager_port}"
-                    )
+                    logger.info(f"HttpServerManager connected to child node at {child_ip}:{args.multinode_httpmanager_port}")
             else:
                 context = zmq.asyncio.Context(2)
                 self.multinode_req_manager = context.socket(zmq.PULL)
                 self.multinode_req_manager.bind(f"tcp://*:{args.multinode_httpmanager_port}")
-                logger.info(
-                    f"HttpServerManager listening for child node requests on *:{args.multinode_httpmanager_port}"
-                )
+                logger.info(f"HttpServerManager listening for child node requests on *:{args.multinode_httpmanager_port}")
 
         self.enable_multimodal = enable_multimodal
         if self.enable_multimodal:
@@ -218,9 +214,7 @@ class HttpServerManager:
 
         return
 
-    async def _alloc_multimodal_resources_v1(
-        self, multimodal_params: MultimodalParams, sampling_params: SamplingParams
-    ):
+    async def _alloc_multimodal_resources_v1(self, multimodal_params: MultimodalParams, sampling_params: SamplingParams):
         items, md5sums, tokens_nums, datas = [], [], [], []
         for img in multimodal_params.images:
             self.tokenizer.init_imageitem_extral_params(img, multimodal_params, sampling_params)
@@ -264,10 +258,7 @@ class HttpServerManager:
             chunk = all_items[i : i + chunk_size]
 
             # 并发处理chunk内的所有item
-            process_tasks = [
-                loop.run_in_executor(self.executor, _process_item, item, multimodal_params, sampling_params)
-                for item in chunk
-            ]
+            process_tasks = [loop.run_in_executor(self.executor, _process_item, item, multimodal_params, sampling_params) for item in chunk]
             chunk_results = await asyncio.gather(*process_tasks)
             chunk_items, chunk_md5sums, chunk_tokens_nums, chunk_datas = [], [], [], []
             for j, item in enumerate(chunk):
@@ -436,6 +427,10 @@ class HttpServerManager:
             await self._log_req_header(request_headers, group_request_id)
             # 监控
 
+            # 检查多模态图片尺寸是否满足每2张图片尺寸相同的要求
+            if self.enable_multimodal and multimodal_params and multimodal_params.images:
+                await self._check_image_sizes(multimodal_params.images)
+
             prompt_ids = await self._encode(prompt, multimodal_params, sampling_params)
             prompt_tokens = len(prompt_ids)
             # 监控
@@ -472,9 +467,7 @@ class HttpServerManager:
             req_status = ReqStatus(group_request_id, multimodal_params, req_objs, start_time)
             self.req_id_to_out_inf[group_request_id] = req_status
 
-            await self.transfer_to_next_module_or_node(
-                prompt, sampling_params, original_multimodal_params, req_status.group_req_objs
-            )
+            await self.transfer_to_next_module_or_node(prompt, sampling_params, original_multimodal_params, req_status.group_req_objs)
 
             results_generator = self._wait_to_token_package(
                 start_time,
@@ -505,27 +498,17 @@ class HttpServerManager:
         x_session_id = request_headers.get("X-Session-Id", "")
 
         format_in_time = datetime.datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(
-            f"recieved req X-Request-Id:{x_request_id} "
-            f"X-Session-Id:{x_session_id} start_time:{format_in_time} "
-            f"lightllm_req_id:{group_request_id} "
-        )
+        logger.info(f"recieved req X-Request-Id:{x_request_id} " f"X-Session-Id:{x_session_id} start_time:{format_in_time} " f"lightllm_req_id:{group_request_id} ")
         return
 
-    async def _encode(
-        self, prompt: Union[str, List[int]], multimodal_params: MultimodalParams, sampling_params: SamplingParams
-    ):
+    async def _encode(self, prompt: Union[str, List[int]], multimodal_params: MultimodalParams, sampling_params: SamplingParams):
         if isinstance(prompt, str):
             if self.enable_multimodal:
-                assert (
-                    len(multimodal_params.images + multimodal_params.audios) <= self.args.cache_capacity
-                ), "too many multimodal items!"
+                assert len(multimodal_params.images + multimodal_params.audios) <= self.args.cache_capacity, "too many multimodal items!"
                 if multimodal_params.audios:
                     assert self.args.enable_multimodal_audio, "audio multimodal not enabled"
                 await self._alloc_multimodal_resources(multimodal_params, sampling_params)
-                prompt_ids = self.tokenizer.encode(
-                    prompt, multimodal_params, add_special_tokens=sampling_params.add_special_tokens
-                )
+                prompt_ids = self.tokenizer.encode(prompt, multimodal_params, add_special_tokens=sampling_params.add_special_tokens)
             else:
                 prompt_ids = self.tokenizer.encode(prompt, add_special_tokens=sampling_params.add_special_tokens)
             return prompt_ids
@@ -567,9 +550,7 @@ class HttpServerManager:
         # last repaired
         req_total_len = len(prompt_ids) + sampling_params.max_new_tokens
         if req_total_len > self.max_req_total_len:
-            raise ValueError(
-                f"the req total len (input len + output len) is too long > max_req_total_len:{self.max_req_total_len}"
-            )
+            raise ValueError(f"the req total len (input len + output len) is too long > max_req_total_len:{self.max_req_total_len}")
 
         return prompt_ids
 
@@ -696,9 +677,7 @@ class HttpServerManager:
                         x_session_id = request.headers.get("X-Session-Id", "") if request is not None else ""
                         prompt_cache_ratio = prompt_cache_len / prompt_tokens
 
-                        mtp_avg_token_per_step = out_token_counter / max(
-                            (out_token_counter - metadata["mtp_accepted_token_num"]), 1
-                        )
+                        mtp_avg_token_per_step = out_token_counter / max((out_token_counter - metadata["mtp_accepted_token_num"]), 1)
                         format_start_time = datetime.datetime.fromtimestamp(start_time).strftime("%Y-%m-%d %H:%M:%S")
                         logger.info(
                             f"X-Request-Id:{x_request_id} "
@@ -716,15 +695,9 @@ class HttpServerManager:
                             return
                         self.metric_client.histogram_observe("lightllm_cache_length", prompt_cache_len)
                         self.metric_client.histogram_observe("lightllm_cache_ratio", prompt_cache_ratio)
-                        self.metric_client.histogram_observe(
-                            "lightllm_request_inference_duration", total_cost_time_ms / 1000.0
-                        )
-                        self.metric_client.histogram_observe(
-                            "lightllm_request_mean_time_per_token_duration", mean_per_token_cost_time_ms / 1000.0
-                        )
-                        self.metric_client.histogram_observe(
-                            "lightllm_request_first_token_duration", first_token_cost_ms / 1000.0
-                        )
+                        self.metric_client.histogram_observe("lightllm_request_inference_duration", total_cost_time_ms / 1000.0)
+                        self.metric_client.histogram_observe("lightllm_request_mean_time_per_token_duration", mean_per_token_cost_time_ms / 1000.0)
+                        self.metric_client.histogram_observe("lightllm_request_first_token_duration", first_token_cost_ms / 1000.0)
                         self.metric_client.histogram_observe("lightllm_request_generated_tokens", out_token_counter)
                         self.metric_client.counter_inc("lightllm_request_success")
 
@@ -855,6 +828,40 @@ class HttpServerManager:
 
             self.recycle_event.set()
         return
+
+    async def _check_image_sizes(self, images: List[ImageItem]):
+        """
+        检查图片尺寸是否满足每2张图片尺寸相同的要求
+        如果不满足条件，抛出异常
+        """
+        if not images:
+            return
+
+        # 确保图片数量是偶数
+        if len(images) % 2 != 0:
+            raise ValueError(f"图片数量必须是偶数，当前图片数量: {len(images)}")
+
+        # 检查每2张图片的尺寸是否相同
+        for i in range(0, len(images), 2):
+            if i + 1 >= len(images):
+                break
+
+            img1 = images[i]
+            img2 = images[i + 1]
+
+            # 检查图片是否已经预加载并获取了尺寸信息
+            if not hasattr(img1, "image_w") or not hasattr(img1, "image_h") or not hasattr(img2, "image_w") or not hasattr(img2, "image_h"):
+                raise ValueError(f"图片 {i} 或 {i+1} 尚未预加载，无法获取尺寸信息")
+            # 检查宽度和高度是否能被28整除
+            if img1.image_w % 28 != 0 or img1.image_h % 28 != 0:
+                raise ValueError(f"图片 {i} 尺寸 {img1.image_w}x{img1.image_h} 不能被28整除")
+            if img2.image_w % 28 != 0 or img2.image_h % 28 != 0:
+                raise ValueError(f"图片 {i+1} 尺寸 {img2.image_w}x{img2.image_h} 不能被28整除")
+
+            if img1.image_w != img2.image_w or img1.image_h != img2.image_h:
+                raise ValueError(f"图片 {i} 和图片 {i+1} 尺寸不匹配: " f"图片 {i}: {img1.image_w}x{img1.image_h}, " f"图片 {i+1}: {img2.image_w}x{img2.image_h}")
+
+        logger.info(f"图片尺寸检查通过，共 {len(images)} 张图片")
 
 
 class ReqStatus:
