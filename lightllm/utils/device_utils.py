@@ -167,8 +167,16 @@ def get_gpu_compute_mode(gpu_index=0):
             logger.warning("nvidia-smi not found in PATH.")
             return None
 
-        cmd = ["nvidia-smi", "-i", str(gpu_index), "--query-gpu=compute_mode", "--format=csv,noheader"]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        cmd = [
+            "nvidia-smi",
+            "-i",
+            str(gpu_index),
+            "--query-gpu=compute_mode",
+            "--format=csv,noheader",
+        ]
+        result = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
 
         if result.returncode != 0:
             logger.warning(f"Failed to query compute mode: {result.stderr.strip()}")
@@ -201,7 +209,10 @@ def set_gpu_exclusive_mode(gpu_index=0):
 def set_gpu_default_mode(gpu_index=0):
     logger.info(f"Setting GPU {gpu_index} to DEFAULT mode...")
     result = subprocess.run(
-        ["nvidia-smi", "-i", str(gpu_index), "-c", "DEFAULT"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        ["nvidia-smi", "-i", str(gpu_index), "-c", "DEFAULT"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     if result.returncode == 0:
         logger.info(f"GPU {gpu_index} set to DEFAULT mode.")
@@ -221,9 +232,13 @@ def set_sm_limit(percent: int, gpu_index=0):
 
     mode = get_gpu_compute_mode(gpu_index)
     if mode != "Exclusive_Process":
-        logger.warning(f"Cannot set SM limit. GPU {gpu_index} is in '{mode}' mode, not 'Exclusive_Process'.")
+        logger.warning(
+            f"Cannot set SM limit. GPU {gpu_index} is in '{mode}' mode, not 'Exclusive_Process'."
+        )
         return False
 
     os.environ["CUDA_MPS_ACTIVE_THREAD_PERCENTAGE"] = str(percent)
-    logger.info(f"Set CUDA_MPS_ACTIVE_THREAD_PERCENTAGE to {percent}% for GPU {gpu_index}.")
+    logger.info(
+        f"Set CUDA_MPS_ACTIVE_THREAD_PERCENTAGE to {percent}% for GPU {gpu_index}."
+    )
     return True

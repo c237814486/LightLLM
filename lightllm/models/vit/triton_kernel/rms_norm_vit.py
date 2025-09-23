@@ -36,14 +36,21 @@ def rms_norm_kernel(
     tl.store(out_ptr + offsets * out_col_stride, out, mask=offsets < N_COLS)
 
 
-def rms_norm(hidden_states: Tensor, weight: Tensor, eps: float = 1e-5, use_custom_tensor_mananger: bool = False):
+def rms_norm(
+    hidden_states: Tensor,
+    weight: Tensor,
+    eps: float = 1e-5,
+    use_custom_tensor_mananger: bool = False,
+):
     """Rms norm."""
 
     assert hidden_states.is_contiguous(), "hidden_states must be contiguous"
 
     origin_shape = hidden_states.shape
     hidden_dim = weight.shape[0]
-    assert hidden_dim == origin_shape[-1], f"hidden_dim {hidden_dim} != {origin_shape[-1]}"
+    assert (
+        hidden_dim == origin_shape[-1]
+    ), f"hidden_dim {hidden_dim} != {origin_shape[-1]}"
 
     rows = hidden_states.numel() // hidden_dim
     if hidden_states.dim() == 3:  # (bs, seq_len, hidden_dim)
@@ -93,10 +100,14 @@ def test():
 
     # 2-D contiguous
     x2 = torch.randn(seq_len, hidden, device=device, dtype=dtype).contiguous()
-    assert torch.allclose(rms_norm(x2, weight, eps), _rms_norm_ref(x2, weight, eps), atol=1e-3, rtol=1e-3)
+    assert torch.allclose(
+        rms_norm(x2, weight, eps), _rms_norm_ref(x2, weight, eps), atol=1e-3, rtol=1e-3
+    )
 
     # 3-D contiguous
     x3 = torch.randn(bs, seq_len, hidden, device=device, dtype=dtype).contiguous()
-    assert torch.allclose(rms_norm(x3, weight, eps), _rms_norm_ref(x3, weight, eps), atol=1e-3, rtol=1e-3)
+    assert torch.allclose(
+        rms_norm(x3, weight, eps), _rms_norm_ref(x3, weight, eps), atol=1e-3, rtol=1e-3
+    )
 
     print("all tests pass")

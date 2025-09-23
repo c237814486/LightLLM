@@ -2,7 +2,9 @@ import torch
 import math
 import numpy as np
 from lightllm.common.basemodel import TransformerLayerWeight
-from lightllm.models.llama.layer_weights.transformer_layer_weight import LlamaTransformerLayerWeight
+from lightllm.models.llama.layer_weights.transformer_layer_weight import (
+    LlamaTransformerLayerWeight,
+)
 
 
 class Phi3TransformerLayerWeight(LlamaTransformerLayerWeight):
@@ -16,7 +18,9 @@ class Phi3TransformerLayerWeight(LlamaTransformerLayerWeight):
             qkv_weight_ = weights[qkv_weight_name]
             n_embed = self.network_config_["hidden_size"]
             kv_n_embed = (
-                n_embed // self.network_config_["num_attention_heads"] * self.network_config_["num_key_value_heads"]
+                n_embed
+                // self.network_config_["num_attention_heads"]
+                * self.network_config_["num_key_value_heads"]
             )
             q_weight_ = qkv_weight_[:n_embed, :]
             k_weight_ = qkv_weight_[n_embed : n_embed + kv_n_embed, :]

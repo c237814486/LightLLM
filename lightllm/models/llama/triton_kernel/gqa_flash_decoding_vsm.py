@@ -39,7 +39,9 @@ class GQAVSMDecodeAttentionKernelConfig(KernelConfigs):
                     key=lambda x: abs(int(x) - avg_seq_len_in_batch),
                 )
             ]
-            config = batch_size_config[min(batch_size_config.keys(), key=lambda x: abs(int(x) - batch_size))]
+            config = batch_size_config[
+                min(batch_size_config.keys(), key=lambda x: abs(int(x) - batch_size))
+            ]
 
             return config
         else:
@@ -82,7 +84,9 @@ def _fwd_kernel_calcu_index_and_block_seq(
     batch_size,
     BLOCK_N: tl.constexpr,
 ):
-    b_seq_len = tl.load(b_seq_len + tl.arange(0, 2048), mask=tl.arange(0, 2048) < batch_size, other=0)
+    b_seq_len = tl.load(
+        b_seq_len + tl.arange(0, 2048), mask=tl.arange(0, 2048) < batch_size, other=0
+    )
     total_token_num = tl.sum(b_seq_len)
 
     block_seq = tl.cdiv(total_token_num, vsm_count * 4)
@@ -175,7 +179,11 @@ def _kernel_gqa_token_decode_attention_flash_decoding_vsm_stage1(
 
             cur_kv_start = cur_block_idx * block_size
 
-            q_off = cur_batch * stride_q_bs + cur_q_range[:, None] * stride_q_h + d_off[None, :]
+            q_off = (
+                cur_batch * stride_q_bs
+                + cur_q_range[:, None] * stride_q_h
+                + d_off[None, :]
+            )
             q_tensor = tl.load(
                 q + q_off,
                 mask=cur_q_mask[:, None],
@@ -186,7 +194,10 @@ def _kernel_gqa_token_decode_attention_flash_decoding_vsm_stage1(
             max_exp = tl.zeros([Q_HEAD_NUM], dtype=tl.float32) - float("inf")
             accumu = tl.zeros([Q_HEAD_NUM, BLOCK_DMODEL], dtype=tl.float32)
 
-            cur_total_chunk = tl.cdiv(tl.minimum(cur_kv_start + block_size, cur_seq_len) - cur_kv_start, BLOCK_N)
+            cur_total_chunk = tl.cdiv(
+                tl.minimum(cur_kv_start + block_size, cur_seq_len) - cur_kv_start,
+                BLOCK_N,
+            )
 
             for chunk_idx in tl.range(0, cur_total_chunk, 1, num_stages=NUM_STAGES):
                 cur_chunk_start = cur_kv_start + chunk_idx * BLOCK_N
@@ -201,14 +212,22 @@ def _kernel_gqa_token_decode_attention_flash_decoding_vsm_stage1(
                 ).to(tl.int64)
 
                 k_off = (
-                    cur_kv_loc[None, :] * stride_k_bs + cur_kv_head_idx * stride_k_h + d_off[:, None]
+                    cur_kv_loc[None, :] * stride_k_bs
+                    + cur_kv_head_idx * stride_k_h
+                    + d_off[:, None]
                 )  # shape: [BLOCK_DMODEL, BLOCK_N]
-                v_off = cur_kv_loc[:, None] * stride_v_bs + cur_kv_head_idx * stride_v_h + d_off[None, :]
+                v_off = (
+                    cur_kv_loc[:, None] * stride_v_bs
+                    + cur_kv_head_idx * stride_v_h
+                    + d_off[None, :]
+                )
                 k_tensor = tl.load(k + k_off, mask=cur_chunk_mask[None, :], other=0.0)
 
                 att_tensor = tl.dot(q_tensor, k_tensor)  # shape: [Q_HEAD_NUM, BLOCK_N]
                 att_tensor *= softmax_scale
-                att_tensor = tl.where(cur_chunk_mask[None, :], att_tensor, float("-inf"))
+                att_tensor = tl.where(
+                    cur_chunk_mask[None, :], att_tensor, float("-inf")
+                )
 
                 cur_max = tl.max(att_tensor, axis=1)
                 new_max = tl.maximum(cur_max, max_exp)
@@ -216,7 +235,9 @@ def _kernel_gqa_token_decode_attention_flash_decoding_vsm_stage1(
                 exp_logic = tl.exp(att_tensor - new_max[:, None])
                 log_scale = tl.exp(max_exp - new_max)
                 accumu *= log_scale[:, None]
-                v_tensor = tl.load(v + v_off, mask=cur_chunk_mask[:, None], other=0.0)  # shape: [BLOCK_N, BLOCK_DMODEL]
+                v_tensor = tl.load(
+                    v + v_off, mask=cur_chunk_mask[:, None], other=0.0
+                )  # shape: [BLOCK_N, BLOCK_DMODEL]
                 accumu += tl.dot(exp_logic.to(v_tensor.dtype), v_tensor)
 
                 sum_exp = sum_exp * log_scale + tl.sum(exp_logic, axis=1)
@@ -325,8 +346,13 @@ def _kernel_gqa_token_decode_attention_flash_decoding_vsm_stage2(
     max_logic = -float("inf")
     acc = tl.zeros([BLOCK_DMODEL], dtype=tl.float32)
 
-    off_mo = cur_head * stride_mid_o_h + cur_batch_start_index * stride_mid_o_seq + off_d
-    off_ml = cur_head * stride_mid_o_logexpsum_h + cur_batch_start_index * stride_mid_o_logexpsum_seq
+    off_mo = (
+        cur_head * stride_mid_o_h + cur_batch_start_index * stride_mid_o_seq + off_d
+    )
+    off_ml = (
+        cur_head * stride_mid_o_logexpsum_h
+        + cur_batch_start_index * stride_mid_o_logexpsum_seq
+    )
 
     for block_seq_n in tl.range(0, block_n_size, 1, num_stages=NUM_STAGES):
         mo_tensor = tl.load(mid_o + off_mo + block_seq_n * stride_mid_o_seq)
@@ -340,11 +366,19 @@ def _kernel_gqa_token_decode_attention_flash_decoding_vsm_stage2(
         sum_exp = sum_exp * old_scale + exp_logic
         max_logic = new_max_logic
 
-    tl.store(out + cur_batch * stride_o_bs + cur_head * stride_o_h + off_d, acc / sum_exp)
+    tl.store(
+        out + cur_batch * stride_o_bs + cur_head * stride_o_h + off_d, acc / sum_exp
+    )
 
 
 def gqa_token_decode_attention_flash_decoding_vsm_stage2(
-    mid_o_decode_att_block_seq, mid_o_batch_start_index, mid_o, mid_o_logexpsum, b_seq_len, out, **run_config
+    mid_o_decode_att_block_seq,
+    mid_o_batch_start_index,
+    mid_o,
+    mid_o_logexpsum,
+    b_seq_len,
+    out,
+    **run_config
 ):
     num_warps = run_config["stage2_num_warps"]
     num_stages = run_config["stage2_num_stages"]
@@ -370,7 +404,16 @@ def gqa_token_decode_attention_flash_decoding_vsm_stage2(
 
 
 def emstimate_stage1_vsm(
-    q, k, v, req_to_token_indexs, b_req_idx, b_seq_len, mid_o, mid_o_logexpsum, softmax_scale, **run_config
+    q,
+    k,
+    v,
+    req_to_token_indexs,
+    b_req_idx,
+    b_seq_len,
+    mid_o,
+    mid_o_logexpsum,
+    softmax_scale,
+    **run_config
 ):
     num_sm = 1
     q_head_num = q.shape[1]
@@ -407,7 +450,9 @@ def emstimate_stage1_vsm(
         grid=(1,),
     )
     kernel._init_handles()
-    num_vsm = calcu_kernel_best_vsm_count(kernel, num_warps=run_config["stage1_num_warps"])
+    num_vsm = calcu_kernel_best_vsm_count(
+        kernel, num_warps=run_config["stage1_num_warps"]
+    )
     return num_vsm
 
 
@@ -417,7 +462,7 @@ def gqa_token_decode_attention_flash_decoding_vsm(
     batch_size, q_head_num, q_head_dim = q.shape
     kv_head_num = k.shape[1]
     gqa_group_size = q_head_num // kv_head_num
-    sm_scale = 1.0 / (q_head_dim ** 0.5)
+    sm_scale = 1.0 / (q_head_dim**0.5)
 
     if not run_config:
         if torch.cuda.is_current_stream_capturing():

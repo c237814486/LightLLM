@@ -9,12 +9,22 @@ from lightllm.common.mem_utils import select_mem_manager_class
 from lightllm.models.gemma3.infer_struct import Gemma3InferStateInfo
 from lightllm.models.gemma3.layer_infer.post_layer_infer import Gemma3PostLayerInfer
 from lightllm.models.gemma3.layer_infer.pre_layer_infer import Gemma3PreLayerInfer
-from lightllm.models.gemma3.layer_infer.transformer_layer_infer import Gemma3TransformerLayerInfer
-from lightllm.models.gemma3.layer_weights.pre_and_post_layer_weight import Gemma3PreAndPostLayerWeight
-from lightllm.models.gemma3.layer_weights.transformer_layer_weight import Gemma3TransformerLayerWeight
+from lightllm.models.gemma3.layer_infer.transformer_layer_infer import (
+    Gemma3TransformerLayerInfer,
+)
+from lightllm.models.gemma3.layer_weights.pre_and_post_layer_weight import (
+    Gemma3PreAndPostLayerWeight,
+)
+from lightllm.models.gemma3.layer_weights.transformer_layer_weight import (
+    Gemma3TransformerLayerWeight,
+)
 from lightllm.models.llama.model import LlamaTpPartModel
-from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import LlamaMultimodalPreLayerInfer
-from lightllm.models.llava.layer_weights.pre_and_post_layer_weight import LlavaPreAndPostLayerWeight
+from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import (
+    LlamaMultimodalPreLayerInfer,
+)
+from lightllm.models.llava.layer_weights.pre_and_post_layer_weight import (
+    LlavaPreAndPostLayerWeight,
+)
 from lightllm.server.multimodal_params import AudioItem, MultimodalParams, ImageItem
 from lightllm.server.core.objs import SamplingParams
 from lightllm.common.build_utils import repair_config
@@ -39,12 +49,18 @@ class Gemma3Tokenizer(BaseMultiModalTokenizer):
         self.image_length = self.mm_tokens_per_image
 
     def init_imageitem_extral_params(
-        self, img: ImageItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        img: ImageItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         return
 
     def init_audioitem_extral_params(
-        self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        audio: AudioItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         raise NotImplementedError
 
@@ -55,7 +71,12 @@ class Gemma3Tokenizer(BaseMultiModalTokenizer):
         raise NotImplementedError
 
     # only change the impl of the encode func:
-    def encode(self, prompt, multimodal_params: MultimodalParams = None, add_special_tokens=False):
+    def encode(
+        self,
+        prompt,
+        multimodal_params: MultimodalParams = None,
+        add_special_tokens=False,
+    ):
         if multimodal_params is None:
             return self.tokenizer(prompt).input_ids
 
@@ -66,7 +87,9 @@ class Gemma3Tokenizer(BaseMultiModalTokenizer):
         for ids in ids_chunks[1:]:
             token_id = multimodal_params.images[image_id].token_id
             token_num = multimodal_params.images[image_id].token_num
-            assert token_num == self.image_length, "invalid token num: {} vs {}!".format(token_num, self.image_length)
+            assert (
+                token_num == self.image_length
+            ), "invalid token num: {} vs {}!".format(token_num, self.image_length)
 
             input_ids.append(self.boi_token_index)
             input_ids.extend(range(token_id, token_id + self.mm_tokens_per_image))
@@ -75,7 +98,9 @@ class Gemma3Tokenizer(BaseMultiModalTokenizer):
             image_id += 1
         if multimodal_params:
             image_cnt = len(multimodal_params.images)
-            assert image_cnt == image_id, "invalid image tag num: {} vs {}!".format(image_cnt, image_id)
+            assert image_cnt == image_id, "invalid image tag num: {} vs {}!".format(
+                image_cnt, image_id
+            )
         return input_ids
 
 
@@ -98,7 +123,9 @@ class Gemma3TpPartModel(LlamaTpPartModel):
         return
 
     def _init_to_get_rotary(self, default_base=10000.0):
-        partial_head_dim = int(self.config.get("partial_rotary_factor", 1) * self.head_dim_)
+        partial_head_dim = int(
+            self.config.get("partial_rotary_factor", 1) * self.head_dim_
+        )
         if self.config.get("rope_scaling", {}) is None:
             rope_scaling_factor = 1.0
         else:
@@ -111,19 +138,31 @@ class Gemma3TpPartModel(LlamaTpPartModel):
             max_seq_len = max_position_embeddings * rope_scaling_factor
 
         inv_freq_local = 1.0 / (
-            10000.0 ** (torch.arange(0, partial_head_dim, 2, dtype=torch.int64).float().cuda() / partial_head_dim)
+            10000.0
+            ** (
+                torch.arange(0, partial_head_dim, 2, dtype=torch.int64).float().cuda()
+                / partial_head_dim
+            )
         )
         inv_freq_global = (
             1.0
-            / (1000000.0 ** (torch.arange(0, partial_head_dim, 2, dtype=torch.int64).float().cuda() / partial_head_dim))
+            / (
+                1000000.0
+                ** (
+                    torch.arange(0, partial_head_dim, 2, dtype=torch.int64)
+                    .float()
+                    .cuda()
+                    / partial_head_dim
+                )
+            )
             / rope_scaling_factor
         )
         # local default
         # global linear
         # print(inv_freq_local, inv_freq_global, partial_head_dim)
-        t = torch.arange(max(max_seq_len + 1024 * 128, self.max_seq_length), dtype=torch.float32).to(
-            inv_freq_local.device
-        )
+        t = torch.arange(
+            max(max_seq_len + 1024 * 128, self.max_seq_length), dtype=torch.float32
+        ).to(inv_freq_local.device)
 
         freqs_global = torch.outer(t, inv_freq_global)
         freqs_local = torch.outer(t, inv_freq_local)
@@ -158,7 +197,9 @@ class Gemma3TpPartModel(LlamaTpPartModel):
             self.config = json.load(json_file)
         # rename keys
         if "text_config" in self.config:
-            config = AutoConfig.from_pretrained(self.weight_dir_, trust_remote_code=True)
+            config = AutoConfig.from_pretrained(
+                self.weight_dir_, trust_remote_code=True
+            )
             self.config = config.text_config.to_dict()
 
         repair_config(self.config, same_names=["num_attention_heads", "n_head"])

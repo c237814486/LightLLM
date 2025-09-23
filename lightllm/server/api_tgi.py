@@ -57,7 +57,9 @@ def format_tgi_params(params, num_beam: int = 1):
     return params
 
 
-async def tgi_generate_impl(request: Request, httpserver_manager: HttpServerManager) -> Response:
+async def tgi_generate_impl(
+    request: Request, httpserver_manager: HttpServerManager
+) -> Response:
 
     request_dict = await request.json()
     prompt = request_dict.pop("inputs")
@@ -70,7 +72,9 @@ async def tgi_generate_impl(request: Request, httpserver_manager: HttpServerMana
     multimodal_params_dict = request_dict.get("multimodal_params", {})
     multimodal_params = MultimodalParams(**multimodal_params_dict)
 
-    results_generator = httpserver_manager.generate(prompt, sampling_params, multimodal_params, request=request)
+    results_generator = httpserver_manager.generate(
+        prompt, sampling_params, multimodal_params, request=request
+    )
 
     # Non-streaming case
     final_output_dict = collections.defaultdict(list)
@@ -143,7 +147,9 @@ async def tgi_generate_impl(request: Request, httpserver_manager: HttpServerMana
     return JSONResponse(content=json_compatible_item_data)
 
 
-async def tgi_generate_stream_impl(request: Request, httpserver_manager: HttpServerManager) -> Response:
+async def tgi_generate_stream_impl(
+    request: Request, httpserver_manager: HttpServerManager
+) -> Response:
 
     request_dict = await request.json()
     prompt = request_dict.pop("inputs")
@@ -157,7 +163,9 @@ async def tgi_generate_stream_impl(request: Request, httpserver_manager: HttpSer
     multimodal_params_dict = request_dict.get("multimodal_params", {})
     multimodal_params = MultimodalParams(**multimodal_params_dict)
 
-    results_generator = httpserver_manager.generate(prompt, sampling_params, multimodal_params, request=request)
+    results_generator = httpserver_manager.generate(
+        prompt, sampling_params, multimodal_params, request=request
+    )
 
     # Streaming case
     async def stream_results() -> AsyncGenerator[bytes, None]:
@@ -187,7 +195,11 @@ async def tgi_generate_stream_impl(request: Request, httpserver_manager: HttpSer
                         "prompt_tokens": metadata.get("prompt_tokens", 0),
                     }
 
-            yield ("data:" + json.dumps(ret, ensure_ascii=False) + "\n\n").encode("utf-8")
+            yield ("data:" + json.dumps(ret, ensure_ascii=False) + "\n\n").encode(
+                "utf-8"
+            )
 
     background_tasks = BackgroundTasks()
-    return StreamingResponse(stream_results(), media_type="text/event-stream", background=background_tasks)
+    return StreamingResponse(
+        stream_results(), media_type="text/event-stream", background=background_tasks
+    )

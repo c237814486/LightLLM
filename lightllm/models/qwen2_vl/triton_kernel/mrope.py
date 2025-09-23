@@ -87,7 +87,13 @@ def mrope_kernel(
     tl.store(out_ptr + out_idx, out, mask=mask)
 
 
-def mrope_triton(q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor, axis_map: torch.Tensor):
+def mrope_triton(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    cos: torch.Tensor,
+    sin: torch.Tensor,
+    axis_map: torch.Tensor,
+):
 
     B, H_q, L, D = q.shape
     H_k = k.shape[1]
@@ -178,8 +184,18 @@ def test():
     torch.manual_seed(0)
     device = "cuda"
 
-    q = torch.rand(B, H_q, L, D, dtype=torch.float32, device=device).transpose(1, 2).contiguous().transpose(1, 2)
-    k = torch.rand(B, H_k, L, D, dtype=torch.float32, device=device).transpose(1, 2).contiguous().transpose(1, 2)
+    q = (
+        torch.rand(B, H_q, L, D, dtype=torch.float32, device=device)
+        .transpose(1, 2)
+        .contiguous()
+        .transpose(1, 2)
+    )
+    k = (
+        torch.rand(B, H_k, L, D, dtype=torch.float32, device=device)
+        .transpose(1, 2)
+        .contiguous()
+        .transpose(1, 2)
+    )
     cos = torch.rand(3, 1, L, D, dtype=torch.float32, device=device)
     sin = torch.rand(3, 1, L, D, dtype=torch.float32, device=device)
 
@@ -188,7 +204,9 @@ def test():
     for i, n in enumerate(mrope_section * 2):
         axis_map += [i % 3] * n
     axis_map = torch.tensor(axis_map, dtype=torch.int32, device="cuda")
-    ref_q, ref_k = apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim=1)
+    ref_q, ref_k = apply_multimodal_rotary_pos_emb(
+        q, k, cos, sin, mrope_section, unsqueeze_dim=1
+    )
 
     torch.cuda.synchronize()
     out_q, out_k = mrope_triton(q, k, cos, sin, axis_map)
@@ -207,7 +225,9 @@ def test():
 
     e0.record()
     for _ in range(n_iter):
-        _ = apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim=1)
+        _ = apply_multimodal_rotary_pos_emb(
+            q, k, cos, sin, mrope_section, unsqueeze_dim=1
+        )
     e1.record()
     torch.cuda.synchronize()
     t_ref = e0.elapsed_time(e1) / n_iter

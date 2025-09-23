@@ -5,7 +5,9 @@ import numpy as np
 import torch.nn.functional as F
 import flashinfer
 from lightllm.utils.log_utils import init_logger
-from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding import gqa_token_decode_attention_flash_decoding
+from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding import (
+    gqa_token_decode_attention_flash_decoding,
+)
 from lightllm.models.deepseek2.infer_struct import Deepseek2InferStateInfo
 from lightllm.common.req_manager import ReqManager
 
@@ -40,7 +42,9 @@ def test_gqa_flash_decoding(batch, seqlen, heads, nope_head, rope_head):
     kv = torch.randn((Z * N_CTX, 1, D_HEAD + ROPE_HEAD), dtype=dtype, device="cuda")
 
     max_input_len = Z * N_CTX
-    req_to_token_indexs = torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    req_to_token_indexs = (
+        torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    )
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda") * N_CTX
     b_start_loc = torch.arange(Z).cuda().int() * N_CTX
     b_req_idx = torch.randperm(Z, dtype=torch.int32).cuda()

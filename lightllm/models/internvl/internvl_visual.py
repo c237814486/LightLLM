@@ -36,7 +36,10 @@ class InternVLVisionModel:
 
         cfg = InternVLChatConfig.from_pretrained(weight_dir)
         self.model = InternVLChatModel.from_pretrained(
-            weight_dir, config=cfg, torch_dtype=self.dtype, language_model="fake_language_model"
+            weight_dir,
+            config=cfg,
+            torch_dtype=self.dtype,
+            language_model="fake_language_model",
         )
         self.model.eval().cuda()
         self.load_image_func = get_load_image_func(weight_dir)
@@ -55,10 +58,14 @@ class InternVLVisionModel:
                 uuids.append(img.uuid)
                 image_data = read_shm(get_shm_name_data(img.uuid))
                 image_data = Image.open(BytesIO(image_data))
-                t = self.load_image_func(image_data, max_num=img.extra_params["image_patch_max_num"])
+                t = self.load_image_func(
+                    image_data, max_num=img.extra_params["image_patch_max_num"]
+                )
                 img_tensors.append(t)
             else:
-                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
+                raise Exception(
+                    "Unsupport input types: {} for {}".format(type(img), img)
+                )
 
             cur_num = img_tensors[-1].shape[0]
             valid_ids.append([valid_id, valid_id + cur_num])

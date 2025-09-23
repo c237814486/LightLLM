@@ -23,9 +23,15 @@ def test_gen_decode_params_basic():
     assert max_q_seq_len == 1
     assert max_kv_seq_len == b_seq_len.max().item()
     assert torch.equal(b_q_seq_len, true_b_q_seq_len)
-    assert torch.equal(b1_cu_q_seq_len, torch.nn.functional.pad(torch.cumsum(true_b_q_seq_len, dim=0), (1, 0), value=0))
+    assert torch.equal(
+        b1_cu_q_seq_len,
+        torch.nn.functional.pad(torch.cumsum(true_b_q_seq_len, dim=0), (1, 0), value=0),
+    )
     assert torch.equal(b_kv_seq_len, b_seq_len)
-    assert torch.equal(b1_cu_kv_seq_len, torch.nn.functional.pad(torch.cumsum(b_seq_len, dim=0), (1, 0), value=0))
+    assert torch.equal(
+        b1_cu_kv_seq_len,
+        torch.nn.functional.pad(torch.cumsum(b_seq_len, dim=0), (1, 0), value=0),
+    )
     assert torch.equal(position_ids, b_seq_len - 1)
 
 

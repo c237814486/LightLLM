@@ -29,7 +29,10 @@ def _fwd_kernel_flash_decode_stage2(
     offs_d = tl.arange(0, BLOCK_DMODEL)
     cur_batch_seq_len = tl.load(B_Seqlen + cur_batch)
 
-    block_n_size = tl.where(cur_batch_seq_len <= 0, 0, cur_batch_seq_len + BLOCK_SEQ - 1) // BLOCK_SEQ
+    block_n_size = (
+        tl.where(cur_batch_seq_len <= 0, 0, cur_batch_seq_len + BLOCK_SEQ - 1)
+        // BLOCK_SEQ
+    )
 
     sum_exp = 0.0
     max_logic = -float("inf")
@@ -38,7 +41,11 @@ def _fwd_kernel_flash_decode_stage2(
     offs_v = cur_batch * stride_mid_ob + cur_head * stride_mid_oh + offs_d
     offs_logic = cur_batch * stride_mid_o_eb + cur_head * stride_mid_o_eh
     for block_seq_n in range(0, block_n_size, 1):
-        tv = tl.load(Mid_O + offs_v + block_seq_n * stride_mid_os, mask=offs_d < head_dim, other=0.0)
+        tv = tl.load(
+            Mid_O + offs_v + block_seq_n * stride_mid_os,
+            mask=offs_d < head_dim,
+            other=0.0,
+        )
         tlogic = tl.load(Mid_O_LogExpSum + offs_logic + block_seq_n)
         new_max_logic = tl.maximum(tlogic, max_logic)
 
@@ -49,7 +56,11 @@ def _fwd_kernel_flash_decode_stage2(
         sum_exp = sum_exp * old_scale + exp_logic
         max_logic = new_max_logic
 
-    tl.store(Out + cur_batch * stride_obs + cur_head * stride_oh + offs_d, acc / sum_exp, mask=offs_d < head_dim)
+    tl.store(
+        Out + cur_batch * stride_obs + cur_head * stride_oh + offs_d,
+        acc / sum_exp,
+        mask=offs_d < head_dim,
+    )
     return
 
 

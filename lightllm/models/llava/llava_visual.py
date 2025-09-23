@@ -37,7 +37,11 @@ class LlavaVisionModel:
         assert "model.mm_projector.2.bias" in self.projector_weights
 
     def load_hf_model(self, config, weight_dir):
-        from transformers import AutoConfig, AutoProcessor, LlavaForConditionalGeneration
+        from transformers import (
+            AutoConfig,
+            AutoProcessor,
+            LlavaForConditionalGeneration,
+        )
 
         config = AutoConfig.from_pretrained(weight_dir, trust_remote_code=True)
         self.select_layer = config.vision_feature_layer
@@ -60,11 +64,15 @@ class LlavaVisionModel:
                 for k in d.keys():
                     if "multi_modal_projector.linear_1" in k:
                         self.projector_weights[
-                            k.replace("multi_modal_projector.linear_1", "model.mm_projector.0")
+                            k.replace(
+                                "multi_modal_projector.linear_1", "model.mm_projector.0"
+                            )
                         ] = d.get_tensor(k).half()
                     if "multi_modal_projector.linear_2" in k:
                         self.projector_weights[
-                            k.replace("multi_modal_projector.linear_2", "model.mm_projector.2")
+                            k.replace(
+                                "multi_modal_projector.linear_2", "model.mm_projector.2"
+                            )
                         ] = d.get_tensor(k).half()
 
     def load_bin_model(self, config, weight_dir):
@@ -135,10 +143,14 @@ class LlavaVisionModel:
                 uuids.append(img.uuid)
                 image_data = read_shm(get_shm_name_data(img.uuid))
                 image_data = Image.open(BytesIO(image_data)).convert("RGB")
-                t = self.image_processor.preprocess(image_data, return_tensors="pt")["pixel_values"]
+                t = self.image_processor.preprocess(image_data, return_tensors="pt")[
+                    "pixel_values"
+                ]
                 img_tensors.append(t)
             else:
-                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
+                raise Exception(
+                    "Unsupport input types: {} for {}".format(type(img), img)
+                )
 
             cur_num = img_tensors[-1].shape[0]
             valid_ids.append([valid_id, valid_id + cur_num])

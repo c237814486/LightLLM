@@ -43,7 +43,8 @@ def init_mtp_model(args: StartArgs, kvargs, main_model):
                 "disable_chunked_prefill": True,
                 "mtp_mode": args.mtp_mode,
                 "main_model": main_model,
-                "mem_layer_start": main_model.config["num_hidden_layers"] + i * mtp_model_cfg["num_hidden_layers"],
+                "mem_layer_start": main_model.config["num_hidden_layers"]
+                + i * mtp_model_cfg["num_hidden_layers"],
             }
         )
         draft_models.append(Deepseek3MTPModel(mtp_model_kvargs))
@@ -80,7 +81,14 @@ def test_model_inference_mtp(args):
         }
         proc = multiprocessing.Process(
             target=tppart_model_infer,
-            args=(args, model_kvargs, args.batch_size, args.input_len, args.output_len, ans_queue),
+            args=(
+                args,
+                model_kvargs,
+                args.batch_size,
+                args.input_len,
+                args.output_len,
+                ans_queue,
+            ),
         )
         proc.start()
         workers.append(proc)
@@ -107,18 +115,24 @@ def torch_profile(fn, log_dir=None):
         print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
 
 
-def run_forward_once(args, input_len, output_len, batch_size, main_model, draft_models, warmup=False):
+def run_forward_once(
+    args, input_len, output_len, batch_size, main_model, draft_models, warmup=False
+):
     import time
 
     torch.cuda.synchronize()
     prefill_start_time = time.time()
 
-    test_data = np.vstack([np.random.randint(0, 50256, input_len) for _ in range(batch_size)])
+    test_data = np.vstack(
+        [np.random.randint(0, 50256, input_len) for _ in range(batch_size)]
+    )
     test_data = test_data.reshape(-1)
     test_data = torch.from_numpy(test_data).cuda()
 
     b_req_idx = torch.tensor(
-        [main_model.req_manager.alloc() for _ in range(batch_size)], dtype=torch.int32, device="cuda"
+        [main_model.req_manager.alloc() for _ in range(batch_size)],
+        dtype=torch.int32,
+        device="cuda",
     )
     b_seq_len = torch.zeros(batch_size, dtype=torch.int32, device="cuda")
     b_ready_cache_len = torch.zeros(batch_size, dtype=torch.int32, device="cuda")
@@ -149,7 +163,9 @@ def run_forward_once(args, input_len, output_len, batch_size, main_model, draft_
 
     # Draft model Prefill
     # For simplicity, we'll just take the input of main_model to draft model.
-    model_input.deepseekv3_mtp_draft_input_hiddens = model_output.deepseekv3_mtp_main_output_hiddens
+    model_input.deepseekv3_mtp_draft_input_hiddens = (
+        model_output.deepseekv3_mtp_main_output_hiddens
+    )
     for draft_model_id in range(len(draft_models)):
         draft_model = draft_models[draft_model_id]
         model_output = draft_model.forward(model_input)
@@ -157,7 +173,9 @@ def run_forward_once(args, input_len, output_len, batch_size, main_model, draft_
         predict_ids = torch.argmax(prob_out, dim=1, keepdim=True)
         predict_ids = predict_ids.detach().cpu().numpy()
         draft_ids.append(predict_ids)
-        model_input.deepseekv3_mtp_draft_input_hiddens = model_output.deepseekv3_mtp_main_output_hiddens
+        model_input.deepseekv3_mtp_draft_input_hiddens = (
+            model_output.deepseekv3_mtp_main_output_hiddens
+        )
 
     torch.cuda.synchronize()
     prefill_end_time = time.time()
@@ -193,7 +211,9 @@ def run_forward_once(args, input_len, output_len, batch_size, main_model, draft_
 
     nopad_b_seq_idx = torch.tensor(nopad_b_seq_idx, dtype=torch.int32, device="cuda")
     nopad_b_seq_len = torch.tensor(nopad_b_seq_len, dtype=torch.int32, device="cuda")
-    mem_indexes = main_model.req_manager.mem_manager.alloc(batch_size * (len(draft_models) + 1)).cuda()
+    mem_indexes = main_model.req_manager.mem_manager.alloc(
+        batch_size * (len(draft_models) + 1)
+    ).cuda()
 
     model_input = ModelInput(
         batch_size=batch_size * (len(draft_models) + 1),
@@ -218,7 +238,9 @@ def run_forward_once(args, input_len, output_len, batch_size, main_model, draft_
 
         # draft decode
         model_input.input_ids = predict_ids.reshape(-1)
-        model_input.deepseekv3_mtp_draft_input_hiddens = model_output.deepseekv3_mtp_main_output_hiddens
+        model_input.deepseekv3_mtp_draft_input_hiddens = (
+            model_output.deepseekv3_mtp_main_output_hiddens
+        )
 
         for draft_model_id in range(len(draft_models)):
             draft_model = draft_models[draft_model_id]
@@ -228,24 +250,32 @@ def run_forward_once(args, input_len, output_len, batch_size, main_model, draft_
             prob_out = torch.softmax(model_output.logits, dim=-1)
             predict_ids = torch.argmax(prob_out, dim=1, keepdim=True)
             model_input.input_ids = predict_ids.reshape(-1)
-            model_input.deepseekv3_mtp_draft_input_hiddens = model_output.deepseekv3_mtp_main_output_hiddens
+            model_input.deepseekv3_mtp_draft_input_hiddens = (
+                model_output.deepseekv3_mtp_main_output_hiddens
+            )
 
         # accept all draft ids by default.
         model_input.input_ids = predict_ids.reshape(-1)
-        model_input.deepseekv3_mtp_draft_input_hiddens = model_output.deepseekv3_mtp_main_output_hiddens
+        model_input.deepseekv3_mtp_draft_input_hiddens = (
+            model_output.deepseekv3_mtp_main_output_hiddens
+        )
         torch.cuda.synchronize()
         if i % 100 == 0 or i == output_len - 1:
             step_end_time = time.time()
             if get_current_rank_in_dp() == 0 and not warmup:
                 step_time = step_end_time - step_start_time
                 print(i, " step cost time:", step_time * 1000)
-                print(f"Decode throughput: {batch_size * (len(draft_models) + 1) * args.dp / step_time} tokens/s")
+                print(
+                    f"Decode throughput: {batch_size * (len(draft_models) + 1) * args.dp / step_time} tokens/s"
+                )
 
     main_model.mem_manager.free_all()
     main_model.req_manager.free_all()
 
 
-def tppart_model_infer(args, model_kvargs, batch_sizes, input_len, output_len, ans_queue):
+def tppart_model_infer(
+    args, model_kvargs, batch_sizes, input_len, output_len, ans_queue
+):
     args = get_env_start_args()
     import triton.profiler as proton
     import torch
@@ -272,9 +302,25 @@ def tppart_model_infer(args, model_kvargs, batch_sizes, input_len, output_len, a
 
     for batch_size in batch_sizes:
         # warm up
-        run_forward_once(args, input_len, output_len, batch_size, main_model, draft_models, warmup=True)
+        run_forward_once(
+            args,
+            input_len,
+            output_len,
+            batch_size,
+            main_model,
+            draft_models,
+            warmup=True,
+        )
         torch.cuda.synchronize()
-        run_forward_once(args, input_len, output_len, batch_size, main_model, draft_models, warmup=False)
+        run_forward_once(
+            args,
+            input_len,
+            output_len,
+            batch_size,
+            main_model,
+            draft_models,
+            warmup=False,
+        )
         dist.barrier()
 
     ans_queue.put(True)

@@ -34,7 +34,9 @@ class Fp8BlockMMKernelConfig(KernelConfigs):
 
         if finded_config:
             # find by M
-            config: dict = finded_config[min(finded_config.keys(), key=lambda x: abs(int(x) - M))]
+            config: dict = finded_config[
+                min(finded_config.keys(), key=lambda x: abs(int(x) - M))
+            ]
             return config
         else:
             config = {
@@ -49,7 +51,12 @@ class Fp8BlockMMKernelConfig(KernelConfigs):
 
     @classmethod
     def save_config(
-        cls, N: int, K: int, block_size: Tuple[int, int], out_dtype: str, config_json: Dict[int, Dict[int, Dict]]
+        cls,
+        N: int,
+        K: int,
+        block_size: Tuple[int, int],
+        out_dtype: str,
+        config_json: Dict[int, Dict[int, Dict]],
     ):
 
         key_params = {
@@ -64,7 +71,9 @@ class Fp8BlockMMKernelConfig(KernelConfigs):
 
 
 @triton.jit
-def grouped_launch(pid, m, n, block_m: tl.constexpr, block_n: tl.constexpr, group_m: tl.constexpr):
+def grouped_launch(
+    pid, m, n, block_m: tl.constexpr, block_n: tl.constexpr, group_m: tl.constexpr
+):
 
     grid_m = tl.cdiv(m, block_m)
     grid_n = tl.cdiv(n, block_n)
@@ -171,11 +180,18 @@ def w8a8_block_fp8_matmul(
     assert A.is_contiguous() and C.is_contiguous()
     M, K = A.shape
     _, N = B.shape
-    assert triton.cdiv(K, block_k) == Ascale.shape[-1] and Ascale.shape[-1] == Bscale.shape[0]
+    assert (
+        triton.cdiv(K, block_k) == Ascale.shape[-1]
+        and Ascale.shape[-1] == Bscale.shape[0]
+    )
     assert triton.cdiv(N, block_n) == Bscale.shape[1]
     if not run_config:
-        run_config = Fp8BlockMMKernelConfig.try_to_get_best_config(M, N, K, block_size, dtype)
-    grid = (triton.cdiv(M, run_config["BLOCK_M"]) * triton.cdiv(N, run_config["BLOCK_N"]),)
+        run_config = Fp8BlockMMKernelConfig.try_to_get_best_config(
+            M, N, K, block_size, dtype
+        )
+    grid = (
+        triton.cdiv(M, run_config["BLOCK_M"]) * triton.cdiv(N, run_config["BLOCK_N"]),
+    )
     _block_scaled_block_gemm[grid](
         A,
         B,
@@ -209,7 +225,9 @@ if __name__ == "__main__":
     block_size = 128
     output_dtype = torch.bfloat16
     M, N, K = 4096, 256, 7168
-    A = torch.randn((M, K), dtype=output_dtype).cuda().to(torch.float8_e4m3fn)  # Activation
+    A = (
+        torch.randn((M, K), dtype=output_dtype).cuda().to(torch.float8_e4m3fn)
+    )  # Activation
     B = torch.randn((K, N), dtype=output_dtype).cuda().to(torch.float8_e4m3fn)  # Weight
     Ascale = torch.randn((M, K // block_size)).cuda()  # + 0.2
     Bscale = torch.ones((K // block_size, N // block_size)).cuda()
@@ -218,18 +236,30 @@ if __name__ == "__main__":
     B = B.T.contiguous().T
     # warmup
 
-    w8a8_block_fp8_matmul(A, B, Ascale, Bscale, C, (block_size, block_size), output_dtype)
+    w8a8_block_fp8_matmul(
+        A, B, Ascale, Bscale, C, (block_size, block_size), output_dtype
+    )
 
     #### groud truth
-    print(Ascale.unsqueeze(-1).repeat(1, 1, block_size).reshape(M, K).to(output_dtype).shape)
-    d_A = A.to(output_dtype) * (Ascale.unsqueeze(-1).repeat(1, 1, block_size).reshape(M, K).to(output_dtype))
+    print(
+        Ascale.unsqueeze(-1)
+        .repeat(1, 1, block_size)
+        .reshape(M, K)
+        .to(output_dtype)
+        .shape
+    )
+    d_A = A.to(output_dtype) * (
+        Ascale.unsqueeze(-1).repeat(1, 1, block_size).reshape(M, K).to(output_dtype)
+    )
     d_B = B.to(output_dtype).contiguous()
 
     gt_C = d_A.mm(d_B)
     # caluate the simlarity
     import torch.nn.functional as F
 
-    cosine_sim = F.cosine_similarity(C.flatten().unsqueeze(0), gt_C.flatten().unsqueeze(0), dim=1)
+    cosine_sim = F.cosine_similarity(
+        C.flatten().unsqueeze(0), gt_C.flatten().unsqueeze(0), dim=1
+    )
 
     print(f"Cosine Similarity between C and gt_C: {cosine_sim.item()}")
 
@@ -237,6 +267,8 @@ if __name__ == "__main__":
     ms2 = triton.testing.do_bench(fn2)
     print(f"bf16 time : {ms2} ms")
 
-    fn2 = lambda: w8a8_block_fp8_matmul(A, B, Ascale, Bscale, C, (block_size, block_size), output_dtype)
+    fn2 = lambda: w8a8_block_fp8_matmul(
+        A, B, Ascale, Bscale, C, (block_size, block_size), output_dtype
+    )
     ms2 = triton.testing.do_bench_cudagraph(fn2)
     print(f"fp8 time : {ms2} ms")

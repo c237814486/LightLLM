@@ -24,7 +24,12 @@ class ViTPreAndPostLayerWeight(PreAndPostLayerWeight):
         target_dtype = pos_embed.dtype
         pos_embed = (
             pos_embed.float()
-            .reshape(1, self.image_size // self.patch_size, self.image_size // self.patch_size, -1)
+            .reshape(
+                1,
+                self.image_size // self.patch_size,
+                self.image_size // self.patch_size,
+                -1,
+            )
             .permute(0, 3, 1, 2)
         )
         pos_embed = (
@@ -36,24 +41,34 @@ class ViTPreAndPostLayerWeight(PreAndPostLayerWeight):
         return pos_embed
 
     def load_hf_weights(self, weights):
-        split_indexes = np.linspace(0, self.embed_dim, self.tp_world_size_ + 1, dtype=np.int64)
+        split_indexes = np.linspace(
+            0, self.embed_dim, self.tp_world_size_ + 1, dtype=np.int64
+        )
         split_start = split_indexes[self.tp_rank_]
         split_end = split_indexes[self.tp_rank_ + 1]
         if "vision_model.embeddings.class_embedding" in weights:
             self.class_embedding = self._cuda(
-                weights["vision_model.embeddings.class_embedding"][:, :, split_start:split_end]
+                weights["vision_model.embeddings.class_embedding"][
+                    :, :, split_start:split_end
+                ]
             )
         if "vision_model.embeddings.position_embedding" in weights:
             self.position_embedding = self._cuda(
-                weights["vision_model.embeddings.position_embedding"][:, :, split_start:split_end]
+                weights["vision_model.embeddings.position_embedding"][
+                    :, :, split_start:split_end
+                ]
             )
         if "vision_model.embeddings.patch_embedding.weight" in weights:
             self.patch_embedding_weight_ = self._cuda(
-                weights["vision_model.embeddings.patch_embedding.weight"][split_start:split_end, :, :, :]
+                weights["vision_model.embeddings.patch_embedding.weight"][
+                    split_start:split_end, :, :, :
+                ]
             )
         if "vision_model.embeddings.patch_embedding.bias" in weights:
             self.patch_embedding_bias_ = self._cuda(
-                weights["vision_model.embeddings.patch_embedding.bias"][split_start:split_end]
+                weights["vision_model.embeddings.patch_embedding.bias"][
+                    split_start:split_end
+                ]
             )
 
         if "mlp1.0.weight" in weights:
@@ -61,17 +76,25 @@ class ViTPreAndPostLayerWeight(PreAndPostLayerWeight):
         if "mlp1.0.bias" in weights:
             self.layernorm_bias_ = self._cuda(weights["mlp1.0.bias"])
 
-        split_indexes = np.linspace(0, self.llm_hidden_size, self.tp_world_size_ + 1, dtype=np.int64)
+        split_indexes = np.linspace(
+            0, self.llm_hidden_size, self.tp_world_size_ + 1, dtype=np.int64
+        )
         split_start = split_indexes[self.tp_rank_]
         split_end = split_indexes[self.tp_rank_ + 1]
 
         if "mlp1.1.weight" in weights:
-            self.mlp1_1_weight_ = self._cuda(weights["mlp1.1.weight"][split_start:split_end, :]).t()
+            self.mlp1_1_weight_ = self._cuda(
+                weights["mlp1.1.weight"][split_start:split_end, :]
+            ).t()
         if "mlp1.1.bias" in weights:
-            self.mlp1_1_bias_ = self._cuda(weights["mlp1.1.bias"][split_start:split_end])
+            self.mlp1_1_bias_ = self._cuda(
+                weights["mlp1.1.bias"][split_start:split_end]
+            )
 
         if "mlp1.3.weight" in weights:
-            self.mlp1_3_weight_ = self._cuda(weights["mlp1.3.weight"][:, split_start:split_end]).t()
+            self.mlp1_3_weight_ = self._cuda(
+                weights["mlp1.3.weight"][:, split_start:split_end]
+            ).t()
         if "mlp1.3.bias" in weights:
             self.mlp1_3_bias_ = self._cuda(weights["mlp1.3.bias"])
 

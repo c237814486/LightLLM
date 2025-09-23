@@ -70,10 +70,18 @@ def benchmark(M, N, K, renorm, runs):
     max_err_triton_torch_sgl = (sgl_vals - torch_vals).abs().max().item()
     max_err_triton_sgl = (triton_vals - sgl_vals).abs().max().item()
 
-    assert diff_sgl_triton_ids == 0, f"Mismatch SGL vs Triton ids: {diff_sgl_triton_ids}"
-    assert diff_torch_triton_ids == 0, f"Mismatch Torch vs Triton ids: {diff_torch_triton_ids}"
-    assert max_err_triton_torch < 1e-3, f"Max err Triton vs Torch: {max_err_triton_torch}"
-    assert max_err_triton_torch_sgl < 1e-3, f"Max err Triton vs SGL: {max_err_triton_torch_sgl}"
+    assert (
+        diff_sgl_triton_ids == 0
+    ), f"Mismatch SGL vs Triton ids: {diff_sgl_triton_ids}"
+    assert (
+        diff_torch_triton_ids == 0
+    ), f"Mismatch Torch vs Triton ids: {diff_torch_triton_ids}"
+    assert (
+        max_err_triton_torch < 1e-3
+    ), f"Max err Triton vs Torch: {max_err_triton_torch}"
+    assert (
+        max_err_triton_torch_sgl < 1e-3
+    ), f"Max err Triton vs SGL: {max_err_triton_torch_sgl}"
     assert max_err_triton_sgl < 1e-3, f"Max err Torch vs SGL: {max_err_triton_sgl}"
 
     results = {

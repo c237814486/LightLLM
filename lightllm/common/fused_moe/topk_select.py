@@ -24,7 +24,11 @@ from lightllm.utils.light_utils import light_ops
 from typing import Callable, List, Optional, Tuple
 from lightllm.common.fused_moe.softmax_topk import softmax_topk
 
-use_cuda_grouped_topk = os.getenv("LIGHTLLM_CUDA_GROUPED_TOPK", "False").upper() in ["ON", "TRUE", "1"]
+use_cuda_grouped_topk = os.getenv("LIGHTLLM_CUDA_GROUPED_TOPK", "False").upper() in [
+    "ON",
+    "TRUE",
+    "1",
+]
 
 
 def fused_topk(
@@ -39,7 +43,9 @@ def fused_topk(
         return softmax_topk(gating_output, topk, renorm=renormalize)
     M, _ = hidden_states.shape
 
-    topk_weights = torch.empty(M, topk, dtype=torch.float32, device=hidden_states.device)
+    topk_weights = torch.empty(
+        M, topk, dtype=torch.float32, device=hidden_states.device
+    )
     topk_ids = torch.empty(M, topk, dtype=torch.int32, device=hidden_states.device)
 
     sgl_ops.topk_softmax(
@@ -72,8 +78,12 @@ def grouped_topk(
         scores = scores + correction_bias
 
     num_token = scores.shape[0]
-    group_scores = scores.view(num_token, num_expert_group, -1).max(dim=-1).values  # [n, n_group]
-    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[1]  # [n, top_k_group]
+    group_scores = (
+        scores.view(num_token, num_expert_group, -1).max(dim=-1).values
+    )  # [n, n_group]
+    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
+        1
+    ]  # [n, top_k_group]
     group_mask = torch.zeros_like(group_scores)  # [n, n_group]
     group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
     score_mask = (
@@ -106,9 +116,13 @@ def biased_grouped_topk(
     num_token = scores.shape[0]
     scores_for_choice = scores.view(num_token, -1) + correction_bias.unsqueeze(0)
     group_scores = (
-        scores_for_choice.view(num_token, num_expert_group, -1).topk(2, dim=-1)[0].sum(dim=-1)
+        scores_for_choice.view(num_token, num_expert_group, -1)
+        .topk(2, dim=-1)[0]
+        .sum(dim=-1)
     )  # [n, n_group]
-    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[1]  # [n, top_k_group]
+    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
+        1
+    ]  # [n, top_k_group]
     group_mask = torch.zeros_like(group_scores)  # [n, n_group]
     group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
     score_mask = (
@@ -141,10 +155,18 @@ def cuda_grouped_topk(
     assert light_ops is not None, "lightllm_kernel is not installed."
 
     num_tokens = gating_output.shape[0]
-    topk_weights = torch.empty(num_tokens, topk, device=hidden_states.device, dtype=torch.float32)
-    topk_indices = torch.empty(num_tokens, topk, device=hidden_states.device, dtype=torch.int32)
-    token_expert_indices = torch.empty(num_tokens, topk_group, device=hidden_states.device, dtype=torch.int32)
-    group_scores = torch.empty(num_tokens, num_expert_group, device=hidden_states.device, dtype=torch.float32)
+    topk_weights = torch.empty(
+        num_tokens, topk, device=hidden_states.device, dtype=torch.float32
+    )
+    topk_indices = torch.empty(
+        num_tokens, topk, device=hidden_states.device, dtype=torch.int32
+    )
+    token_expert_indices = torch.empty(
+        num_tokens, topk_group, device=hidden_states.device, dtype=torch.int32
+    )
+    group_scores = torch.empty(
+        num_tokens, num_expert_group, device=hidden_states.device, dtype=torch.float32
+    )
     if correction_bias is None:
         correction_bias = torch.zeros_like(gating_output, dtype=torch.float32)
     light_ops.grouped_topk(
@@ -214,11 +236,17 @@ def select_experts(
 
     elif custom_routing_function is None:
         topk_weights, topk_ids = fused_topk(
-            hidden_states=hidden_states, gating_output=router_logits, topk=top_k, renormalize=renormalize
+            hidden_states=hidden_states,
+            gating_output=router_logits,
+            topk=top_k,
+            renormalize=renormalize,
         )
     else:
         topk_weights, topk_ids = custom_routing_function(
-            hidden_states=hidden_states, gating_output=router_logits, topk=top_k, renormalize=renormalize
+            hidden_states=hidden_states,
+            gating_output=router_logits,
+            topk=top_k,
+            renormalize=renormalize,
         )
 
     return topk_weights, topk_ids

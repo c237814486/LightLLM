@@ -32,7 +32,11 @@ FPS_MAX_FRAMES = 768
 
 
 def smart_resize(
-    height: int, width: int, factor: int = IMAGE_FACTOR, min_pixels: int = MIN_PIXELS, max_pixels: int = MAX_PIXELS
+    height: int,
+    width: int,
+    factor: int = IMAGE_FACTOR,
+    min_pixels: int = MIN_PIXELS,
+    max_pixels: int = MAX_PIXELS,
 ) -> tuple[int, int]:
 
     if max(height, width) / min(height, width) > MAX_RATIO:
@@ -52,7 +56,9 @@ def smart_resize(
     return h_bar, w_bar
 
 
-def resize_image(image_file: Image.Image, size_factor: int = IMAGE_FACTOR) -> tuple[Image.Image, int, int]:
+def resize_image(
+    image_file: Image.Image, size_factor: int = IMAGE_FACTOR
+) -> tuple[Image.Image, int, int]:
 
     image = image_file.convert("RGB")
     width, height = image.size
@@ -120,18 +126,28 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
                 max_pixels=self.max_pixels,
             )
             image = resize(
-                image, size=(resized_height, resized_width), resample=self.resample, input_data_format=input_data_format
+                image,
+                size=(resized_height, resized_width),
+                resample=self.resample,
+                input_data_format=input_data_format,
             )
 
         if self.do_rescale:
-            image = self.rescale(image, scale=self.rescale_factor, input_data_format=input_data_format)
+            image = self.rescale(
+                image, scale=self.rescale_factor, input_data_format=input_data_format
+            )
 
         if self.do_normalize:
             image = self.normalize(
-                image=image, mean=self.image_mean, std=self.image_std, input_data_format=input_data_format
+                image=image,
+                mean=self.image_mean,
+                std=self.image_std,
+                input_data_format=input_data_format,
             )
 
-        image = to_channel_dimension_format(image, self.data_format, input_channel_dim=input_data_format)
+        image = to_channel_dimension_format(
+            image, self.data_format, input_channel_dim=input_data_format
+        )
 
         patches = np.array([image])
 
@@ -140,7 +156,10 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
             patches = np.tile(patches, (self.temporal_patch_size, 1, 1, 1))
         channel = patches.shape[1]
         grid_t = patches.shape[0] // self.temporal_patch_size
-        grid_h, grid_w = resized_height // self.patch_size, resized_width // self.patch_size
+        grid_h, grid_w = (
+            resized_height // self.patch_size,
+            resized_width // self.patch_size,
+        )
         patches = patches.reshape(
             grid_t,
             self.temporal_patch_size,
@@ -154,7 +173,8 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
         )
         patches = patches.transpose(0, 3, 6, 4, 7, 2, 1, 5, 8)
         flatten_patches = patches.reshape(
-            grid_t * grid_h * grid_w, channel * self.temporal_patch_size * self.patch_size * self.patch_size
+            grid_t * grid_h * grid_w,
+            channel * self.temporal_patch_size * self.patch_size * self.patch_size,
         )
         image_grid_thw = (grid_t, grid_h, grid_w)
         pixel_values = torch.as_tensor(flatten_patches)

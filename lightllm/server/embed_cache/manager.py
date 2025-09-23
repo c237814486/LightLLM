@@ -23,7 +23,9 @@ class CacheServer(rpyc.Service):
         # (to finalize the service, if needed)
         pass
 
-    def exposed_alloc(self, md5sum_list: list[str], token_num_list: list[int]) -> Optional[list[dict]]:
+    def exposed_alloc(
+        self, md5sum_list: list[str], token_num_list: list[int]
+    ) -> Optional[list[dict]]:
         md5sum_list = obtain(md5sum_list)
         token_num_list = obtain(token_num_list)
         record = self._impl.alloc(md5sum_list, token_num_list)
@@ -49,7 +51,7 @@ class CacheServer(rpyc.Service):
         ids = obtain(ids)
         return self._impl.get_items_embed(ids)
 
-    def exposed_alloc_v2(self, batch_md5_token_nums:bytes) -> bytes:
+    def exposed_alloc_v2(self, batch_md5_token_nums: bytes) -> bytes:
         """
         batch_md5_token_nums: pickle.dumps([(md5sum, token_num), ...])
         返回: pickle.dumps(records)
@@ -59,7 +61,6 @@ class CacheServer(rpyc.Service):
         token_num_list = [obtain(num) for md5, num in batch_requests]
         record = self._impl.alloc(md5sum_list, token_num_list)
         return pickle.dumps(record)
-
 
     def exposed_release_v2(self, ids_blob: bytes) -> None:
         ids = pickle.loads(ids_blob)
@@ -79,7 +80,7 @@ class CacheServer(rpyc.Service):
         return pickle.dumps(status_list)
 
     def exposed_set_items_embed_v2(self, ids_blob: bytes) -> None:
-       
+
         ids = pickle.loads(ids_blob)
         ids = [obtain(id) for id in ids]
         status_list = self._impl.set_items_embed(ids)

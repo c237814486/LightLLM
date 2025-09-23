@@ -10,7 +10,9 @@ class BloomPreAndPostLayerWeight(PreAndPostLayerWeight):
     def load_hf_weights(self, weights):
 
         if "word_embeddings_layernorm.weight" in weights:
-            self.pre_norm_weight_ = self._cuda(weights["word_embeddings_layernorm.weight"])
+            self.pre_norm_weight_ = self._cuda(
+                weights["word_embeddings_layernorm.weight"]
+            )
         if "word_embeddings_layernorm.bias" in weights:
             self.pre_norm_bias_ = self._cuda(weights["word_embeddings_layernorm.bias"])
         if "ln_f.weight" in weights:
@@ -22,7 +24,10 @@ class BloomPreAndPostLayerWeight(PreAndPostLayerWeight):
             split_vob_size = vob_size // self.tp_world_size_
             self.wte_weight_ = self._cuda(
                 weights["word_embeddings.weight"][
-                    split_vob_size * self.tp_rank_ : split_vob_size * (self.tp_rank_ + 1), :
+                    split_vob_size
+                    * self.tp_rank_ : split_vob_size
+                    * (self.tp_rank_ + 1),
+                    :,
                 ]
             )
             self.lm_head_weight_ = self.wte_weight_

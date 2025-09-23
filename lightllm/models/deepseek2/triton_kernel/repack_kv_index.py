@@ -72,7 +72,12 @@ if __name__ == "__main__":
     b_seq_len = torch.randint(1, MAX_SEQ_LEN, (BATCH,)).cuda().int()
     req_to_token_indexs = torch.zeros((2 * BATCH, 2 * MAX_SEQ_LEN)).cuda().int()
     b_start_loc = (
-        torch.cat([torch.zeros([1], device=b_seq_len.device, dtype=b_seq_len.dtype), b_seq_len[0:-1].cumsum(0)])
+        torch.cat(
+            [
+                torch.zeros([1], device=b_seq_len.device, dtype=b_seq_len.dtype),
+                b_seq_len[0:-1].cumsum(0),
+            ]
+        )
         .cuda()
         .int()
     )
@@ -82,8 +87,12 @@ if __name__ == "__main__":
     for b, sl, start in zip(b_req_idx, b_seq_len, b_start_loc):
         req_to_token_indexs[b][:sl] = rand_idx[start : start + sl]
 
-    fn1 = lambda: repack_kv_ref(req_to_token_indexs, b_req_idx, b_seq_len, b_start_loc, ref)
-    fn2 = lambda: repack_kv_index(req_to_token_indexs, b_req_idx, b_seq_len, b_start_loc, MAX_SEQ_LEN, output)
+    fn1 = lambda: repack_kv_ref(
+        req_to_token_indexs, b_req_idx, b_seq_len, b_start_loc, ref
+    )
+    fn2 = lambda: repack_kv_index(
+        req_to_token_indexs, b_req_idx, b_seq_len, b_start_loc, MAX_SEQ_LEN, output
+    )
     ms1 = triton.testing.do_bench(fn1)
     ms2 = triton.testing.do_bench_cudagraph(fn2)
     print(ms1, ms2)

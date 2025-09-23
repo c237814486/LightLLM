@@ -6,34 +6,63 @@ from .mem_manager import MemoryManager
 from typing import List, Union
 from lightllm.utils.log_utils import init_logger
 from lightllm.common.kv_trans_kernel.kv_trans import kv_trans
-from lightllm.common.kv_trans_kernel.kv_trans_v2 import kv_trans_v2_for_d_node, kv_trans_v2_for_p_node
+from lightllm.common.kv_trans_kernel.kv_trans_v2 import (
+    kv_trans_v2_for_d_node,
+    kv_trans_v2_for_p_node,
+)
 from lightllm.distributed.pynccl import PyNcclCommunicator
 
 logger = init_logger(__name__)
 
 
 class Deepseek2MemoryManager(MemoryManager):
-    def __init__(self, size, dtype, head_num, head_dim, layer_num, always_copy=False, mem_fraction=0.9):
-        super().__init__(size, dtype, head_num, head_dim, layer_num, always_copy, mem_fraction)
+    def __init__(
+        self,
+        size,
+        dtype,
+        head_num,
+        head_dim,
+        layer_num,
+        always_copy=False,
+        mem_fraction=0.9,
+    ):
+        super().__init__(
+            size, dtype, head_num, head_dim, layer_num, always_copy, mem_fraction
+        )
 
     def get_cell_size(self):
-        return self.head_num * self.head_dim * self.layer_num * torch._utils._element_size(self.dtype)
+        return (
+            self.head_num
+            * self.head_dim
+            * self.layer_num
+            * torch._utils._element_size(self.dtype)
+        )
 
     def _init_buffers(self, size, dtype, head_num, head_dim, layer_num):
-        self.kv_buffer = torch.empty((layer_num, size + 1, head_num, head_dim), dtype=dtype, device="cuda")
+        self.kv_buffer = torch.empty(
+            (layer_num, size + 1, head_num, head_dim), dtype=dtype, device="cuda"
+        )
 
         # todo, etp or edp use the same work buffer here
         # also it can be used for any kernels for work buffer witout save info only
         if os.environ.get("ETP_MODE_ENABLED") == "true":
-            self.work_buffer = torch.empty(1024 * 1024 * 1024, dtype=torch.bfloat16, device="cuda")
+            self.work_buffer = torch.empty(
+                1024 * 1024 * 1024, dtype=torch.bfloat16, device="cuda"
+            )
             self.work_buffer.share_memory_()
 
     def alloc_kv_move_buffer(self, max_req_total_len):
         self.kv_move_buffer = torch.empty(
-            (1, max_req_total_len + 8, self.head_num, self.head_dim), dtype=self.dtype, device="cuda"
+            (1, max_req_total_len + 8, self.head_num, self.head_dim),
+            dtype=self.dtype,
+            device="cuda",
         )
-        self.kv_move_buf_indexes = torch.arange(0, max_req_total_len + 8, dtype=torch.int64, device="cuda")
-        self.token_dim_size = self.kv_move_buffer.shape[-1] * self.kv_move_buffer.shape[-2]
+        self.kv_move_buf_indexes = torch.arange(
+            0, max_req_total_len + 8, dtype=torch.int64, device="cuda"
+        )
+        self.token_dim_size = (
+            self.kv_move_buffer.shape[-1] * self.kv_move_buffer.shape[-2]
+        )
         return
 
     def send_to_decode_node(
@@ -49,7 +78,9 @@ class Deepseek2MemoryManager(MemoryManager):
         move_token_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(task.prefill_token_indexes[-task.move_kv_len :])
+                move_token_indexes.extend(
+                    task.prefill_token_indexes[-task.move_kv_len :]
+                )
 
         cur_device_index = self.kv_buffer.get_device()
         cur_mem = mem_managers[cur_device_index]
@@ -79,27 +110,41 @@ class Deepseek2MemoryManager(MemoryManager):
         move_token_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(task.decode_token_indexes[-task.move_kv_len :])
+                move_token_indexes.extend(
+                    task.decode_token_indexes[-task.move_kv_len :]
+                )
 
         cur_device_index = self.kv_buffer.get_device()
         token_num = len(move_token_indexes)
         move_size = self.token_dim_size * token_num
-        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(1, token_num, self.head_num, self.head_dim)
+        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(
+            1, token_num, self.head_num, self.head_dim
+        )
         for layer_index in range(self.layer_num):
             nccl_comm.recv(recive_buffer, src=0)
             for i, mem in enumerate(mem_managers):
                 if i == cur_device_index:
-                    mem._write_kv_move_data(move_token_indexes, recive_buffer, layer_index)
+                    mem._write_kv_move_data(
+                        move_token_indexes, recive_buffer, layer_index
+                    )
                 else:
-                    new_recive_buffer = mem.kv_move_buffer.view(-1)[0:move_size].view(recive_buffer.shape)
+                    new_recive_buffer = mem.kv_move_buffer.view(-1)[0:move_size].view(
+                        recive_buffer.shape
+                    )
                     from torch.cuda import comm
 
                     comm.broadcast(recive_buffer, out=[new_recive_buffer])
-                    mem._write_kv_move_data(move_token_indexes, new_recive_buffer, layer_index)
+                    mem._write_kv_move_data(
+                        move_token_indexes, new_recive_buffer, layer_index
+                    )
         return
 
-    def _write_kv_move_data(self, token_indexes: torch.Tensor, buffer_tensor: torch.Tensor, layer_index):
-        self.kv_buffer[layer_index : layer_index + 1, token_indexes, :, :] = buffer_tensor
+    def _write_kv_move_data(
+        self, token_indexes: torch.Tensor, buffer_tensor: torch.Tensor, layer_index
+    ):
+        self.kv_buffer[layer_index : layer_index + 1, token_indexes, :, :] = (
+            buffer_tensor
+        )
         return
 
     def send_to_decode_node_p2p(
@@ -116,8 +161,12 @@ class Deepseek2MemoryManager(MemoryManager):
             self.mem_ptrs_dict = {}
             for layer_index in range(self.layer_num):
                 mems_ptr = []
-                for i in range(0, len(mem_managers), len(mem_managers) // dp_size_in_node):
-                    mems_ptr.append(mem_managers[i].kv_buffer[layer_index, :, :, :].data_ptr())
+                for i in range(
+                    0, len(mem_managers), len(mem_managers) // dp_size_in_node
+                ):
+                    mems_ptr.append(
+                        mem_managers[i].kv_buffer[layer_index, :, :, :].data_ptr()
+                    )
                 mems_ptr = torch.tensor(mems_ptr, dtype=torch.uint64, device="cuda")
                 self.mem_ptrs_dict[layer_index] = mems_ptr
 
@@ -125,14 +174,26 @@ class Deepseek2MemoryManager(MemoryManager):
         token_dp_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(task.prefill_token_indexes[-task.move_kv_len :])
-                token_dp_indexes.extend([task.prefill_dp_index for _ in range(task.move_kv_len)])
+                move_token_indexes.extend(
+                    task.prefill_token_indexes[-task.move_kv_len :]
+                )
+                token_dp_indexes.extend(
+                    [task.prefill_dp_index for _ in range(task.move_kv_len)]
+                )
 
-        move_token_indexes = torch.tensor(move_token_indexes, dtype=torch.int64, device="cuda")
-        token_dp_indexes = torch.tensor(token_dp_indexes, dtype=torch.int32, device="cuda")
+        move_token_indexes = torch.tensor(
+            move_token_indexes, dtype=torch.int64, device="cuda"
+        )
+        token_dp_indexes = torch.tensor(
+            token_dp_indexes, dtype=torch.int32, device="cuda"
+        )
         for layer_index in range(self.layer_num):
             move_buffer = self._get_kv_move_data_p2p(
-                move_token_indexes, token_dp_indexes, layer_index, self.kv_move_buffer, dp_size_in_node
+                move_token_indexes,
+                token_dp_indexes,
+                layer_index,
+                self.kv_move_buffer,
+                dp_size_in_node,
             )
             nccl_comm.send(move_buffer, dst=1)
         return
@@ -147,7 +208,9 @@ class Deepseek2MemoryManager(MemoryManager):
     ):
         move_token_num = len(token_indexes)
         move_size = self.token_dim_size * move_token_num
-        move_buffer = kv_move_buffer.view(-1)[0:move_size].view(move_token_num, self.head_num, self.head_dim)
+        move_buffer = kv_move_buffer.view(-1)[0:move_size].view(
+            move_token_num, self.head_num, self.head_dim
+        )
         kv_trans_v2_for_p_node(
             input_mems=self.mem_ptrs_dict[layer_index],
             input_idx=token_indexes,
@@ -170,7 +233,9 @@ class Deepseek2MemoryManager(MemoryManager):
             for layer_index in range(self.layer_num):
                 mems_ptr = []
                 for i in range(0, len(mem_managers)):
-                    mems_ptr.append(mem_managers[i].kv_buffer[layer_index, :, :, :].data_ptr())
+                    mems_ptr.append(
+                        mem_managers[i].kv_buffer[layer_index, :, :, :].data_ptr()
+                    )
                 mems_ptr = torch.tensor(mems_ptr, dtype=torch.uint64, device="cuda")
                 self.mem_ptrs_dict[layer_index] = mems_ptr
 
@@ -178,19 +243,33 @@ class Deepseek2MemoryManager(MemoryManager):
         token_dp_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(task.decode_token_indexes[-task.move_kv_len :])
-                token_dp_indexes.extend([task.decode_dp_index for _ in range(task.move_kv_len)])
+                move_token_indexes.extend(
+                    task.decode_token_indexes[-task.move_kv_len :]
+                )
+                token_dp_indexes.extend(
+                    [task.decode_dp_index for _ in range(task.move_kv_len)]
+                )
 
-        move_token_indexes = torch.tensor(move_token_indexes, dtype=torch.int64, device="cuda")
-        token_dp_indexes = torch.tensor(token_dp_indexes, dtype=torch.int32, device="cuda")
+        move_token_indexes = torch.tensor(
+            move_token_indexes, dtype=torch.int64, device="cuda"
+        )
+        token_dp_indexes = torch.tensor(
+            token_dp_indexes, dtype=torch.int32, device="cuda"
+        )
 
         token_num = len(move_token_indexes)
         move_size = self.token_dim_size * token_num
-        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(token_num, self.head_num, self.head_dim)
+        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(
+            token_num, self.head_num, self.head_dim
+        )
         for layer_index in range(self.layer_num):
             nccl_comm.recv(recive_buffer, src=0)
             self._write_kv_move_data_p2p(
-                move_token_indexes, token_dp_indexes, recive_buffer, layer_index, dp_size_in_node
+                move_token_indexes,
+                token_dp_indexes,
+                recive_buffer,
+                layer_index,
+                dp_size_in_node,
             )
         return
 

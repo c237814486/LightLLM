@@ -50,7 +50,16 @@ class FusedMoeWeightTP(BaseWeight):
         self.w2 = [None, None]  # weight, weight_scale
         self.lock = threading.Lock()
 
-    def experts(self, input_tensor, router_logits, top_k, renormalize, use_grouped_topk, topk_group, num_expert_group):
+    def experts(
+        self,
+        input_tensor,
+        router_logits,
+        top_k,
+        renormalize,
+        use_grouped_topk,
+        topk_group,
+        num_expert_group,
+    ):
         from lightllm.common.fused_moe.topk_select import select_experts
 
         topk_weights, topk_ids = select_experts(
@@ -96,15 +105,26 @@ class FusedMoeWeightTP(BaseWeight):
                 w1_list = []
                 for i_experts in range(self.n_routed_experts):
                     expert_gate_up_proj = torch.cat(
-                        [self.experts_gate_projs[i_experts], self.experts_up_projs[i_experts]], dim=0
+                        [
+                            self.experts_gate_projs[i_experts],
+                            self.experts_up_projs[i_experts],
+                        ],
+                        dim=0,
                     )
                     expert_gate_up_proj = expert_gate_up_proj
                     w1_list.append(expert_gate_up_proj)
 
                 inter_shape, hidden_size = w1_list[0].shape[0], w1_list[0].shape[1]
-                w1 = torch._utils._flatten_dense_tensors(w1_list).view(len(w1_list), inter_shape, hidden_size)
-                inter_shape, hidden_size = self.w2_list[0].shape[0], self.w2_list[0].shape[1]
-                w2 = torch._utils._flatten_dense_tensors(self.w2_list).view(len(self.w2_list), inter_shape, hidden_size)
+                w1 = torch._utils._flatten_dense_tensors(w1_list).view(
+                    len(w1_list), inter_shape, hidden_size
+                )
+                inter_shape, hidden_size = (
+                    self.w2_list[0].shape[0],
+                    self.w2_list[0].shape[1],
+                )
+                w2 = torch._utils._flatten_dense_tensors(self.w2_list).view(
+                    len(self.w2_list), inter_shape, hidden_size
+                )
                 if not self.quantized_weight and self.quant_method is not None:
                     self.w1 = self.quant_method.quantize(w1)
                     self.w2 = self.quant_method.quantize(w2)
@@ -126,15 +146,25 @@ class FusedMoeWeightTP(BaseWeight):
                 w1_scale_list = []
                 for i_experts in range(self.n_routed_experts):
                     expert_gate_up_proj_scale = torch.cat(
-                        [self.experts_gate_proj_scales[i_experts], self.experts_up_proj_scales[i_experts]], dim=0
+                        [
+                            self.experts_gate_proj_scales[i_experts],
+                            self.experts_up_proj_scales[i_experts],
+                        ],
+                        dim=0,
                     )
                     w1_scale_list.append(expert_gate_up_proj_scale)
 
-                inter_shape, hidden_size = w1_scale_list[0].shape[0], w1_scale_list[0].shape[1]
+                inter_shape, hidden_size = (
+                    w1_scale_list[0].shape[0],
+                    w1_scale_list[0].shape[1],
+                )
                 w1_scale = torch._utils._flatten_dense_tensors(w1_scale_list).view(
                     len(w1_scale_list), inter_shape, hidden_size
                 )
-                inter_shape, hidden_size = self.w2_scale_list[0].shape[0], self.w2_scale_list[0].shape[1]
+                inter_shape, hidden_size = (
+                    self.w2_scale_list[0].shape[0],
+                    self.w2_scale_list[0].shape[1],
+                )
                 w2_scale = torch._utils._flatten_dense_tensors(self.w2_scale_list).view(
                     len(self.w2_scale_list), inter_shape, hidden_size
                 )
@@ -146,7 +176,9 @@ class FusedMoeWeightTP(BaseWeight):
 
     def load_hf_weights(self, weights):
         if self.e_score_correction_bias_name in weights:
-            self.e_score_correction_bias = self._cuda(weights[self.e_score_correction_bias_name])
+            self.e_score_correction_bias = self._cuda(
+                weights[self.e_score_correction_bias_name]
+            )
         for i_experts in range(self.n_routed_experts):
             w1_weight = f"{self.weight_prefix}.{i_experts}.{self.w1_weight_name}.weight"
             w2_weight = f"{self.weight_prefix}.{i_experts}.{self.w2_weight_name}.weight"
@@ -154,16 +186,25 @@ class FusedMoeWeightTP(BaseWeight):
 
             if w1_weight in weights:
                 self.experts_gate_projs[i_experts] = weights[w1_weight][
-                    self.split_inter_size * self.tp_rank_ : self.split_inter_size * (self.tp_rank_ + 1), :
+                    self.split_inter_size
+                    * self.tp_rank_ : self.split_inter_size
+                    * (self.tp_rank_ + 1),
+                    :,
                 ]
             if w3_weight in weights:
                 self.experts_up_projs[i_experts] = weights[w3_weight][
-                    self.split_inter_size * self.tp_rank_ : self.split_inter_size * (self.tp_rank_ + 1), :
+                    self.split_inter_size
+                    * self.tp_rank_ : self.split_inter_size
+                    * (self.tp_rank_ + 1),
+                    :,
                 ]
 
             if w2_weight in weights:
                 self.w2_list[i_experts] = weights[w2_weight][
-                    :, self.split_inter_size * self.tp_rank_ : self.split_inter_size * (self.tp_rank_ + 1)
+                    :,
+                    self.split_inter_size
+                    * self.tp_rank_ : self.split_inter_size
+                    * (self.tp_rank_ + 1),
                 ]
         if self.quant_method is not None:
             self._load_weight_scale(weights)

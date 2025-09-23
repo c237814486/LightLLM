@@ -70,7 +70,9 @@ def lightllm_per_token_group_quant_fp8(
         eps: The minimum to avoid dividing zero.
         dtype: The dype of output tensor. Note that only `torch.float8_e4m3fn` is supported for now.
     """
-    assert x.shape[-1] % group_size == 0, "the last dimension of `x` cannot be divisible by `group_size`"
+    assert (
+        x.shape[-1] % group_size == 0
+    ), "the last dimension of `x` cannot be divisible by `group_size`"
     assert x.is_contiguous(), "`x` is not contiguous"
 
     xs_row_major = x_s.is_contiguous()
@@ -116,9 +118,13 @@ def per_token_group_quant_fp8(
     if HAS_SGL_KERNEL:
         finfo = torch.finfo(dtype)
         fp8_max, fp8_min = finfo.max, finfo.min
-        sgl_ops.sgl_per_token_group_quant_fp8(x, x_q, x_s, group_size, 1e-10, fp8_min, fp8_max, False)
+        sgl_ops.sgl_per_token_group_quant_fp8(
+            x, x_q, x_s, group_size, 1e-10, fp8_min, fp8_max, False
+        )
     else:
-        lightllm_per_token_group_quant_fp8(x, group_size, x_q, x_s, eps=1e-10, dtype=torch.float8_e4m3fn)
+        lightllm_per_token_group_quant_fp8(
+            x, group_size, x_q, x_s, eps=1e-10, dtype=torch.float8_e4m3fn
+        )
 
 
 # copy from
@@ -159,10 +165,16 @@ def _tma_align_input_scale_kernel(
     k_offsets = tl.arange(0, BLOCK_SIZE_K)
 
     for m_base in range(pid_m, m, grid_m):
-        input_offset = input_scale_ptr + m_base * input_scale_stride_m + k_offsets * input_scale_stride_k
+        input_offset = (
+            input_scale_ptr
+            + m_base * input_scale_stride_m
+            + k_offsets * input_scale_stride_k
+        )
         input_data = tl.load(input_offset, mask=k_offsets < k_div_block_size)
 
-        output_offset = output_ptr + k_offsets * output_stride_k + m_base * output_stride_m
+        output_offset = (
+            output_ptr + k_offsets * output_stride_k + m_base * output_stride_m
+        )
         tl.store(output_offset, input_data, mask=k_offsets < k_div_block_size)
 
 
@@ -170,7 +182,9 @@ def tma_align_input_scale(input_scale: torch.Tensor):
     assert input_scale.dim() == 2
     m, k_div_block_size = input_scale.shape
     padd_m = get_tma_aligned_size(m, input_scale.element_size())
-    output = torch.empty((k_div_block_size, padd_m), dtype=input_scale.dtype, device=input_scale.device)
+    output = torch.empty(
+        (k_div_block_size, padd_m), dtype=input_scale.dtype, device=input_scale.device
+    )
 
     grid_m = min(m, 8192)
     BLOCK_SIZE_K = triton.next_power_of_2(k_div_block_size)
@@ -234,7 +248,10 @@ def test_per_token_group_quant_fp8():
     x_s = x_s[:1024]
     th_x_q, th_x_s = torch_quant(x, group_size)
     print("th_x_s - x_s", torch.abs(th_x_s - x_s.reshape(-1)).max())
-    print("th_x_q - x_q", torch.abs(th_x_q.to(torch.float32) - x_q.to(torch.float32)).max())
+    print(
+        "th_x_q - x_q",
+        torch.abs(th_x_q.to(torch.float32) - x_q.to(torch.float32)).max(),
+    )
 
 
 if __name__ == "__main__":

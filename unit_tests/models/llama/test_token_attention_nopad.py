@@ -7,7 +7,9 @@ import flashinfer
 from lightllm.utils.log_utils import init_logger
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 from lightllm.common.req_manager import ReqManager
-from lightllm.models.llama.triton_kernel.gqa_decode_flashattention_nopad import gqa_decode_attention_fwd
+from lightllm.models.llama.triton_kernel.gqa_decode_flashattention_nopad import (
+    gqa_decode_attention_fwd,
+)
 
 logger = init_logger(__name__)
 
@@ -20,7 +22,9 @@ if torch.cuda.is_available():
 
 
 def ref_token_attention_nopad(q, k, v, o, q_h, h_dim, infer_state):
-    from lightllm.models.llama.triton_kernel.token_attention_nopad_att1 import token_att_fwd
+    from lightllm.models.llama.triton_kernel.token_attention_nopad_att1 import (
+        token_att_fwd,
+    )
 
     total_token_num = infer_state.total_token_num
     batch_size = infer_state.batch_size
@@ -73,7 +77,9 @@ def test_token_attention_nopad(batch, seqlen, q_heads, kv_heads, head_dim):
     kv = torch.randn((Z * N_CTX, 2 * KV_HEADS, HEAD_DIM), dtype=dtype, device="cuda")
 
     max_input_len = Z * N_CTX
-    req_to_token_indexs = torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    req_to_token_indexs = (
+        torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    )
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda") * N_CTX
     b_start_loc = torch.arange(Z).cuda().int() * N_CTX
     b_req_idx = torch.randperm(Z, dtype=torch.int32).cuda()
@@ -122,7 +128,9 @@ def test_token_attention_nopad(batch, seqlen, q_heads, kv_heads, head_dim):
     kv_indices = torch.arange(Z * N_CTX).cuda().int()
     for b, sl, start in zip(b_req_idx, b_seq_len, b_start_loc):
         kv_indices[start : start + sl] = req_to_token_indexs[b][:sl]
-    kv_last_page_len_buffer = torch.empty(batch_size, device="cuda:0", dtype=torch.int32)
+    kv_last_page_len_buffer = torch.empty(
+        batch_size, device="cuda:0", dtype=torch.int32
+    )
     wrapper = flashinfer.decode.BatchDecodeWithPagedKVCacheWrapper(
         workspace_buffer,
         "NHD",
@@ -145,7 +153,9 @@ def test_token_attention_nopad(batch, seqlen, q_heads, kv_heads, head_dim):
         non_blocking=True,
     )
     kv = kv.unsqueeze(1)
-    wrapper.run(q, (kv[:, :, :KV_HEADS, :], kv[:, :, KV_HEADS:, :]), out=o1, return_lse=False)
+    wrapper.run(
+        q, (kv[:, :, :KV_HEADS, :], kv[:, :, KV_HEADS:, :]), out=o1, return_lse=False
+    )
 
     cos_sim1 = F.cosine_similarity(o, o1).mean()
     assert cos_sim1 == 1.0

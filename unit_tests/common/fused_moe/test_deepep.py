@@ -25,12 +25,16 @@ if torch.cuda.is_available():
 def per_block_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     assert x.dim() == 2
     m, n = x.shape
-    x_padded = torch.zeros((ceil_div(m, 128) * 128, ceil_div(n, 128) * 128), dtype=x.dtype, device=x.device)
+    x_padded = torch.zeros(
+        (ceil_div(m, 128) * 128, ceil_div(n, 128) * 128), dtype=x.dtype, device=x.device
+    )
     x_padded[:m, :n] = x
     x_view = x_padded.view(-1, 128, x_padded.size(1) // 128, 128)
     x_amax = x_view.abs().float().amax(dim=(1, 3), keepdim=True).clamp(1e-4)
     x_scaled = (x_view * (448.0 / x_amax)).to(torch.float8_e4m3fn)
-    return x_scaled.view_as(x_padded)[:m, :n].contiguous(), (x_amax / 448.0).view(x_view.size(0), x_view.size(2))
+    return x_scaled.view_as(x_padded)[:m, :n].contiguous(), (x_amax / 448.0).view(
+        x_view.size(0), x_view.size(2)
+    )
 
 
 def init_dist(local_rank: int, num_local_ranks: int):
@@ -51,7 +55,11 @@ def init_dist(local_rank: int, num_local_ranks: int):
     torch.set_default_device("cuda")
     torch.cuda.set_device(local_rank)
 
-    return dist.get_rank(), dist.get_world_size(), dist.new_group(list(range(num_local_ranks * num_nodes)))
+    return (
+        dist.get_rank(),
+        dist.get_world_size(),
+        dist.new_group(list(range(num_local_ranks * num_nodes))),
+    )
 
 
 def fused_experts_impl_ref(
@@ -75,9 +83,13 @@ def fused_experts_impl_ref(
 
     if ep_size > 1:
         tokens_per_ep_rank = tokens_per_expert.view(ep_size, -1).sum(dim=1)
-        tokens_per_expert_group = tokens_per_expert.new_empty(tokens_per_expert.shape[0])
+        tokens_per_expert_group = tokens_per_expert.new_empty(
+            tokens_per_expert.shape[0]
+        )
         dist.all_to_all_single(tokens_per_expert_group, tokens_per_expert)
-        output_splits = tokens_per_expert_group.view(ep_size, -1).sum(1).cpu().numpy().tolist()
+        output_splits = (
+            tokens_per_expert_group.view(ep_size, -1).sum(1).cpu().numpy().tolist()
+        )
         gathered_tokens = sorted_tokens.new_empty(
             tokens_per_expert_group.sum(dim=0).cpu().item(), sorted_tokens.shape[1]
         )
@@ -86,7 +98,9 @@ def fused_experts_impl_ref(
             list(gathered_tokens.split(output_splits)),
             list(sorted_tokens.split(input_split_sizes)),
         )
-        tokens_per_expert_post_gather = tokens_per_expert_group.view(ep_size, experts_per_rank).sum(dim=0)
+        tokens_per_expert_post_gather = tokens_per_expert_group.view(
+            ep_size, experts_per_rank
+        ).sum(dim=0)
         gatherd_idxs = np.zeros(shape=(gathered_tokens.shape[0],), dtype=np.int32)
         s = 0
         for i, k in enumerate(tokens_per_expert_group.cpu().numpy()):
@@ -146,13 +160,25 @@ def case1(local_rank: int, num_local_ranks: int):
     # Construct inputs
     seqlen = 16
     hidden_states = torch.randn((seqlen, 7168), device="cuda", dtype=torch.bfloat16)
-    w1 = torch.randn((256 // num_local_ranks, 4096, 7168), device="cuda", dtype=torch.bfloat16)
-    w2 = torch.randn((256 // num_local_ranks, 7168, 2048), device="cuda", dtype=torch.bfloat16)
+    w1 = torch.randn(
+        (256 // num_local_ranks, 4096, 7168), device="cuda", dtype=torch.bfloat16
+    )
+    w2 = torch.randn(
+        (256 // num_local_ranks, 7168, 2048), device="cuda", dtype=torch.bfloat16
+    )
 
     w1_fp8 = torch.empty_like(w1, dtype=torch.float8_e4m3fn)
     w2_fp8 = torch.empty_like(w2, dtype=torch.float8_e4m3fn)
-    w1_scale = torch.empty((256 // num_local_ranks, 4096 // 128, 7168 // 128), device="cuda", dtype=torch.float)
-    w2_scale = torch.empty((256 // num_local_ranks, 7168 // 128, 2048 // 128), device="cuda", dtype=torch.float)
+    w1_scale = torch.empty(
+        (256 // num_local_ranks, 4096 // 128, 7168 // 128),
+        device="cuda",
+        dtype=torch.float,
+    )
+    w2_scale = torch.empty(
+        (256 // num_local_ranks, 7168 // 128, 2048 // 128),
+        device="cuda",
+        dtype=torch.float,
+    )
 
     for i in range(256 // num_local_ranks):
         w1_fp8[i], w1_scale[i] = per_block_cast_to_fp8(w1[i])
@@ -169,7 +195,12 @@ def case1(local_rank: int, num_local_ranks: int):
     test_ll_compatibility, num_rdma_bytes = True, 0
     num_max_dispatch_tokens_per_rank = 512
     if test_ll_compatibility:
-        ll_num_tokens, ll_hidden, ll_num_experts, _ = num_max_dispatch_tokens_per_rank, 7168, 256, 8
+        ll_num_tokens, ll_hidden, ll_num_experts, _ = (
+            num_max_dispatch_tokens_per_rank,
+            7168,
+            256,
+            8,
+        )
         num_rdma_bytes = deep_ep.Buffer.get_low_latency_rdma_size_hint(
             ll_num_tokens, ll_hidden, num_ranks, ll_num_experts
         )
@@ -184,7 +215,12 @@ def case1(local_rank: int, num_local_ranks: int):
 
     # Test normal
     ref_output = fused_experts_impl_ref(
-        x=hidden_states, w1=w1, w2=w2, topk_weight=topk_weights, topk_ids=topk_ids, num_experts=256
+        x=hidden_states,
+        w1=w1,
+        w2=w2,
+        topk_weight=topk_weights,
+        topk_ids=topk_ids,
+        num_experts=256,
     )
 
     output = fused_experts_impl(
@@ -312,14 +348,20 @@ def test_scatter_gather():
     num_recv_tokens_per_expert_list[6] = 128
     num_recv_tokens_per_expert_list[7] = 128
     num_recv_tokens_per_expert_list[8] = 128
-    num_recv_tokens_per_expert = torch.tensor(num_recv_tokens_per_expert_list, dtype=torch.int, device="cuda")
+    num_recv_tokens_per_expert = torch.tensor(
+        num_recv_tokens_per_expert_list, dtype=torch.int, device="cuda"
+    )
 
     all_tokens = sum(num_recv_tokens_per_expert_list)
     m_indices_ref = torch.empty(all_tokens, device="cuda", dtype=torch.int32)
     m_indices = torch.empty(all_tokens, device="cuda", dtype=torch.int32)
 
-    recv_x = torch.randn((7, 4096), device="cuda", dtype=torch.float32).to(torch.float8_e4m3fn)
-    recv_x_scale = torch.randn((7, 4096 // block_size), device="cuda", dtype=torch.float32)
+    recv_x = torch.randn((7, 4096), device="cuda", dtype=torch.float32).to(
+        torch.float8_e4m3fn
+    )
+    recv_x_scale = torch.randn(
+        (7, 4096 // block_size), device="cuda", dtype=torch.float32
+    )
 
     recv_topk_id = torch.ones((7, 8), device="cuda", dtype=torch.int32) * -1
     recv_topk_weights = torch.zeros((7, 8), device="cuda", dtype=torch.float)
@@ -331,13 +373,23 @@ def test_scatter_gather():
             recv_topk_weights[i][idx] = random.randint(0, 10) / 10.0
 
     output_indexs = torch.zeros_like(recv_topk_id)
-    output_tensor = torch.zeros((all_tokens, 4096), device="cuda", dtype=torch.float32).to(torch.float8_e4m3fn)
-    output_tensor_ref = torch.zeros((all_tokens, 4096), device="cuda", dtype=torch.float32).to(torch.float8_e4m3fn)
+    output_tensor = torch.zeros(
+        (all_tokens, 4096), device="cuda", dtype=torch.float32
+    ).to(torch.float8_e4m3fn)
+    output_tensor_ref = torch.zeros(
+        (all_tokens, 4096), device="cuda", dtype=torch.float32
+    ).to(torch.float8_e4m3fn)
 
-    output_tensor_scale = torch.zeros((all_tokens, 4096 // block_size), device="cuda", dtype=torch.float32)
-    output_tensor_scale_ref = torch.zeros((all_tokens, 4096 // block_size), device="cuda", dtype=torch.float32)
+    output_tensor_scale = torch.zeros(
+        (all_tokens, 4096 // block_size), device="cuda", dtype=torch.float32
+    )
+    output_tensor_scale_ref = torch.zeros(
+        (all_tokens, 4096 // block_size), device="cuda", dtype=torch.float32
+    )
 
-    expert_start_loc = torch.cumsum(torch.tensor([0] + num_recv_tokens_per_expert_list[:-1], device="cuda"), dim=0)
+    expert_start_loc = torch.cumsum(
+        torch.tensor([0] + num_recv_tokens_per_expert_list[:-1], device="cuda"), dim=0
+    )
 
     cur = 0
     for i, k in enumerate(num_recv_tokens_per_expert_list):
@@ -364,8 +416,15 @@ def test_scatter_gather():
                 output_tensor_ref[dst][:] = recv_x[i][:]
                 output_tensor_scale_ref[dst][:] = recv_x_scale[i][:]
 
-    assert torch.allclose(output_tensor.to(torch.float), output_tensor_ref.to(torch.float), atol=1e-2, rtol=0)
-    assert torch.allclose(output_tensor_scale, output_tensor_scale_ref, atol=1e-2, rtol=0)
+    assert torch.allclose(
+        output_tensor.to(torch.float),
+        output_tensor_ref.to(torch.float),
+        atol=1e-2,
+        rtol=0,
+    )
+    assert torch.allclose(
+        output_tensor_scale, output_tensor_scale_ref, atol=1e-2, rtol=0
+    )
 
     #### gather
 

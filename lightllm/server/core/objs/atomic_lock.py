@@ -22,10 +22,14 @@ class AtomicShmLock:
 
     def _init_shm(self):
         try:
-            shm = shared_memory.SharedMemory(name=self.lock_name, create=True, size=self.dest_size)
+            shm = shared_memory.SharedMemory(
+                name=self.lock_name, create=True, size=self.dest_size
+            )
             logger.info(f"create lock shm {self.lock_name}")
         except:
-            shm = shared_memory.SharedMemory(name=self.lock_name, create=False, size=self.dest_size)
+            shm = shared_memory.SharedMemory(
+                name=self.lock_name, create=False, size=self.dest_size
+            )
             logger.info(f"link lock shm {self.lock_name}")
         self.shm = shm
         return

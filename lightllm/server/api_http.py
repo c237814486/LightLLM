@@ -42,7 +42,10 @@ from .multimodal_params import MultimodalParams
 from .httpserver.manager import HttpServerManager
 from .httpserver_for_pd_master.manager import HttpServerManagerForPDMaster
 from .api_lightllm import lightllm_get_score
-from lightllm.utils.envs_utils import get_env_start_args, get_lightllm_websocket_max_message_size
+from lightllm.utils.envs_utils import (
+    get_env_start_args,
+    get_lightllm_websocket_max_message_size,
+)
 from lightllm.utils.log_utils import init_logger
 from lightllm.utils.error_utils import ServerBusyError
 from lightllm.server.metrics.manager import MetricClient
@@ -102,8 +105,12 @@ class G_Objs:
                 enable_multimodal=args.enable_multimodal,
                 metric_port=args.metric_port,
             )
-            dp_size_in_node = max(1, args.dp // args.nnodes)  # 兼容多机纯tp的运行模式，这时候 1 // 2 == 0, 需要兼容
-            self.shared_token_load = TokenLoad(f"{get_unique_server_name()}_shared_token_load", dp_size_in_node)
+            dp_size_in_node = max(
+                1, args.dp // args.nnodes
+            )  # 兼容多机纯tp的运行模式，这时候 1 // 2 == 0, 需要兼容
+            self.shared_token_load = TokenLoad(
+                f"{get_unique_server_name()}_shared_token_load", dp_size_in_node
+            )
 
 
 g_objs = G_Objs()
@@ -146,11 +153,14 @@ async def healthcheck(request: Request):
         return JSONResponse({"message": "Error"}, status_code=503)
     from lightllm.utils.health_check import health_check, health_obj
 
-    health_task = asyncio.create_task(health_check(g_objs.args, g_objs.httpserver_manager, None))
+    health_task = asyncio.create_task(
+        health_check(g_objs.args, g_objs.httpserver_manager, None)
+    )
     if not health_obj.is_health():
         await health_task
     return JSONResponse(
-        {"message": "Ok" if health_obj.is_health() else "Error"}, status_code=200 if health_obj.is_health() else 503
+        {"message": "Ok" if health_obj.is_health() else "Error"},
+        status_code=200 if health_obj.is_health() else 503,
     )
 
 
@@ -159,15 +169,18 @@ async def token_load(request: Request):
     ans_dict = {
         # 当前使用 token 量，估计的负载
         "current_load": [
-            float(g_objs.shared_token_load.get_current_load(dp_index)) for dp_index in range(g_objs.args.dp)
+            float(g_objs.shared_token_load.get_current_load(dp_index))
+            for dp_index in range(g_objs.args.dp)
         ],
         # 朴素估计的负载，简单将当前请求的输入和输出长度想加得到,目前已未使用，其值与 dynamic_max_load 一样。
         "logical_max_load": [
-            float(g_objs.shared_token_load.get_logical_max_load(dp_index)) for dp_index in range(g_objs.args.dp)
+            float(g_objs.shared_token_load.get_logical_max_load(dp_index))
+            for dp_index in range(g_objs.args.dp)
         ],
         # 动态估计的最大负载，考虑请求中途退出的情况的负载
         "dynamic_max_load": [
-            float(g_objs.shared_token_load.get_dynamic_max_load(dp_index)) for dp_index in range(g_objs.args.dp)
+            float(g_objs.shared_token_load.get_dynamic_max_load(dp_index))
+            for dp_index in range(g_objs.args.dp)
         ],
     }
 
@@ -220,7 +233,9 @@ async def compat_generate(request: Request) -> Response:
 
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
-async def chat_completions(request: ChatCompletionRequest, raw_request: Request) -> Response:
+async def chat_completions(
+    request: ChatCompletionRequest, raw_request: Request
+) -> Response:
     resp = await chat_completions_impl(request, raw_request)
     return resp
 
@@ -240,7 +255,9 @@ async def tokens(request: Request):
         sample_params_dict = request_dict.pop("parameters", {})
 
         sampling_params = SamplingParams()
-        sampling_params.init(tokenizer=g_objs.httpserver_manager.tokenizer, **sample_params_dict)
+        sampling_params.init(
+            tokenizer=g_objs.httpserver_manager.tokenizer, **sample_params_dict
+        )
         sampling_params.verify()
 
         multimodal_params_dict = request_dict.get("multimodal_params", {})
@@ -296,7 +313,9 @@ async def register_and_keep_alive(websocket: WebSocket):
 async def kv_move_status(websocket: WebSocket):
     await websocket.accept()
     client_ip, client_port = websocket.client
-    logger.info(f"kv_move_status Client connected from IP: {client_ip}, Port: {client_port}")
+    logger.info(
+        f"kv_move_status Client connected from IP: {client_ip}, Port: {client_port}"
+    )
     try:
         while True:
             # 等待接收消息，设置超时为10秒
@@ -307,7 +326,9 @@ async def kv_move_status(websocket: WebSocket):
             upkv_status = UpKVStatus(**json_data)
             await g_objs.httpserver_manager.update_req_status(upkv_status)
     except (WebSocketDisconnect, Exception, RuntimeError) as e:
-        logger.error(f"kv_move_status client {(client_ip, client_port)} has error {str(e)}")
+        logger.error(
+            f"kv_move_status client {(client_ip, client_port)} has error {str(e)}"
+        )
         logger.exception(str(e))
     return
 

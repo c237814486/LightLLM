@@ -13,11 +13,29 @@ logger = init_logger(__name__)
 
 @staticmethod
 def fix_repopulate_pool_static(
-    ctx, Process, processes, pool, inqueue, outqueue, initializer, initargs, maxtasksperchild, wrap_exception
+    ctx,
+    Process,
+    processes,
+    pool,
+    inqueue,
+    outqueue,
+    initializer,
+    initargs,
+    maxtasksperchild,
+    wrap_exception,
 ):
     for i in range(processes - len(pool)):
         w = Process(
-            ctx, target=worker, args=(inqueue, outqueue, initializer, initargs, maxtasksperchild, wrap_exception)
+            ctx,
+            target=worker,
+            args=(
+                inqueue,
+                outqueue,
+                initializer,
+                initargs,
+                maxtasksperchild,
+                wrap_exception,
+            ),
         )
         w.name = w.name.replace("Process", "PoolWorker")
         w.daemon = False  # modify to False
@@ -120,7 +138,9 @@ def tuning_configs(device_id, device_count, **configs):
                 if cost_time < best_cost_time:
                     best_config = test_configs_list[0]
                     best_cost_time = cost_time
-                    logger.info(f"current best: {best_config}, cost_time: {best_cost_time}")
+                    logger.info(
+                        f"current best: {best_config}, cost_time: {best_cost_time}"
+                    )
                 del test_configs_list[0]
             except:
                 logger.info(f"current best: {best_config}, cost_time: {best_cost_time}")
@@ -142,7 +162,9 @@ def tuning_configs(device_id, device_count, **configs):
                 if cost_time < best_cost_time:
                     best_config = test_configs_list[0]
                     best_cost_time = cost_time
-                    logger.info(f"current best: {best_config}, cost_time: {best_cost_time}")
+                    logger.info(
+                        f"current best: {best_config}, cost_time: {best_cost_time}"
+                    )
                 del test_configs_list[0]
             except:
                 logger.info(f"current best: {best_config}, cost_time: {best_cost_time}")

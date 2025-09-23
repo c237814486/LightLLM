@@ -64,7 +64,10 @@ class Req(ctypes.Structure):
         ("group_req_id", ctypes.c_int64),
         ("input_len", ctypes.c_int),
         ("alloc_shm_numpy_len", ctypes.c_int),
-        ("shm_infer_released", ctypes.c_bool),  # 推理进程用于标记请求对象已经被推理进程释放，router进程得到信息后亦可释放shm req对象
+        (
+            "shm_infer_released",
+            ctypes.c_bool,
+        ),  # 推理进程用于标记请求对象已经被推理进程释放，router进程得到信息后亦可释放shm req对象
         ("shm_cur_kv_len", ctypes.c_int),  # 推理进程记录自己当前占用kv 显存长度
         ("shm_cur_output_len", ctypes.c_int),  # 推理进程记录自己输出长度的计数
         # candetoken_out_len 推理进程修改这个数据，让detokenization进程知道需要detoken的长度，
@@ -84,7 +87,10 @@ class Req(ctypes.Structure):
         ("out_tokens_queue", CircularQueue),
         ("sample_params", SamplingParams),
         ("chunked_prefill_size", ctypes.c_int),  # 只有chunked prefill模式才使用的参数
-        ("prefix_token_ids", PrefixTokenIdsStruct),  # 只有 token_headling 模式使用的参数
+        (
+            "prefix_token_ids",
+            PrefixTokenIdsStruct,
+        ),  # 只有 token_headling 模式使用的参数
         # can_released_mark的作用是：
         # 只有整个流程中的最后一个处理模块，一般是 detokenization 进程，标记这个参数为True后，主管理进程才能真
         # 的释放请求对像。
@@ -143,7 +149,9 @@ class Req(ctypes.Structure):
 
         self.out_tokens_queue = CircularQueue()
         self.input_len = len(prompt_ids)
-        self.alloc_shm_numpy_len = self.input_len + self.sample_params.max_new_tokens + 1024  # + 1024 for safe
+        self.alloc_shm_numpy_len = (
+            self.input_len + self.sample_params.max_new_tokens + 1024
+        )  # + 1024 for safe
         self.create_logprobs_shm_array()
         self.create_prompt_ids_shm_array()
         self.chunked_prefill_size = chunked_prefill_size
@@ -160,28 +168,36 @@ class Req(ctypes.Structure):
     def create_prompt_ids_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_prompts_{self.index_in_shm_mem}"
-        self.shm_prompt_ids = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.int64)
+        self.shm_prompt_ids = ShmArray(
+            name, (self.alloc_shm_numpy_len,), dtype=np.int64
+        )
         self.shm_prompt_ids.create_shm()
         return
 
     def link_prompt_ids_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_prompts_{self.index_in_shm_mem}"
-        self.shm_prompt_ids = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.int64)
+        self.shm_prompt_ids = ShmArray(
+            name, (self.alloc_shm_numpy_len,), dtype=np.int64
+        )
         self.shm_prompt_ids.link_shm()
         return
 
     def create_logprobs_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_logprobs_{self.index_in_shm_mem}"
-        self.shm_logprobs = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.float32)
+        self.shm_logprobs = ShmArray(
+            name, (self.alloc_shm_numpy_len,), dtype=np.float32
+        )
         self.shm_logprobs.create_shm()
         return
 
     def link_logprobs_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_logprobs_{self.index_in_shm_mem}"
-        self.shm_logprobs = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.float32)
+        self.shm_logprobs = ShmArray(
+            name, (self.alloc_shm_numpy_len,), dtype=np.float32
+        )
         self.shm_logprobs.link_shm()
         return
 
@@ -200,7 +216,12 @@ class Req(ctypes.Structure):
                 self.sample_params.suggested_dp_index,
             )
         else:
-            return (self.request_id, self.index_in_shm_mem, None, self.sample_params.suggested_dp_index)
+            return (
+                self.request_id,
+                self.index_in_shm_mem,
+                None,
+                self.sample_params.suggested_dp_index,
+            )
 
     def can_release(self):
         # 只有管理节点有一个引用
@@ -210,7 +231,12 @@ class Req(ctypes.Structure):
         if self.is_aborted and can_released_mark and ref_count_ok:
             return True
 
-        if self.finish_status.is_finished() and can_released_mark and ref_count_ok and self.out_tokens_queue.is_empty():
+        if (
+            self.finish_status.is_finished()
+            and can_released_mark
+            and ref_count_ok
+            and self.out_tokens_queue.is_empty()
+        ):
             return True
 
         return False
@@ -237,7 +263,9 @@ class Req(ctypes.Structure):
         cur_ids = self.shm_prompt_ids.arr[0 : self.input_len]
         all_prompts = []
         for index in range(len(cur_ids) - 1):
-            tmp_dict = {int(cur_ids[index + 1]): float(self.shm_logprobs.arr[index + 1])}
+            tmp_dict = {
+                int(cur_ids[index + 1]): float(self.shm_logprobs.arr[index + 1])
+            }
             all_prompts.append([int(cur_ids[index]), tmp_dict])
 
         metadata["prompt_logprobs"] = all_prompts
@@ -273,12 +301,19 @@ class ChunkedPrefillReq(Req):
             cur_max_new_token_len = self.sample_params.max_new_tokens
         else:
             cur_max_new_token_len = min(
-                self.sample_params.max_new_tokens, max(int(1.1 * has_out_len), router_max_new_token_len)
+                self.sample_params.max_new_tokens,
+                max(int(1.1 * has_out_len), router_max_new_token_len),
             )
 
         a_len = max(self.input_len + has_out_len + 1, self.shm_cur_kv_len + 1)
         b_len = (
-            (self.input_len + has_out_len - self.shm_cur_kv_len + self.chunked_prefill_size - 1)
+            (
+                self.input_len
+                + has_out_len
+                - self.shm_cur_kv_len
+                + self.chunked_prefill_size
+                - 1
+            )
             // self.chunked_prefill_size
             * (max_waiting_token + 1)
             + cur_max_new_token_len
@@ -294,7 +329,10 @@ class ChunkedPrefillReq(Req):
         chunkedprefill 调度模式的实现
         """
         # 当开启 mtp 模式以后，每一次 decode 需要的 token 数量会增加
-        need_tokens = min(self.input_len + self.shm_cur_output_len - self.shm_cur_kv_len, self.chunked_prefill_size)
+        need_tokens = min(
+            self.input_len + self.shm_cur_output_len - self.shm_cur_kv_len,
+            self.chunked_prefill_size,
+        )
         if need_tokens == 1:
             need_tokens = self._mtp_step + 1
 
@@ -315,7 +353,9 @@ class TokenHealingReq(ChunkedPrefillReq):
             if self.input_len > prefix_token_num:
                 self.input_len -= prefix_token_num
                 self.prefix_token_ids.set_token_ids(
-                    self.shm_prompt_ids.arr[self.input_len : (self.input_len + prefix_token_num)]
+                    self.shm_prompt_ids.arr[
+                        self.input_len : (self.input_len + prefix_token_num)
+                    ]
                 )
                 break
 
@@ -324,5 +364,7 @@ class TokenHealingReq(ChunkedPrefillReq):
         # 估计的生成token数据对应的生存周期可能会不准确,所以为了缓解调
         # 度带来的显存估计问题，对于生成token的长度 + 6来缓解可能的估计
         # 错误问题。
-        self.sample_params.max_new_tokens = self.sample_params.max_new_tokens + self.prefix_token_ids.size + 6
+        self.sample_params.max_new_tokens = (
+            self.sample_params.max_new_tokens + self.prefix_token_ids.size + 6
+        )
         return

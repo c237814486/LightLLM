@@ -20,7 +20,9 @@ def test_sp_pad_copy(token_num, hidden_dim, sp_world_size):
 
     in_tensor = torch.randn((token_num, hidden_dim), dtype=torch.float16, device="cuda")
     out_tensors = [
-        sp_pad_copy(in_tensor=in_tensor, sp_rank_id=rank_id, sp_world_size=sp_world_size)
+        sp_pad_copy(
+            in_tensor=in_tensor, sp_rank_id=rank_id, sp_world_size=sp_world_size
+        )
         for rank_id in range(sp_world_size)
     ]
     out_tensor = torch.cat(out_tensors, dim=0)

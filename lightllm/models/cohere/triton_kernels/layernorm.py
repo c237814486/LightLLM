@@ -2,6 +2,7 @@ import torch
 import triton
 import triton.language as tl
 
+
 # LayerNorm adapted from triton tutorial, used for Cohere q, k norm
 # X [N, head_num, head_dim]
 # W [head_num, head_dim]

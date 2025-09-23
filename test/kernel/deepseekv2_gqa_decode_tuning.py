@@ -4,7 +4,9 @@ import os
 import torch.multiprocessing as mp
 from typing import List
 from lightllm.utils.log_utils import init_logger
-from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding import gqa_token_decode_attention_flash_decoding
+from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding import (
+    gqa_token_decode_attention_flash_decoding,
+)
 from lightllm.utils.watchdog_utils import Watchdog
 
 logger = init_logger(__name__)
@@ -43,13 +45,22 @@ def test_decode_attentions(
     infer_state.max_len_in_batch = test_seq_len
     infer_state.req_manager = tmp_class()
     infer_state.req_manager.req_to_token_indexs = torch.zeros(
-        (infer_state.batch_size, infer_state.max_len_in_batch), dtype=torch.int32, device="cuda"
+        (infer_state.batch_size, infer_state.max_len_in_batch),
+        dtype=torch.int32,
+        device="cuda",
     )
     infer_state.req_manager.req_to_token_indexs.view(-1)[:] = torch.arange(
-        0, infer_state.batch_size * infer_state.max_len_in_batch, step=1, dtype=torch.int32
+        0,
+        infer_state.batch_size * infer_state.max_len_in_batch,
+        step=1,
+        dtype=torch.int32,
     ).cuda()
-    infer_state.b_req_idx = torch.arange(0, infer_state.batch_size, step=1, dtype=torch.int32).cuda()
-    infer_state.b_seq_len = torch.full((infer_state.batch_size,), fill_value=test_seq_len, dtype=torch.int32).cuda()
+    infer_state.b_req_idx = torch.arange(
+        0, infer_state.batch_size, step=1, dtype=torch.int32
+    ).cuda()
+    infer_state.b_seq_len = torch.full(
+        (infer_state.batch_size,), fill_value=test_seq_len, dtype=torch.int32
+    ).cuda()
 
     input_tuples = []
     for _ in range(test_count):
@@ -294,7 +305,9 @@ if __name__ == "__main__":
     torch.multiprocessing.set_start_method("spawn")
 
     from lightllm.utils.tuning_utils import mp_tuning
-    from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding_config import MlaDecodeAttentionKernelConfig
+    from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding_config import (
+        MlaDecodeAttentionKernelConfig,
+    )
 
     q_head_num = 16
     q_head_dim = 512

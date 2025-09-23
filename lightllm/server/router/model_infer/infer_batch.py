@@ -32,10 +32,16 @@ class InferenceContext:
     infer_req_ids = None
     vocab_size = None
 
-    overlap_stream: torch.cuda.Stream = None  # 一些情况下推理进程进行异步折叠操作的异步流对象。
+    overlap_stream: torch.cuda.Stream = (
+        None  # 一些情况下推理进程进行异步折叠操作的异步流对象。
+    )
 
     def register(
-        self, req_manager: ReqManager, radix_cache: RadixCache, shm_req_manager: ShmReqManager, vocab_size: int
+        self,
+        req_manager: ReqManager,
+        radix_cache: RadixCache,
+        shm_req_manager: ShmReqManager,
+        vocab_size: int,
     ):
         self.req_manager = req_manager
         self.req_sampling_manager = self.req_manager.req_sampling_params_manager
@@ -54,7 +60,9 @@ class InferenceContext:
             self.overlap_stream = torch.cuda.Stream()
         return self.overlap_stream
 
-    def add_reqs(self, requests: List[Tuple[int, int, Any, int]], init_prefix_cache: bool = True) -> List["InferReq"]:
+    def add_reqs(
+        self, requests: List[Tuple[int, int, Any, int]], init_prefix_cache: bool = True
+    ) -> List["InferReq"]:
         req_objs = []
         request_ids = []
         for r in requests:
@@ -80,36 +88,62 @@ class InferenceContext:
                 req: InferReq = g_infer_context.requests_mapping[r_id]
                 group_req_id = req.shm_req.group_req_id
                 if group_req_id not in g_infer_context.group_mapping:
-                    g_infer_context.group_mapping[group_req_id] = InferReqGroup(group_req_id=group_req_id)
+                    g_infer_context.group_mapping[group_req_id] = InferReqGroup(
+                        group_req_id=group_req_id
+                    )
                 g_infer_context.group_mapping[group_req_id].add_req(r_id)
 
         return req_objs
 
-    def free_a_req_mem(self, free_token_index: List, req: "InferReq", is_group_finished: bool):
+    def free_a_req_mem(
+        self, free_token_index: List, req: "InferReq", is_group_finished: bool
+    ):
         if self.radix_cache is None:
             if is_group_finished:
-                free_token_index.append(self.req_manager.req_to_token_indexs[req.req_idx][0 : req.cur_kv_len])
+                free_token_index.append(
+                    self.req_manager.req_to_token_indexs[req.req_idx][
+                        0 : req.cur_kv_len
+                    ]
+                )
             else:
                 free_token_index.append(
-                    self.req_manager.req_to_token_indexs[req.req_idx][req.shm_req.input_len : req.cur_kv_len]
+                    self.req_manager.req_to_token_indexs[req.req_idx][
+                        req.shm_req.input_len : req.cur_kv_len
+                    ]
                 )
         else:
             input_token_ids = req.get_input_token_ids()
-            key = torch.tensor(input_token_ids[0 : req.cur_kv_len], dtype=torch.int64, device="cpu")
+            key = torch.tensor(
+                input_token_ids[0 : req.cur_kv_len], dtype=torch.int64, device="cpu"
+            )
             # .cpu() 是 流内阻塞操作
-            value = self.req_manager.req_to_token_indexs[req.req_idx][: req.cur_kv_len].detach().cpu()
+            value = (
+                self.req_manager.req_to_token_indexs[req.req_idx][: req.cur_kv_len]
+                .detach()
+                .cpu()
+            )
 
             if is_group_finished:
                 prefix_len = self.radix_cache.insert(key, value)
-                old_prefix_len = 0 if req.shared_kv_node is None else req.shared_kv_node.node_prefix_total_len
-                free_token_index.append(self.req_manager.req_to_token_indexs[req.req_idx][old_prefix_len:prefix_len])
+                old_prefix_len = (
+                    0
+                    if req.shared_kv_node is None
+                    else req.shared_kv_node.node_prefix_total_len
+                )
+                free_token_index.append(
+                    self.req_manager.req_to_token_indexs[req.req_idx][
+                        old_prefix_len:prefix_len
+                    ]
+                )
                 if req.shared_kv_node is not None:
                     assert req.shared_kv_node.node_prefix_total_len <= prefix_len
                     self.radix_cache.dec_node_ref_counter(req.shared_kv_node)
                     req.shared_kv_node = None
             else:
                 free_token_index.append(
-                    self.req_manager.req_to_token_indexs[req.req_idx][req.shm_req.input_len : req.cur_kv_len]
+                    self.req_manager.req_to_token_indexs[req.req_idx][
+                        req.shm_req.input_len : req.cur_kv_len
+                    ]
                 )
                 if req.shared_kv_node is not None:
                     self.radix_cache.dec_node_ref_counter(req.shared_kv_node)
@@ -123,7 +157,9 @@ class InferenceContext:
         like paper:
         https://arxiv.org/abs/2403.01241
         """
-        prompt_cache_token_id = list(self.radix_cache.root_node.children.values())[0].token_id_key
+        prompt_cache_token_id = list(self.radix_cache.root_node.children.values())[
+            0
+        ].token_id_key
         print(f"prompt_cache_token_id : {prompt_cache_token_id}")
         index = range(len(prompt_cache_token_id))
         prompt_cache_kv_buffer = self.radix_cache.mem_manager.get_index_kv_buffer(index)
@@ -140,7 +176,9 @@ class InferenceContext:
             req: InferReq = self.requests_mapping.pop(request_id)
             group_req_id = convert_sub_id_to_group_id(req.shm_req.request_id)
             if group_req_id in self.group_mapping:
-                is_group_finished = self.group_mapping[group_req_id].remove_req(req.shm_req.request_id)
+                is_group_finished = self.group_mapping[group_req_id].remove_req(
+                    req.shm_req.request_id
+                )
                 if is_group_finished:
                     del self.group_mapping[group_req_id]
                 self.free_a_req_mem(free_token_index, req, is_group_finished)
@@ -155,7 +193,9 @@ class InferenceContext:
         self.req_manager.free(free_req_index, free_token_index)
 
         finished_req_ids_set = set(finished_request_ids)
-        self.infer_req_ids = [_id for _id in self.infer_req_ids if _id not in finished_req_ids_set]
+        self.infer_req_ids = [
+            _id for _id in self.infer_req_ids if _id not in finished_req_ids_set
+        ]
 
         if self.radix_cache is not None and len(self.infer_req_ids) == 0:
             logger.debug(
@@ -217,9 +257,12 @@ class InferenceContext:
         radix_cache_unref_token_num = 0
         if self.radix_cache is not None:
             radix_cache_unref_token_num = (
-                self.radix_cache.get_tree_total_tokens_num() - self.radix_cache.get_refed_tokens_num()
+                self.radix_cache.get_tree_total_tokens_num()
+                - self.radix_cache.get_refed_tokens_num()
             )
-        return self.req_manager.mem_manager.can_use_mem_size + radix_cache_unref_token_num
+        return (
+            self.req_manager.mem_manager.can_use_mem_size + radix_cache_unref_token_num
+        )
 
 
 g_infer_context = InferenceContext()
@@ -253,15 +296,21 @@ class InferSamplingParams:
 
         # p d mode use params
         if self.shm_param.move_kv_to_decode_node.exists:
-            self.move_kv_to_decode_node = self.shm_param.move_kv_to_decode_node.to_dict()
+            self.move_kv_to_decode_node = (
+                self.shm_param.move_kv_to_decode_node.to_dict()
+            )
         else:
             self.move_kv_to_decode_node = None
 
         # this check is not very good to placed here. to do...
         if self.allowed_token_ids is not None:
             if not all(e < vocab_size for e in self.allowed_token_ids):
-                logger.error("allowed_token_ids contain tokenid >= vobsize, we remove these token ids")
-                self.allowed_token_ids = [e for e in self.allowed_token_ids if e < vocab_size]
+                logger.error(
+                    "allowed_token_ids contain tokenid >= vobsize, we remove these token ids"
+                )
+                self.allowed_token_ids = [
+                    e for e in self.allowed_token_ids if e < vocab_size
+                ]
         return
 
     def has_constraint_setting(self) -> bool:
@@ -309,14 +358,20 @@ class InferReq:
         return
 
     def _init_all_state(self):
-        self.shm_req = g_infer_context.shm_req_manager.get_req_obj_by_index(self.shm_index)
+        self.shm_req = g_infer_context.shm_req_manager.get_req_obj_by_index(
+            self.shm_index
+        )
         self.shm_req.link_prompt_ids_shm_array()
         self.shm_req.link_logprobs_shm_array()
-        self.sampling_param: InferSamplingParams = InferSamplingParams(self.shm_req, self.vocab_size)
+        self.sampling_param: InferSamplingParams = InferSamplingParams(
+            self.shm_req, self.vocab_size
+        )
         self.cur_kv_len = 0
         self.cur_output_len = 0
 
-        g_infer_context.req_manager.req_sampling_params_manager.init_req_sampling_params(self)
+        g_infer_context.req_manager.req_sampling_params_manager.init_req_sampling_params(
+            self
+        )
 
         self.stop_sequences = self.sampling_param.shm_param.stop_sequences.to_list()
         # token healing mode 才被使用的管理对象
@@ -331,18 +386,34 @@ class InferReq:
         return
 
     def _match_radix_cache(self):
-        if g_infer_context.radix_cache is not None and self.get_cur_total_len() > 1 and self.cur_kv_len == 0:
-            input_token_ids = self.shm_req.shm_prompt_ids.arr[0 : self.get_cur_total_len()]
+        if (
+            g_infer_context.radix_cache is not None
+            and self.get_cur_total_len() > 1
+            and self.cur_kv_len == 0
+        ):
+            input_token_ids = self.shm_req.shm_prompt_ids.arr[
+                0 : self.get_cur_total_len()
+            ]
             key = torch.tensor(input_token_ids, dtype=torch.int64, device="cpu")
-            key = key[0 : len(key) - 1]  # 最后一个不需要，因为需要一个额外的token，让其在prefill的时候输出下一个token的值
-            share_node, kv_len, value_tensor = g_infer_context.radix_cache.match_prefix(key, update_refs=True)
+            key = key[
+                0 : len(key) - 1
+            ]  # 最后一个不需要，因为需要一个额外的token，让其在prefill的时候输出下一个token的值
+            share_node, kv_len, value_tensor = g_infer_context.radix_cache.match_prefix(
+                key, update_refs=True
+            )
             if share_node is not None:
                 self.shared_kv_node = share_node
                 ready_cache_len = share_node.node_prefix_total_len
                 # 从 cpu 到 gpu 是流内阻塞操作
-                g_infer_context.req_manager.req_to_token_indexs[self.req_idx, 0:ready_cache_len] = value_tensor
-                self.cur_kv_len = int(ready_cache_len)  # 序列化问题, 该对象可能为numpy.int64，用 int(*)转换
-                self.shm_req.prompt_cache_len = self.cur_kv_len  # 记录 prompt cache 的命中长度
+                g_infer_context.req_manager.req_to_token_indexs[
+                    self.req_idx, 0:ready_cache_len
+                ] = value_tensor
+                self.cur_kv_len = int(
+                    ready_cache_len
+                )  # 序列化问题, 该对象可能为numpy.int64，用 int(*)转换
+                self.shm_req.prompt_cache_len = (
+                    self.cur_kv_len
+                )  # 记录 prompt cache 的命中长度
 
         self.shm_req.shm_cur_kv_len = self.cur_kv_len
         return
@@ -358,15 +429,21 @@ class InferReq:
 
     def get_chuncked_input_token_ids(self):
         chunked_start = self.cur_kv_len
-        chunked_end = min(self.get_cur_total_len(), chunked_start + self.shm_req.chunked_prefill_size)
+        chunked_end = min(
+            self.get_cur_total_len(), chunked_start + self.shm_req.chunked_prefill_size
+        )
         return self.shm_req.shm_prompt_ids.arr[0:chunked_end]
 
     def get_chuncked_input_token_len(self):
         chunked_start = self.cur_kv_len
-        chunked_end = min(self.get_cur_total_len(), chunked_start + self.shm_req.chunked_prefill_size)
+        chunked_end = min(
+            self.get_cur_total_len(), chunked_start + self.shm_req.chunked_prefill_size
+        )
         return chunked_end
 
-    def set_next_gen_token_id(self, next_token_id: int, logprob: float, output_len: int):
+    def set_next_gen_token_id(
+        self, next_token_id: int, logprob: float, output_len: int
+    ):
         index = self.shm_req.input_len + output_len
         self.shm_req.shm_prompt_ids.arr[index - 1] = next_token_id
         self.shm_req.shm_logprobs.arr[index - 1] = logprob
@@ -377,14 +454,17 @@ class InferReq:
         self.shm_req.mtp_accepted_token_num += accept_token_num
 
     def get_last_gen_token(self):
-        return self.shm_req.shm_prompt_ids.arr[self.shm_req.input_len + self.cur_output_len - 1]
+        return self.shm_req.shm_prompt_ids.arr[
+            self.shm_req.input_len + self.cur_output_len - 1
+        ]
 
     def update_finish_status(self, eos_ids, output_len: int):
         if self._stop_sequences_matched(output_len=output_len):
             self.finish_status.set_status(FinishStatus.FINISHED_STOP)
         elif (
             output_len > 0
-            and self.shm_req.shm_prompt_ids.arr[self.shm_req.input_len + output_len - 1] in eos_ids
+            and self.shm_req.shm_prompt_ids.arr[self.shm_req.input_len + output_len - 1]
+            in eos_ids
             and self.sampling_param.shm_param.ignore_eos is False
         ):
             self.finish_status.set_status(FinishStatus.FINISHED_STOP)
@@ -400,8 +480,13 @@ class InferReq:
             stop_len = len(stop_token_ids)
             if stop_len > 0:
                 if output_len >= stop_len:
-                    input_token_ids = self.shm_req.shm_prompt_ids.arr[0 : (self.shm_req.input_len + output_len)]
-                    if all(input_token_ids[i] == stop_token_ids[i] for i in range(-1, -(stop_len + 1), -1)):
+                    input_token_ids = self.shm_req.shm_prompt_ids.arr[
+                        0 : (self.shm_req.input_len + output_len)
+                    ]
+                    if all(
+                        input_token_ids[i] == stop_token_ids[i]
+                        for i in range(-1, -(stop_len + 1), -1)
+                    ):
                         return True
         return False
 
@@ -431,7 +516,10 @@ class InferReqGroup:
         return g_infer_context.requests_mapping[self.req_ids_group[index]]
 
     def get_all_reqs(self):
-        return [g_infer_context.requests_mapping[self.req_ids_group[i]] for i in range(len(self.req_ids_group))]
+        return [
+            g_infer_context.requests_mapping[self.req_ids_group[i]]
+            for i in range(len(self.req_ids_group))
+        ]
 
     def add_req(self, req_id):
         self.req_ids_group.append(req_id)
@@ -446,14 +534,18 @@ class InferReqGroup:
 
     def diverse_copy(self, req_manager, is_prefill):
         # record previous status
-        prev_req = g_infer_context.requests_mapping[convert_sub_id_to_group_id(self.req_ids_group[0])]
+        prev_req = g_infer_context.requests_mapping[
+            convert_sub_id_to_group_id(self.req_ids_group[0])
+        ]
         if prev_req.shared_kv_node is not None:
             prefix_len = prev_req.shared_kv_node.node_prefix_total_len
         else:
             prefix_len = 0
         prefix_len = max(prefix_len, prev_req.cur_kv_len)
         pre_input_len = prev_req.get_chuncked_input_token_len()
-        cache_token_id = req_manager.req_to_token_indexs[prev_req.req_idx][prefix_len:pre_input_len]
+        cache_token_id = req_manager.req_to_token_indexs[prev_req.req_idx][
+            prefix_len:pre_input_len
+        ]
         # update the InferReq status and mem_manager status for cache sharing
         for req_id in self.req_ids_group[:]:
             if req_id == convert_sub_id_to_group_id(req_id):
@@ -461,7 +553,9 @@ class InferReqGroup:
             req = g_infer_context.requests_mapping[req_id]
             req.finish_status.set_status(FinishStatus.NO_FINISH)
             input_len = req.get_chuncked_input_token_len()
-            req_manager.req_to_token_indexs[req.req_idx][prefix_len:input_len] = cache_token_id
+            req_manager.req_to_token_indexs[req.req_idx][
+                prefix_len:input_len
+            ] = cache_token_id
             assert input_len == pre_input_len
 
 
@@ -490,7 +584,9 @@ class InferReqUpdatePack:
         req_obj = self.req_obj
         shm_req = req_obj.shm_req
         finish_status = req_obj.finish_status
-        req_obj.set_next_gen_token_id(next_token_id, next_token_logprob, self.output_len)
+        req_obj.set_next_gen_token_id(
+            next_token_id, next_token_logprob, self.output_len
+        )
 
         # 这里提前判定的主要作用是：
         # 在 mtp mode 下，可以存在同一个 req 对象的多次处理，

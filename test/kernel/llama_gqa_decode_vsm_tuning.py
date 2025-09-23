@@ -49,8 +49,12 @@ def test_decode_attentions(
     state.req_manager.req_to_token_indexs.view(-1)[:] = torch.arange(
         0, state.batch_size * state.max_len_in_batch, step=1, dtype=torch.int32
     ).cuda()
-    state.b_req_idx = torch.arange(0, state.batch_size, step=1, dtype=torch.int32).cuda()
-    state.b_seq_len = torch.full((state.batch_size,), fill_value=test_seq_len, dtype=torch.int32).cuda()
+    state.b_req_idx = torch.arange(
+        0, state.batch_size, step=1, dtype=torch.int32
+    ).cuda()
+    state.b_seq_len = torch.full(
+        (state.batch_size,), fill_value=test_seq_len, dtype=torch.int32
+    ).cuda()
 
     args = []
     q_head_dim = q_shape[2]
@@ -60,7 +64,7 @@ def test_decode_attentions(
     state.q_head_num = q_head_num
     state.q_head_dim = q_head_dim
     state.kv_head_num = kv_head_num
-    state.softmax_scale = 1 / (q_head_dim ** 0.5)
+    state.softmax_scale = 1 / (q_head_dim**0.5)
     state.total_token_num = state.batch_size * test_seq_len
 
     infer_state = state
@@ -267,7 +271,9 @@ if __name__ == "__main__":
     torch.multiprocessing.set_start_method("spawn")
 
     from lightllm.utils.tuning_utils import mp_tuning
-    from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding_config import MlaDecodeAttentionKernelConfig
+    from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding_config import (
+        MlaDecodeAttentionKernelConfig,
+    )
 
     import collections
 

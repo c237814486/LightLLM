@@ -17,7 +17,8 @@ class DpQueue:
 
         self.router: RouterManager = router
         self.inner_queues: List[BaseQueue] = [
-            base_queue_class(args, router, dp_index, dp_size_in_node) for dp_index in range(self.dp_size_in_node)
+            base_queue_class(args, router, dp_index, dp_size_in_node)
+            for dp_index in range(self.dp_size_in_node)
         ]
 
         return
@@ -32,7 +33,8 @@ class DpQueue:
     # @calculate_time(show=True, min_cost_ms=10)
     def generate_new_batch(self, current_batch: Batch):
         batches = [
-            self.inner_queues[dp_index].generate_new_batch(current_batch) for dp_index in range(self.dp_size_in_node)
+            self.inner_queues[dp_index].generate_new_batch(current_batch)
+            for dp_index in range(self.dp_size_in_node)
         ]
         return self._merge_batch(batches)
 
@@ -48,7 +50,9 @@ class DpQueue:
     def append(self, req: Req):
         suggested_dp_index = req.sample_params.suggested_dp_index
         if suggested_dp_index >= self.dp_size_in_node or suggested_dp_index < 0:
-            logger.warning(f"input req {req.request_id} dp index {suggested_dp_index} is invalid")
+            logger.warning(
+                f"input req {req.request_id} dp index {suggested_dp_index} is invalid"
+            )
             suggested_dp_index = self._get_suggest_dp_index()
             self.pre_select_dp_index = suggested_dp_index
             req.sample_params.suggested_dp_index = suggested_dp_index
@@ -63,7 +67,9 @@ class DpQueue:
         for req in req_group:
             suggested_dp_index = req.sample_params.suggested_dp_index
             if suggested_dp_index >= self.dp_size_in_node or suggested_dp_index < 0:
-                logger.warning(f"input req {req.request_id} dp index {suggested_dp_index} is invalid")
+                logger.warning(
+                    f"input req {req.request_id} dp index {suggested_dp_index} is invalid"
+                )
                 self.pre_select_dp_index = index
                 req.sample_params.suggested_dp_index = index
                 self.inner_queues[index].append(req)
@@ -78,20 +84,31 @@ class DpQueue:
     def update_token_load(self, current_batch: Batch, force_update=False):
         if self.router.shared_token_load.need_update_dynamic_max_load() or force_update:
             for dp_index in range(self.dp_size_in_node):
-                estimated_peak_token_count, dynamic_max_load = self.inner_queues[dp_index].calcu_batch_token_load(
-                    current_batch
+                estimated_peak_token_count, dynamic_max_load = self.inner_queues[
+                    dp_index
+                ].calcu_batch_token_load(current_batch)
+                token_ratio1 = (
+                    self.router.get_used_tokens(dp_index)
+                    / self.router.max_total_token_num
                 )
-                token_ratio1 = self.router.get_used_tokens(dp_index) / self.router.max_total_token_num
                 with g_router_lock.obj:
-                    self.router.shared_token_load.set_current_load(token_ratio1, dp_index)
-                    self.router.shared_token_load.set_estimated_peak_token_count(estimated_peak_token_count, dp_index)
-                    self.router.shared_token_load.set_dynamic_max_load(dynamic_max_load, dp_index)
+                    self.router.shared_token_load.set_current_load(
+                        token_ratio1, dp_index
+                    )
+                    self.router.shared_token_load.set_estimated_peak_token_count(
+                        estimated_peak_token_count, dp_index
+                    )
+                    self.router.shared_token_load.set_dynamic_max_load(
+                        dynamic_max_load, dp_index
+                    )
         return
 
     def _get_suggest_dp_index(self):
         min_length = min(len(queue.waiting_req_list) for queue in self.inner_queues)
         select_dp_indexes = [
-            i for i, queue in enumerate(self.inner_queues) if len(queue.waiting_req_list) == min_length
+            i
+            for i, queue in enumerate(self.inner_queues)
+            if len(queue.waiting_req_list) == min_length
         ]
 
         # multi thread safe keep

@@ -9,7 +9,9 @@ from lightllm.models.registry import ModelRegistry
 from lightllm.common.basemodel.multimodal_tokenizer import BaseMultiModalTokenizer
 from transformers import AutoTokenizer
 from lightllm.models.qwen2.model import Qwen2TpPartModel
-from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import LlamaMultimodalPreLayerInfer
+from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import (
+    LlamaMultimodalPreLayerInfer,
+)
 from lightllm.server.multimodal_params import MultimodalParams, ImageItem, AudioItem
 from lightllm.common.build_utils import repair_config
 from transformers import AutoConfig
@@ -50,22 +52,32 @@ class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
     def get_image_token_length(self, img: ImageItem):
         width = img.image_w
         height = img.image_h
-        h, w = self.get_adaptive_pool_size(height, width, scale=self.model_cfg["mm_downsample_ratio"])
+        h, w = self.get_adaptive_pool_size(
+            height, width, scale=self.model_cfg["mm_downsample_ratio"]
+        )
         image_length = h * w // 2  # 每两张图需要合并
         return image_length
 
     def get_audio_token_length(self, audio: AudioItem):
         feature_len = audio.audio_length // self.audio_frame_length
-        token_num = (feature_len + self.audio_downsample_ratio - 1) // self.audio_downsample_ratio
+        token_num = (
+            feature_len + self.audio_downsample_ratio - 1
+        ) // self.audio_downsample_ratio
         return token_num
 
     def init_imageitem_extral_params(
-        self, img: ImageItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        img: ImageItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         return
 
     def init_audioitem_extral_params(
-        self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        audio: AudioItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         return
 
@@ -84,7 +96,11 @@ class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
                 if len(input_ids) == 0:
                     input_ids.extend(ids)
                 else:
-                    if len(ids) > 0 and ids[0] == self.tokenizer.bos_token_id and self.skip_start:
+                    if (
+                        len(ids) > 0
+                        and ids[0] == self.tokenizer.bos_token_id
+                        and self.skip_start
+                    ):
                         ids = ids[1:]
                     input_ids.extend(ids)
             idx += 1
@@ -104,9 +120,14 @@ class LlavaQWen25AudioVLTokenizer(BaseMultiModalTokenizer):
                     ), "Not enough audios in multimodal_params"
                     token_id = multimodal_params.audios[audio_id].token_id
                     token_num = multimodal_params.audios[audio_id].token_num
-                    if self.audio_start_id is not None and self.audio_end_id is not None:
+                    if (
+                        self.audio_start_id is not None
+                        and self.audio_end_id is not None
+                    ):
                         audio_input_ids = (
-                            [self.audio_start_id] + list(range(token_id, token_id + token_num)) + [self.audio_end_id]
+                            [self.audio_start_id]
+                            + list(range(token_id, token_id + token_num))
+                            + [self.audio_end_id]
                         )
                     else:
                         audio_input_ids = list(range(token_id, token_id + token_num))

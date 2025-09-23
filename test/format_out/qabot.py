@@ -12,7 +12,9 @@ def read_md_files(root_dir):
                 with open(file_path, "r", encoding="utf-8") as file:
                     content = file.read()
                     print(f"Path: {file_path}\nContent:\n{content}\n")
-                    ans_str += f"<title>{file_path}</title><content>{content}</content>\n\n"
+                    ans_str += (
+                        f"<title>{file_path}</title><content>{content}</content>\n\n"
+                    )
     return ans_str
 
 
@@ -23,7 +25,9 @@ from pydantic import BaseModel, constr, conlist
 from enum import Enum
 from typing import List
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 from format_out.impl import ChatSession
@@ -39,13 +43,20 @@ knowledge_start = """<|start_header_id|>knowledge<|end_header_id|>"""
 knowledge_end = """<|eot_id|>"""
 
 chat_session = ChatSession(
-    chat_his=system_prompt, url="http://localhost:8017/generate", sampling_param=SamplingParams(do_sample=False)
+    chat_his=system_prompt,
+    url="http://localhost:8017/generate",
+    sampling_param=SamplingParams(do_sample=False),
 )
 chat_session.sampling_param.top_p = 0.7
 chat_session.sampling_param.top_k = 12
 chat_session.disable_log = True
 # 修改采样参数
-chat_session.sampling_param.stop_sequences = [assistant_end, " " + assistant_end, "<|end_of_text|>", " <|end_of_text|>"]
+chat_session.sampling_param.stop_sequences = [
+    assistant_end,
+    " " + assistant_end,
+    "<|end_of_text|>",
+    " <|end_of_text|>",
+]
 
 chat_session.add_prompt(knowledge_start)
 chat_session.add_prompt(pdf_str)
@@ -64,7 +75,9 @@ class Result(BaseModel):
     result: constr(min_length=3, max_length=200)
 
 
-json_ans_str = chat_session.gen_json_object(Result, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}")
+json_ans_str = chat_session.gen_json_object(
+    Result, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}"
+)
 print("tmp:", json_ans_str)
 json_ans_str: str = json_ans_str.strip()
 json_ans_str = json_ans_str.replace("”", '"')  # 修复 json 格式问题
@@ -80,7 +93,9 @@ chat_session.add_prompt("从知识库中查找一下llama13b的相关性能数�
 chat_session.add_prompt(user_end)
 chat_session.add_prompt(assistant_start)
 
-json_ans_str = chat_session.gen_json_object(Result, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}")
+json_ans_str = chat_session.gen_json_object(
+    Result, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}"
+)
 print("tmp:", json_ans_str)
 json_ans_str: str = json_ans_str.strip()
 json_ans_str = json_ans_str.replace("”", '"')  # 修复 json 格式问题
@@ -93,7 +108,9 @@ chat_session.add_prompt("关于L40s的信息，尽量详细")
 chat_session.add_prompt(user_end)
 chat_session.add_prompt(assistant_start)
 
-json_ans_str = chat_session.gen_json_object(Result, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}")
+json_ans_str = chat_session.gen_json_object(
+    Result, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}"
+)
 print("tmp:", json_ans_str)
 json_ans_str: str = json_ans_str.strip()
 json_ans_str = json_ans_str.replace("”", '"')  # 修复 json 格式问题

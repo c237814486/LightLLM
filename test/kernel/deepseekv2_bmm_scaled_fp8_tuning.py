@@ -8,7 +8,10 @@ from lightllm.utils.tuning_utils import mp_tuning, set_seed, tuning_configs
 import sys
 import os
 
-from lightllm.common.basemodel.triton_kernel.bmm_scaled_fp8 import bmm_scaled_fp8, BmmScaledFp8KernelConfig
+from lightllm.common.basemodel.triton_kernel.bmm_scaled_fp8 import (
+    bmm_scaled_fp8,
+    BmmScaledFp8KernelConfig,
+)
 
 
 @torch.no_grad()

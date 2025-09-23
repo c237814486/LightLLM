@@ -46,13 +46,19 @@ class BaseMultiModalTokenizer(ABC):
 
     @abstractmethod
     def init_imageitem_extral_params(
-        self, img: ImageItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        img: ImageItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         pass
 
     @abstractmethod
     def init_audioitem_extral_params(
-        self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        audio: AudioItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         pass
 

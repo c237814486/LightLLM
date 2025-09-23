@@ -2,10 +2,16 @@ import os
 import torch
 import torch.nn.functional as F
 from lightllm.common.basemodel.infer_struct import InferStateInfo
-from lightllm.models.llama.layer_infer.transformer_layer_infer import LlamaTransformerLayerInfer
-from lightllm.models.mistral.layer_infer.transformer_layer_infer import MistralTransformerLayerInfer
+from lightllm.models.llama.layer_infer.transformer_layer_infer import (
+    LlamaTransformerLayerInfer,
+)
+from lightllm.models.mistral.layer_infer.transformer_layer_infer import (
+    MistralTransformerLayerInfer,
+)
 from lightllm.models.mixtral.layer_infer._custom_ops import fused_topk
-from lightllm.models.mixtral.layer_weights.transformer_layer_weight import MixtralTransformerLayerWeight
+from lightllm.models.mixtral.layer_weights.transformer_layer_weight import (
+    MixtralTransformerLayerWeight,
+)
 
 
 class MixtralTransformerLayerInfer(LlamaTransformerLayerInfer):
@@ -16,7 +22,12 @@ class MixtralTransformerLayerInfer(LlamaTransformerLayerInfer):
         self.renormalize = True
         return
 
-    def _ffn(self, input, infer_state: InferStateInfo, layer_weight: MixtralTransformerLayerWeight) -> torch.Tensor:
+    def _ffn(
+        self,
+        input,
+        infer_state: InferStateInfo,
+        layer_weight: MixtralTransformerLayerWeight,
+    ) -> torch.Tensor:
         hidden_states = input.view(-1, self.embed_dim_)
         num_tokens, hidden_dim = hidden_states.shape
 

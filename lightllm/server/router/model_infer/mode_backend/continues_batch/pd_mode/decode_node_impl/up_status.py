@@ -52,7 +52,9 @@ class UpStatusManager:
                     for node_id, pd_master_obj in id_to_pd_master_obj.items():
                         if node_id not in self.id_to_handle_task:
                             self.id_to_handle_queue[node_id] = asyncio.Queue()
-                            self.id_to_handle_task[node_id] = asyncio.create_task(self.up_kv_status_task(pd_master_obj))
+                            self.id_to_handle_task[node_id] = asyncio.create_task(
+                                self.up_kv_status_task(pd_master_obj)
+                            )
 
                 await asyncio.sleep(30)
 
@@ -64,11 +66,17 @@ class UpStatusManager:
         while True:
             try:
                 loop = asyncio.get_event_loop()
-                upkv_status: UpKVStatus = await loop.run_in_executor(None, self.task_queue.get)
+                upkv_status: UpKVStatus = await loop.run_in_executor(
+                    None, self.task_queue.get
+                )
                 if upkv_status.pd_master_node_id in self.id_to_handle_queue:
-                    await self.id_to_handle_queue[upkv_status.pd_master_node_id].put(upkv_status)
+                    await self.id_to_handle_queue[upkv_status.pd_master_node_id].put(
+                        upkv_status
+                    )
                 else:
-                    logger.warning(f"upstatus {upkv_status} no connection to pd_master, drop it")
+                    logger.warning(
+                        f"upstatus {upkv_status} no connection to pd_master, drop it"
+                    )
             except BaseException as e:
                 logger.exception(str(e))
                 await asyncio.sleep(10)
@@ -86,7 +94,9 @@ class UpStatusManager:
                     while True:
                         try:
                             if pd_master_obj.node_id in self.id_to_handle_queue:
-                                task_queue = self.id_to_handle_queue[pd_master_obj.node_id]
+                                task_queue = self.id_to_handle_queue[
+                                    pd_master_obj.node_id
+                                ]
                                 upkv_status: UpKVStatus = await task_queue.get()
                                 await websocket.send(json.dumps(asdict(upkv_status)))
                                 logger.info(f"up status: {upkv_status}")
@@ -100,7 +110,9 @@ class UpStatusManager:
                 return
 
             except Exception as e:
-                logger.error(f"connetion to pd_master {pd_master_obj} has error: {str(e)}")
+                logger.error(
+                    f"connetion to pd_master {pd_master_obj} has error: {str(e)}"
+                )
                 logger.exception(str(e))
                 await asyncio.sleep(10)
                 logger.info("reconnection to pd_master")

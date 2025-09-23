@@ -13,7 +13,9 @@ from pathlib import Path
 warnings.filterwarnings("ignore")
 inc = sysconfig.get_paths().get("include")
 if inc and os.path.exists(inc):
-    os.environ["CPATH"] = inc + (":" + os.environ["CPATH"] if "CPATH" in os.environ else "")
+    os.environ["CPATH"] = inc + (
+        ":" + os.environ["CPATH"] if "CPATH" in os.environ else ""
+    )
 
 
 def _setup_environment():
@@ -75,10 +77,15 @@ def _setup_environment():
 
     inc = sysconfig.get_paths().get("include")
     if inc and os.path.exists(inc):
-        os.environ["CPATH"] = inc + (":" + os.environ["CPATH"] if "CPATH" in os.environ else "")
+        os.environ["CPATH"] = inc + (
+            ":" + os.environ["CPATH"] if "CPATH" in os.environ else ""
+        )
 
     # Prepare writable cache directories for Triton, TorchInductor, etc.
-    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "llm_tts_server"
+    cache_root = (
+        Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+        / "llm_tts_server"
+    )
     triton_cache = cache_root / "triton"
     torchinductor_cache = cache_root / "torchinductor"
     triton_cache.mkdir(parents=True, exist_ok=True)
@@ -125,7 +132,11 @@ def _patch_imports():
     """修补导入问题 - 简化版本，避免递归"""
     # 确保triton缓存目录存在，避免JIT写入失败
     if getattr(sys, "frozen", False):
-        base_dir = sys._MEIPASS if hasattr(sys, "_MEIPASS") else os.path.dirname(os.path.abspath(sys.argv[0]))
+        base_dir = (
+            sys._MEIPASS
+            if hasattr(sys, "_MEIPASS")
+            else os.path.dirname(os.path.abspath(sys.argv[0]))
+        )
         cache_dir = os.path.join(base_dir, ".triton_cache")
         try:
             os.makedirs(cache_dir, exist_ok=True)
@@ -138,7 +149,10 @@ def _setup_logging():
     """设置日志"""
     import logging
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 
 
 # 执行设置

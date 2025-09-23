@@ -5,8 +5,12 @@ import torch.distributed as dist
 import numpy as np
 import triton
 from typing import Tuple
-from lightllm.models.qwen3.layer_weights.transformer_layer_weight import Qwen3TransformerLayerWeight
-from lightllm.models.llama.layer_infer.transformer_layer_infer import LlamaTransformerLayerInfer
+from lightllm.models.qwen3.layer_weights.transformer_layer_weight import (
+    Qwen3TransformerLayerWeight,
+)
+from lightllm.models.llama.layer_infer.transformer_layer_infer import (
+    LlamaTransformerLayerInfer,
+)
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 from lightllm.models.llama.triton_kernel.rmsnorm import rmsnorm_forward
 from lightllm.models.llama.triton_kernel.rotary_emb import rotary_emb_fwd
@@ -33,7 +37,10 @@ class Qwen3TransformerLayerInfer(LlamaTransformerLayerInfer):
         input = input.view(-1, self.embed_dim_)
         q = layer_weight.q_proj.mm(input)
         cache_kv = layer_weight.kv_proj.mm(
-            input, out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_)
+            input,
+            out=cache_kv.view(
+                -1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_
+            ),
         ).view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_), self.head_dim_)
 
         rmsnorm_forward(

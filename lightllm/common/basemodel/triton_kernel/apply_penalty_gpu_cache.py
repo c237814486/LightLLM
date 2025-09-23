@@ -38,7 +38,11 @@ def _fwd_kernel_apply_penalty_cache(
     row_start_ptr = Logits + cur_batch * stride_logit_b
     cur_offset = row_start_ptr + token_ids
     origin_logits = tl.load(cur_offset, mask=mask, other=0.0)
-    p_logits = tl.where(origin_logits > 0, origin_logits / cur_repetition, origin_logits * cur_repetition)
+    p_logits = tl.where(
+        origin_logits > 0,
+        origin_logits / cur_repetition,
+        origin_logits * cur_repetition,
+    )
     p_logits = tl.where(token_ids_count > 0, p_logits, origin_logits)
     p_logits = p_logits - token_ids_count * cur_freqency
     p_logits = p_logits - tl.where(token_ids_count > 0, cur_presence, 0.0)
@@ -69,7 +73,9 @@ def _eos_penalty(
         req_to_exponential_decay_length_penalty + req_idxes, mask=mask, other=1.0
     )
     length_penalty = tl.load(b_length_penalty_param + offs, mask=mask, other=0)
-    penalty_scale = tl.exp2(tl.log2(exponential_decay_length_penalty) * length_penalty) - 1
+    penalty_scale = (
+        tl.exp2(tl.log2(exponential_decay_length_penalty) * length_penalty) - 1
+    )
     mask_eos = tl.load(b_mask_eos_reqs + offs, mask=mask, other=True)
     for eos_index in range(EOS_ID_NUM):
         eos_id = tl.load(eos_ids + eos_index)
@@ -95,7 +101,9 @@ def apply_penalty_gpu_cache(
     num_warps = 8
     vocab_size = sampling_params_manager.vocab_size
     req_to_out_token_id_counter = sampling_params_manager.req_to_out_token_id_counter
-    _fwd_kernel_apply_penalty_cache[(Logits.shape[0], triton.cdiv(vocab_size, BLOCK_P))](
+    _fwd_kernel_apply_penalty_cache[
+        (Logits.shape[0], triton.cdiv(vocab_size, BLOCK_P))
+    ](
         Logits=Logits,
         stride_logit_b=Logits.stride(0),
         stride_logit_s=Logits.stride(1),

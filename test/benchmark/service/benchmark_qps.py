@@ -202,7 +202,10 @@ async def response_collector(
                     results.append((result, input_len))
                 current_count = counter[0] + 1
                 counter[0] = current_count
-                print(f"\rfinished_reqs:{current_count} / target_reqs:{reqs_num} / sent_reqs:{sent_count[0]}", end="")
+                print(
+                    f"\rfinished_reqs:{current_count} / target_reqs:{reqs_num} / sent_reqs:{sent_count[0]}",
+                    end="",
+                )
                 if len(results) >= reqs_num and not stop_send.is_set():
                     end_time[0] = time.time()
                     print("\nReached target number of responses")
@@ -232,7 +235,15 @@ async def response_collector(
 
 
 async def run_continuous_benchmark(
-    async_task, url, prompts, max_new_tokens, reqs_num, num_clients, input_qps, force_terminate, continuous_send
+    async_task,
+    url,
+    prompts,
+    max_new_tokens,
+    reqs_num,
+    num_clients,
+    input_qps,
+    force_terminate,
+    continuous_send,
 ):
     request_queue = asyncio.Queue()
     stop_event = asyncio.Event()
@@ -346,7 +357,9 @@ def main():
     url = args.url
     tokenizer = get_tokenizer(args.tokenizer_path)
     if args.data_path is not None:
-        prompts, max_new_tokens = get_custom_input_data(args.data_path, args.output_len, tokenizer, args.range_ratio)
+        prompts, max_new_tokens = get_custom_input_data(
+            args.data_path, args.output_len, tokenizer, args.range_ratio
+        )
         args.input_num = len(prompts)
     else:
         # qps发送模式发送请求的数量不固定，这里暂定为input_num的10倍
@@ -417,16 +430,22 @@ def main():
     print(f"Sender QPS: {sent_reqs / (end_time - start_time)}")
     print(f"Avg Input Length: {sum(input_lens) / len(input_lens)}")
     print(f"Avg Output Length: {sum(final_output_lens) / len(final_output_lens)}")
-    print(f"Total Throughput: {(sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)} token/s")
+    print(
+        f"Total Throughput: {(sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)} token/s"
+    )
     print(f"Input Throughput: {sum(input_lens) / (end_time - start_time)} token/s")
-    print(f"Output Throughput: {sum(final_output_lens) / (end_time - start_time)} token/s")
+    print(
+        f"Output Throughput: {sum(final_output_lens) / (end_time - start_time)} token/s"
+    )
     print("-" * 10)
     dump_dict["request_num"] = valid_num
     dump_dict["Total QPS"] = valid_num / (end_time - start_time)
     dump_dict["Sender QPS"] = sent_reqs / (end_time - start_time)
     dump_dict["Avg Input Length"] = sum(input_lens) / len(input_lens)
     dump_dict["Avg Output Length"] = sum(final_output_lens) / len(final_output_lens)
-    dump_dict["Total Throughput"] = (sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)
+    dump_dict["Total Throughput"] = (sum(input_lens) + sum(final_output_lens)) / (
+        end_time - start_time
+    )
     dump_dict["Input Throughput"] = sum(input_lens) / (end_time - start_time)
     dump_dict["Output Throughput"] = sum(final_output_lens) / (end_time - start_time)
 

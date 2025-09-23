@@ -1,8 +1,12 @@
 import torch
 from typing import final
 from lightllm.models.registry import ModelRegistry
-from lightllm.models.qwen3_moe.layer_infer.transformer_layer_infer import Qwen3MOETransformerLayerInfer
-from lightllm.models.qwen3_moe.layer_weights.transformer_layer_weight import Qwen3MOETransformerLayerWeight
+from lightllm.models.qwen3_moe.layer_infer.transformer_layer_infer import (
+    Qwen3MOETransformerLayerInfer,
+)
+from lightllm.models.qwen3_moe.layer_weights.transformer_layer_weight import (
+    Qwen3MOETransformerLayerWeight,
+)
 from lightllm.models.qwen3.model import Qwen3TpPartModel
 from lightllm.utils.log_utils import init_logger
 from lightllm.distributed.communication_op import dist_group_manager
@@ -25,4 +29,6 @@ class Qwen3MOEModel(Qwen3TpPartModel):
 
     def _init_custom(self):
         super()._init_custom()
-        dist_group_manager.new_deepep_group(self.config["num_experts"], self.config["hidden_size"])
+        dist_group_manager.new_deepep_group(
+            self.config["num_experts"], self.config["hidden_size"]
+        )

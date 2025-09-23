@@ -42,7 +42,8 @@ logger = init_logger(__name__)
 
 def is_weak_contiguous(inp: torch.Tensor):
     return inp.is_contiguous() or (
-        inp.storage().nbytes() - inp.storage_offset() * inp.element_size() == inp.numel() * inp.element_size()
+        inp.storage().nbytes() - inp.storage_offset() * inp.element_size()
+        == inp.numel() * inp.element_size()
     )
 
 
@@ -51,7 +52,12 @@ class CustomAllgather:
     _SUPPORTED_WORLD_SIZES = [2, 4, 6, 8]
 
     # max_size: max supported allgather size
-    def __init__(self, group: ProcessGroup, device: Union[int, str, torch.device], max_size=8192 * 1024 * 10) -> None:
+    def __init__(
+        self,
+        group: ProcessGroup,
+        device: Union[int, str, torch.device],
+        max_size=8192 * 1024 * 10,
+    ) -> None:
         """
         Args:
             group: the process group to work on. If None, it will use the
@@ -70,7 +76,9 @@ class CustomAllgather:
             # e.g. in a non-cuda environment
             return
         self.group = group
-        assert dist.get_backend(group) != dist.Backend.NCCL, "CustomAllgather should be attached to a non-NCCL group."
+        assert (
+            dist.get_backend(group) != dist.Backend.NCCL
+        ), "CustomAllgather should be attached to a non-NCCL group."
 
         rank = dist.get_rank(group=self.group)
         world_size = dist.get_world_size(group=self.group)
@@ -104,7 +112,9 @@ class CustomAllgather:
 
         physical_device_id = device_ids[device.index]
         tensor = torch.tensor([physical_device_id], dtype=torch.int, device="cpu")
-        gather_list = [torch.tensor([0], dtype=torch.int, device="cpu") for _ in range(world_size)]
+        gather_list = [
+            torch.tensor([0], dtype=torch.int, device="cpu") for _ in range(world_size)
+        ]
         dist.all_gather(gather_list, tensor, group=self.group)
         # physical_device_ids = [t.item() for t in gather_list]
 
@@ -129,16 +139,22 @@ class CustomAllgather:
         # 8*world_size bytes where world_size is at most 8. Allocating 8MB
         # is enough for 131072 such tuples. The largest model I've seen only
         # needs less than 10000 of registered tuples.
-        self.rank_data = torch.empty(8 * 1024 * 1024, dtype=torch.uint8, device=self.device)
+        self.rank_data = torch.empty(
+            8 * 1024 * 1024, dtype=torch.uint8, device=self.device
+        )
         self.max_size = max_size
         self.rank = rank
         self.world_size = world_size
         self.full_nvlink = full_nvlink
-        self._ptr = light_ops.init_custom_gather_ar(self.meta_ptrs, self.rank_data, rank, self.full_nvlink)
+        self._ptr = light_ops.init_custom_gather_ar(
+            self.meta_ptrs, self.rank_data, rank, self.full_nvlink
+        )
         light_ops.allgather_register_buffer(self._ptr, self.buffer_ptrs)
 
     @staticmethod
-    def create_shared_buffer(size_in_bytes: int, group: Optional[ProcessGroup] = None) -> List[int]:
+    def create_shared_buffer(
+        size_in_bytes: int, group: Optional[ProcessGroup] = None
+    ) -> List[int]:
         """
         Creates a shared buffer and returns a list of pointers
         representing the buffer on all processes in the group.
@@ -161,7 +177,9 @@ class CustomAllgather:
         return pointers
 
     @staticmethod
-    def free_shared_buffer(pointers: List[int], group: Optional[ProcessGroup] = None) -> None:
+    def free_shared_buffer(
+        pointers: List[int], group: Optional[ProcessGroup] = None
+    ) -> None:
         rank = dist.get_rank(group=group)
         lib = CudaRTLibrary()
         lib.cudaFree(ctypes.c_void_p(pointers[rank]))
@@ -190,7 +208,9 @@ class CustomAllgather:
         all_data[self.rank] = [handle, offset]
         ranks = sorted(dist.get_process_group_ranks(group=self.group))
         for i, rank in enumerate(ranks):
-            dist.broadcast_object_list(all_data[i], src=rank, group=self.group, device="cpu")
+            dist.broadcast_object_list(
+                all_data[i], src=rank, group=self.group, device="cpu"
+            )
         # Unpack list of tuples to tuple of lists.
         handles = [d[0] for d in all_data]  # type: ignore
         offsets = [d[1] for d in all_data]  # type: ignore
@@ -209,7 +229,9 @@ class CustomAllgather:
             return inp_size < self.max_size
         return False
 
-    def all_gather(self, out: torch.Tensor, inp: torch.Tensor, registered: bool = False):
+    def all_gather(
+        self, out: torch.Tensor, inp: torch.Tensor, registered: bool = False
+    ):
         """Performs an out-of-place all gather.
 
         If registered is True, this assumes inp's pointer is already
@@ -219,10 +241,14 @@ class CustomAllgather:
         if registered:
             light_ops.all_gather(self._ptr, inp, out, 0, 0)
         else:
-            light_ops.all_gather(self._ptr, inp, out, self.buffer_ptrs[self.rank], self.max_size)
+            light_ops.all_gather(
+                self._ptr, inp, out, self.buffer_ptrs[self.rank], self.max_size
+            )
         return out
 
-    def custom_all_gather(self, output: torch.Tensor, input: torch.Tensor) -> Optional[torch.Tensor]:
+    def custom_all_gather(
+        self, output: torch.Tensor, input: torch.Tensor
+    ) -> Optional[torch.Tensor]:
         """The main allgather API that provides support for cuda graph."""
         # When custom allgather is disabled, this will be None.
         if self.disabled or not self.should_custom_ar(input):

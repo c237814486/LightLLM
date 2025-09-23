@@ -78,7 +78,9 @@ def init_vision_distributed_env(kvargs):
 
 
 def init_distributed_env(kvargs):
-    assert kvargs["world_size"] % kvargs["args"].nnodes == 0, "world_size should be divided by nnodes"
+    assert (
+        kvargs["world_size"] % kvargs["args"].nnodes == 0
+    ), "world_size should be divided by nnodes"
     node_world_size = kvargs["world_size"] // kvargs["args"].nnodes
 
     set_global_rank(kvargs["rank_id"])
@@ -196,7 +198,9 @@ def get_node_world_size():
 def create_new_group_for_current_dp(backend):
     ans_group = None
     for iter_dp_rank in range(get_dp_size()):
-        ranks = list(i + iter_dp_rank * get_dp_world_size() for i in range(get_dp_world_size()))
+        ranks = list(
+            i + iter_dp_rank * get_dp_world_size() for i in range(get_dp_world_size())
+        )
         device_group = dist.new_group(ranks, backend=backend)
         if get_global_dp_rank() == iter_dp_rank:
             ans_group = device_group
@@ -211,7 +215,9 @@ def create_new_group_for_current_node(backend):
     nnodes = args.nnodes
     node_world_size = args.tp // nnodes
     for iter_node_rank in range(nnodes):
-        ranks = list(i + iter_node_rank * node_world_size for i in range(node_world_size))
+        ranks = list(
+            i + iter_node_rank * node_world_size for i in range(node_world_size)
+        )
         device_group = dist.new_group(ranks, backend=backend)
         if args.node_rank == iter_node_rank:
             ans_group = device_group
@@ -238,11 +244,15 @@ def _init_nccl_env():
             assert args.config_server_host == args.nccl_host
             url = f"http://{ip_port}/start_tcp_store_server?{params}"
             response = requests.get(url, timeout=60 * 3)
-            assert response.status_code == 200, f"Failed to init config server nccl tcp store: {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Failed to init config server nccl tcp store: {response.status_code}"
         else:
             assert args.config_server_host == args.nccl_host
             url = f"http://{ip_port}/start_tcp_store_server?{params}"
             response = requests.get(url, timeout=60 * 3)
-            assert response.status_code == 200, f"Failed to init config server nccl tcp store: {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Failed to init config server nccl tcp store: {response.status_code}"
 
     return

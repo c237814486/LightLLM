@@ -3,8 +3,12 @@ import pytest
 import numpy as np
 import torch.nn.functional as F
 from lightllm.utils.log_utils import init_logger
-from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding import gqa_token_decode_attention_flash_decoding
-from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding_fp8 import gqa_token_decode_attention_flash_decoding_fp8
+from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding import (
+    gqa_token_decode_attention_flash_decoding,
+)
+from lightllm.models.deepseek2.triton_kernel.gqa_flash_decoding_fp8 import (
+    gqa_token_decode_attention_flash_decoding_fp8,
+)
 from lightllm.models.deepseek2.infer_struct import Deepseek2InferStateInfo
 from lightllm.common.req_manager import ReqManager
 
@@ -20,7 +24,14 @@ if torch.cuda.is_available():
 
 @pytest.mark.parametrize(
     "batch, seqlen, heads, nope_head, rope_head",
-    [(a, b, c, d, e) for a in [1, 16, 32, 128] for b in [16, 32, 512, 2048] for c in [16] for d in [512] for e in [64]],
+    [
+        (a, b, c, d, e)
+        for a in [1, 16, 32, 128]
+        for b in [16, 32, 512, 2048]
+        for c in [16]
+        for d in [512]
+        for e in [64]
+    ],
 )
 def test_gqa_flash_decoding_fp8(batch, seqlen, heads, nope_head, rope_head):
     Z, N_CTX, H, D_HEAD, ROPE_HEAD = batch, seqlen, heads, nope_head, rope_head
@@ -39,7 +50,9 @@ def test_gqa_flash_decoding_fp8(batch, seqlen, heads, nope_head, rope_head):
 
     b_seq_len[0] = N_CTX
     b_req_idx[0] = 0
-    req_to_token_indexs[0][:N_CTX] = torch.tensor(np.arange(N_CTX), dtype=torch.int32).cuda()
+    req_to_token_indexs[0][:N_CTX] = torch.tensor(
+        np.arange(N_CTX), dtype=torch.int32
+    ).cuda()
 
     o = torch.empty((Z, H, D_HEAD), dtype=dtype, device="cuda")
     o1 = torch.empty((Z, H, D_HEAD), dtype=dtype, device="cuda")
@@ -72,7 +85,18 @@ def test_gqa_flash_decoding_fp8(batch, seqlen, heads, nope_head, rope_head):
     kv_nope_fp8 = kv_fp8[:, :, :D_HEAD]
     kv_rope_fp8 = kv_fp8[:, :, D_HEAD:]
     gqa_token_decode_attention_flash_decoding_fp8(
-        q, q_rope, kv_nope_fp8, kv_rope_fp8, kv_scale, infer_state, H, D_HEAD, ROPE_HEAD, D_HEAD, sm_scale, o1
+        q,
+        q_rope,
+        kv_nope_fp8,
+        kv_rope_fp8,
+        kv_scale,
+        infer_state,
+        H,
+        D_HEAD,
+        ROPE_HEAD,
+        D_HEAD,
+        sm_scale,
+        o1,
     )
 
     cos_sim = F.cosine_similarity(o, o1).mean()

@@ -1,9 +1,15 @@
 import torch
 import numpy as np
-from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import LlamaPreAndPostLayerWeight
+from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import (
+    LlamaPreAndPostLayerWeight,
+)
 
-from lightllm.models.internlm2.layer_weights.pre_and_post_layer_weight import Internlm2PreAndPostLayerWeight
-from lightllm.models.qwen2.layer_weights.pre_and_post_layer_weight import Qwen2PreAndPostLayerWeight
+from lightllm.models.internlm2.layer_weights.pre_and_post_layer_weight import (
+    Internlm2PreAndPostLayerWeight,
+)
+from lightllm.models.qwen2.layer_weights.pre_and_post_layer_weight import (
+    Qwen2PreAndPostLayerWeight,
+)
 
 
 # add key: language_model.xxx -> xxx

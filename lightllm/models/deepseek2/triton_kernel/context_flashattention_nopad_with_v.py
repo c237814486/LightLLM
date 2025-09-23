@@ -55,7 +55,11 @@ def _fwd_kernel_with_v(
     offs_d = tl.arange(0, BLOCK_DMODEL)
     offs_rope_d = tl.arange(0, BLOCK_ROPE_DMODEL)
     offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
-    off_q = (cur_batch_in_q_start_index + offs_m[:, None]) * stride_q_bs + cur_head * stride_q_h + offs_d[None, :]
+    off_q = (
+        (cur_batch_in_q_start_index + offs_m[:, None]) * stride_q_bs
+        + cur_head * stride_q_h
+        + offs_d[None, :]
+    )
     off_q_rope = (
         (cur_batch_in_q_start_index + offs_m[:, None]) * stride_q_rope_bs
         + cur_head * stride_q_rope_h
@@ -66,7 +70,9 @@ def _fwd_kernel_with_v(
     off_v = offs_n[:, None] * stride_vbs + cur_k_head * stride_vh + offs_d[None, :]
 
     q = tl.load(Q_nope + off_q, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
-    q_rope = tl.load(Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
+    q_rope = tl.load(
+        Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0
+    )
 
     k_ptrs = K_nope + off_k
     k_rope_ptrs = K_rope + off_k_rope
@@ -78,7 +84,9 @@ def _fwd_kernel_with_v(
     acc = tl.zeros([BLOCK_M, BLOCK_DMODEL], dtype=tl.float32)
 
     block_mask = tl.where(block_start_loc < cur_batch_seq_len, 1, 0)
-    block_end_loc = tl.minimum((start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len)
+    block_end_loc = tl.minimum(
+        (start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len
+    )
 
     for start_n in range(0, block_mask * block_end_loc, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
@@ -98,7 +106,11 @@ def _fwd_kernel_with_v(
         qk += tl.dot(q, k)
         qk += tl.dot(q_rope, k_rope)
         qk *= sm_scale
-        qk = tl.where(offs_m[:, None] + prompt_cache_len >= start_n + offs_n[None, :], qk, float("-100000000.0"))
+        qk = tl.where(
+            offs_m[:, None] + prompt_cache_len >= start_n + offs_n[None, :],
+            qk,
+            float("-100000000.0"),
+        )
 
         # -- compute m_ij, p, l_ij
         m_ij = tl.maximum(m_i, tl.max(qk, 1))
@@ -124,7 +136,11 @@ def _fwd_kernel_with_v(
 
     acc = acc / l_i[:, None]
     # initialize pointers to output
-    off_o = (cur_batch_in_q_start_index + offs_m[:, None]) * stride_obs + cur_head * stride_oh + offs_d[None, :]
+    off_o = (
+        (cur_batch_in_q_start_index + offs_m[:, None]) * stride_obs
+        + cur_head * stride_oh
+        + offs_d[None, :]
+    )
     out_ptrs = Out + off_o
     tl.store(out_ptrs, acc, mask=offs_m[:, None] < cur_batch_seq_len)
     return
@@ -219,7 +235,9 @@ if __name__ == "__main__":
     softmax_scale = 0.117
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda") * N_CTX
     b_prompt_cache_len = torch.zeros_like(b_seq_len, dtype=torch.int32, device="cuda")
-    b_prompt_cache_len = torch.randint_like(b_seq_len, high=N_CTX - 1, dtype=torch.int32, device="cuda")
+    b_prompt_cache_len = torch.randint_like(
+        b_seq_len, high=N_CTX - 1, dtype=torch.int32, device="cuda"
+    )
     q_lens = b_seq_len - b_prompt_cache_len
     q_start_loc = q_lens.cumsum(0) - q_lens
     kv_start_loc = b_seq_len.cumsum(0) - b_seq_len
@@ -256,7 +274,9 @@ if __name__ == "__main__":
     q_indptr = q_starts
     kv_indptr = kv_starts
     workspace_buffer = torch.empty(128 * 1024 * 1024, dtype=torch.int8).to(0)
-    wrapper = flashinfer.prefill.BatchPrefillWithRaggedKVCacheWrapper(workspace_buffer, kv_layout)
+    wrapper = flashinfer.prefill.BatchPrefillWithRaggedKVCacheWrapper(
+        workspace_buffer, kv_layout
+    )
     wrapper.plan(
         qo_indptr=q_indptr,
         kv_indptr=kv_indptr,

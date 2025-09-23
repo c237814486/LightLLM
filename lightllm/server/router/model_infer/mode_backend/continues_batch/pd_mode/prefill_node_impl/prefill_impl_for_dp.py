@@ -3,7 +3,9 @@ from typing import List, Tuple
 from lightllm.server.router.model_infer.infer_batch import InferReq
 from lightllm.utils.log_utils import init_logger
 from .prefill_impl import ChunckedPrefillForPrefillNode
-from lightllm.server.router.model_infer.mode_backend.dp_backend.impl import DPChunkedPrefillBackend
+from lightllm.server.router.model_infer.mode_backend.dp_backend.impl import (
+    DPChunkedPrefillBackend,
+)
 
 logger = init_logger(__name__)
 
@@ -21,10 +23,14 @@ class DPChunkedForPrefillNode(DPChunkedPrefillBackend):
         return
 
     def _pre_handle_finished_reqs(self, finished_reqs):
-        self._prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(finished_reqs=finished_reqs)
+        self._prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(
+            finished_reqs=finished_reqs
+        )
         return
 
-    def _prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(self, finished_reqs: List[InferReq]):
+    def _prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(
+        self, finished_reqs: List[InferReq]
+    ):
         ChunckedPrefillForPrefillNode._prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(
             self, finished_reqs=finished_reqs
         )

@@ -50,7 +50,10 @@ def gen_random_input_text(input_len, tokenizer) -> str:
 
 
 def gen_random_data(
-    input_len: int, output_len: int, input_num: int, tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
+    input_len: int,
+    output_len: int,
+    input_num: int,
+    tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
 ) -> Tuple[List[str], List[int], List[int]]:
     prompts = []
     input_lens = []
@@ -143,7 +146,9 @@ def post_stream_triton(url: str, text_input: str, max_new_tokens: int) -> List[f
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", type=str, default="http://127.0.0.1:8000/generate_stream")
+    parser.add_argument(
+        "--url", type=str, default="http://127.0.0.1:8000/generate_stream"
+    )
     parser.add_argument("--num_clients", type=int, default=100)
     parser.add_argument("--tokenizer_path", type=str, default=None)
     parser.add_argument("--input_num", type=int, default=2000)
@@ -166,7 +171,9 @@ def main():
     seed_all(args.seed)
     url = args.url
     tokenizer = get_tokenizer(args.tokenizer_path)
-    prompts, input_lens, max_new_tokens = gen_random_data(args.input_len, args.output_len, args.input_num, tokenizer)
+    prompts, input_lens, max_new_tokens = gen_random_data(
+        args.input_len, args.output_len, args.input_num, tokenizer
+    )
 
     percentiles = [25, 50, 75, 90, 95, 99, 100]
     if args.server_api == "lightllm":
@@ -186,7 +193,9 @@ def main():
     with ThreadPoolExecutor(max_workers=args.num_clients) as executor:
         results = list(
             tqdm(
-                executor.map(lambda p: post_stream(url, p[0], p[1]), zip(prompts, max_new_tokens)),
+                executor.map(
+                    lambda p: post_stream(url, p[0], p[1]), zip(prompts, max_new_tokens)
+                ),
                 total=len(prompts),
                 desc="Running tests",
             )
@@ -211,15 +220,21 @@ def main():
     print(f"Total QPS: {valid_num / (end_time - start_time)}")
     print(f"Avg Input Length: {sum(input_lens) / len(input_lens)}")
     print(f"Avg Output Length: {sum(final_output_lens) / len(final_output_lens)}")
-    print(f"Total Throughput: {(sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)} token/s")
+    print(
+        f"Total Throughput: {(sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)} token/s"
+    )
     print(f"Input Throughput: {sum(input_lens) / (end_time - start_time)} token/s")
-    print(f"Output Throughput: {sum(final_output_lens) / (end_time - start_time)} token/s")
+    print(
+        f"Output Throughput: {sum(final_output_lens) / (end_time - start_time)} token/s"
+    )
     print("-" * 10)
     dump_dict["request_num"] = valid_num
     dump_dict["Total QPS"] = valid_num / (end_time - start_time)
     dump_dict["Avg Input Length"] = sum(input_lens) / len(input_lens)
     dump_dict["Avg Output Length"] = sum(final_output_lens) / len(final_output_lens)
-    dump_dict["Total Throughput"] = (sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)
+    dump_dict["Total Throughput"] = (sum(input_lens) + sum(final_output_lens)) / (
+        end_time - start_time
+    )
     dump_dict["Input Throughput"] = sum(input_lens) / (end_time - start_time)
     dump_dict["Output Throughput"] = sum(final_output_lens) / (end_time - start_time)
 

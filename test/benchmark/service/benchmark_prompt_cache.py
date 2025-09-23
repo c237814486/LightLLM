@@ -20,6 +20,7 @@ Example usage:
 python benchmark_prompt_cache.py --address http://localhost:8090 --model_name llama \\
 --num_workers 1 --first_input_len 512 --subsequent_input_len 32 --output_len 32 --num_turns 5 --num_users 1
 """
+
 import requests
 import json
 import operator
@@ -51,7 +52,10 @@ def generate_stream(args):
             r = requests.post(
                 f"{args.model_url}/generate_stream",
                 headers=headers,
-                json={"inputs": prompt, "parameters": {"max_new_tokens": args.output_len}},
+                json={
+                    "inputs": prompt,
+                    "parameters": {"max_new_tokens": args.output_len},
+                },
                 stream=True,
             )
             ans = ""
@@ -110,7 +114,9 @@ def conclusion_and_show(results, prefill_token_num, decode_token_num):
                 error_count += 1
             else:
                 first_token_latency.append(tokens[0]["latency"] * 1000)  # ms
-                per_token_latency.extend([e["latency"] * 1000 for e in tokens[1:]])  # ms
+                per_token_latency.extend(
+                    [e["latency"] * 1000 for e in tokens[1:]]
+                )  # ms
                 output_total_tokens += len(tokens)
 
     total_time = total_end_time - total_start_time
@@ -119,7 +125,9 @@ def conclusion_and_show(results, prefill_token_num, decode_token_num):
     summary["total_decode_tokens"] = decode_token_num
     summary["prefill_throughput(tokens/s)"] = round(prefill_token_num / total_time, 2)
     summary["decode_throughput(tokens/s)"] = round(decode_token_num / total_time, 2)
-    summary["total_throughput(tokens/s)"] = round((prefill_token_num + decode_token_num) / total_time, 2)
+    summary["total_throughput(tokens/s)"] = round(
+        (prefill_token_num + decode_token_num) / total_time, 2
+    )
     summary["total_count"] = len(results)
     summary["error_count"] = error_count
     summary["output_total_tokens"] = output_total_tokens
@@ -160,7 +168,11 @@ def run(args):
         os.makedirs(args.result_dir, exist_ok=True)
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             results = list(
-                tqdm(executor.map(generate_stream, [args] * num_users), total=num_users, desc="running tests")
+                tqdm(
+                    executor.map(generate_stream, [args] * num_users),
+                    total=num_users,
+                    desc="running tests",
+                )
             )
             results = reduce(operator.add, results)
         if args.cache:
@@ -168,7 +180,8 @@ def run(args):
                 pickle.dump(results, file)
 
     prefill_token_num = (
-        first_input_len * num_turns + subsequent_input_len * ((num_turns - 1) * num_turns // 2)
+        first_input_len * num_turns
+        + subsequent_input_len * ((num_turns - 1) * num_turns // 2)
     ) * num_users
     decode_token_num = output_len * num_turns * num_users
     summary = conclusion_and_show(results, prefill_token_num, decode_token_num)
@@ -180,17 +193,38 @@ def run(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_url", type=str, default="http://localhost:8080", help="server model_url")
-    parser.add_argument("--model_name", type=str, default="model", help="for result file name")
-    parser.add_argument("--num_workers", type=int, default=5, help="number of concurrent requests")
-    parser.add_argument("--first_input_len", type=int, default=512, help="input length of the first turn of dialogue")
     parser.add_argument(
-        "--subsequent_input_len", type=int, default=512, help="input length of subsequent conversations"
+        "--model_url",
+        type=str,
+        default="http://localhost:8080",
+        help="server model_url",
+    )
+    parser.add_argument(
+        "--model_name", type=str, default="model", help="for result file name"
+    )
+    parser.add_argument(
+        "--num_workers", type=int, default=5, help="number of concurrent requests"
+    )
+    parser.add_argument(
+        "--first_input_len",
+        type=int,
+        default=512,
+        help="input length of the first turn of dialogue",
+    )
+    parser.add_argument(
+        "--subsequent_input_len",
+        type=int,
+        default=512,
+        help="input length of subsequent conversations",
     )
     parser.add_argument("--output_len", type=int, default=128)
-    parser.add_argument("--num_turns", type=int, default=10, help="number of dialogue turns per user")
+    parser.add_argument(
+        "--num_turns", type=int, default=10, help="number of dialogue turns per user"
+    )
     parser.add_argument("--num_users", type=int, default=10, help="number of users")
-    parser.add_argument("--result_dir", type=str, default="./results", help="directory to save results")
+    parser.add_argument(
+        "--result_dir", type=str, default="./results", help="directory to save results"
+    )
     parser.add_argument("--print", type=bool, default=True, help="print result")
     parser.add_argument("--cache", type=bool, default=True, help="cache result")
     parser.add_argument("--use_cache", type=bool, default=True)

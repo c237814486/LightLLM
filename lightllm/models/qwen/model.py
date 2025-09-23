@@ -40,7 +40,9 @@ class QWenTpPartModel(LlamaTpPartModel):
         """
         init qwen dynamic_ntk and logn_attn
         """
-        if self.config.get("use_dynamic_ntk", False) and self.config.get("use_logn_attn", False):
+        if self.config.get("use_dynamic_ntk", False) and self.config.get(
+            "use_logn_attn", False
+        ):
             self._init_qwen_dynamic_ntk()
             self._init_qwen_logn_attn()
         else:
@@ -51,7 +53,13 @@ class QWenTpPartModel(LlamaTpPartModel):
     def _init_nkt_alpha(self, total_seq_len_supported):
         ntk_alphas = []
         for seq_len in range(1, total_seq_len_supported + 1):
-            ntk_alpha = max(2 ** math.ceil(math.log(seq_len / self.config.get("seq_length", 2048), 2) + 1), 1)
+            ntk_alpha = max(
+                2
+                ** math.ceil(
+                    math.log(seq_len / self.config.get("seq_length", 2048), 2) + 1
+                ),
+                1,
+            )
             ntk_alphas.append(ntk_alpha)
         ntk_alphas = np.array(ntk_alphas, dtype=np.int32)
         self.max_ntk_alpha = math.ceil(math.log(ntk_alphas.max(), 2))
@@ -69,10 +77,18 @@ class QWenTpPartModel(LlamaTpPartModel):
             base = self.config.get("rotary_emb_base", 10000)
             base = base * ntk_alpha ** (self.head_dim_ / (self.head_dim_ - 2))
             inv_freq = 1.0 / (
-                base ** (torch.arange(0, self.head_dim_, 2, device="cpu", dtype=torch.float32) / self.head_dim_)
+                base
+                ** (
+                    torch.arange(
+                        0, self.head_dim_, 2, device="cpu", dtype=torch.float32
+                    )
+                    / self.head_dim_
+                )
             )
 
-            t = torch.arange(total_seq_len_supported + 128 * 1024, device="cpu", dtype=torch.float32)
+            t = torch.arange(
+                total_seq_len_supported + 128 * 1024, device="cpu", dtype=torch.float32
+            )
             freqs = torch.outer(t, inv_freq)
             self._cos_cached.append(torch.cos(freqs).to(self.data_type).cuda())
             self._sin_cached.append(torch.sin(freqs).to(self.data_type).cuda())
@@ -85,7 +101,8 @@ class QWenTpPartModel(LlamaTpPartModel):
         total_seq_len_supported = self.config.get("max_position_embeddings", 8 * 1024)
         seq_len = self.config.get("seq_length", 2048)
         logn_list = [
-            math.log(i, seq_len) if i > seq_len else 1 for i in range(1, total_seq_len_supported + 128 * 1024 + 1)
+            math.log(i, seq_len) if i > seq_len else 1
+            for i in range(1, total_seq_len_supported + 128 * 1024 + 1)
         ]
         self.logn_tensor = torch.tensor(logn_list).cuda()
         return

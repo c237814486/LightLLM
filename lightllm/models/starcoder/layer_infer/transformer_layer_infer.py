@@ -1,5 +1,9 @@
-from lightllm.models.bloom.layer_infer.transformer_layer_infer import BloomTransformerLayerInfer
-from lightllm.models.llama.layer_infer.transformer_layer_infer import LlamaTransformerLayerInfer
+from lightllm.models.bloom.layer_infer.transformer_layer_infer import (
+    BloomTransformerLayerInfer,
+)
+from lightllm.models.llama.layer_infer.transformer_layer_infer import (
+    LlamaTransformerLayerInfer,
+)
 
 
 class StarcoderTransformerLayerInfer(BloomTransformerLayerInfer):

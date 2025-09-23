@@ -39,10 +39,14 @@ def test_context_attention_fwd(batch, seqlen, q_heads, kv_heads, head_dim):
     kv = torch.randn((Z * N_CTX, 2 * KV_HEADS, HEAD_DIM), dtype=dtype, device="cuda")
 
     max_input_len = Z * N_CTX
-    req_to_token_indexs = torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    req_to_token_indexs = (
+        torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    )
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda") * N_CTX
     b_ready_cache_len = torch.zeros_like(b_seq_len, dtype=torch.int32, device="cuda")
-    b_ready_cache_len = torch.randint_like(b_seq_len, high=N_CTX - 1, dtype=torch.int32, device="cuda")
+    b_ready_cache_len = torch.randint_like(
+        b_seq_len, high=N_CTX - 1, dtype=torch.int32, device="cuda"
+    )
     b_req_idx = torch.randperm(Z, dtype=torch.int32).cuda()
     q_lens = b_seq_len - b_ready_cache_len
     q_start_loc = q_lens.cumsum(0) - q_lens
@@ -91,7 +95,9 @@ def test_context_attention_fwd(batch, seqlen, q_heads, kv_heads, head_dim):
     kv_indices = torch.arange(Z * N_CTX).cuda().int()
     for b, sl, start in zip(b_req_idx, b_seq_len, kv_start_loc):
         kv_indices[start : start + sl] = req_to_token_indexs[b][:sl]
-    kv_last_page_len_buffer = torch.empty(batch_size, device="cuda:0", dtype=torch.int32)
+    kv_last_page_len_buffer = torch.empty(
+        batch_size, device="cuda:0", dtype=torch.int32
+    )
     wrapper = flashinfer.prefill.BatchPrefillWithPagedKVCacheWrapper(
         workspace_buffer,
         qo_indptr_buf=q_indptr,
@@ -116,7 +122,9 @@ def test_context_attention_fwd(batch, seqlen, q_heads, kv_heads, head_dim):
         kv_data_type=kv.dtype,
     )
     kv = kv.unsqueeze(1)
-    wrapper.run(q, (kv[:, :, :KV_HEADS, :], kv[:, :, KV_HEADS:, :]), out=o1, return_lse=False)
+    wrapper.run(
+        q, (kv[:, :, :KV_HEADS, :], kv[:, :, KV_HEADS:, :]), out=o1, return_lse=False
+    )
 
     # assert torch.allclose(o, o1, atol=1e-2, rtol=0)
     cos_sim1 = F.cosine_similarity(o, o1).mean()
@@ -134,7 +142,9 @@ def test_context_attention_fwd(batch, seqlen, q_heads, kv_heads, head_dim):
         for e in [128]
     ],
 )
-def test_context_attention_fwd_no_prompt_cache(batch, seqlen, q_heads, kv_heads, head_dim):
+def test_context_attention_fwd_no_prompt_cache(
+    batch, seqlen, q_heads, kv_heads, head_dim
+):
     Z, N_CTX, Q_HEADS, KV_HEADS, HEAD_DIM = batch, seqlen, q_heads, kv_heads, head_dim
     dtype = torch.bfloat16
     q = torch.randn((Z * N_CTX, Q_HEADS, HEAD_DIM), dtype=dtype, device="cuda")

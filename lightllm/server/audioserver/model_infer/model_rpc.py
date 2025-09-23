@@ -27,7 +27,10 @@ class AudioModelRpcServer(rpyc.Service):
             config_dict = json.load(f)
         model_cfg = types.SimpleNamespace(**config_dict)
         torch.cuda.set_device(audio_gpu_ids[rank_id])
-        model_kvargs = {"cache_port": kvargs["cache_port"], "data_type": kvargs["data_type"]}
+        model_kvargs = {
+            "cache_port": kvargs["cache_port"],
+            "data_type": kvargs["data_type"],
+        }
         try:
 
             self.model = WhisperAudioModel(model_kvargs)

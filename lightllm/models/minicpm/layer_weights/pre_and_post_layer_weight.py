@@ -1,6 +1,8 @@
 import torch
 import numpy as np
-from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import LlamaPreAndPostLayerWeight
+from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import (
+    LlamaPreAndPostLayerWeight,
+)
 
 
 class MiniCPMPreAndPostLayerWeight(LlamaPreAndPostLayerWeight):
@@ -14,13 +16,20 @@ class MiniCPMPreAndPostLayerWeight(LlamaPreAndPostLayerWeight):
 
     def load_hf_weights(self, weights):
         vob_size = self.network_config_["vocab_size"]
-        split_indexes = np.linspace(0, vob_size, self.tp_world_size_ + 1, dtype=np.int64)
+        split_indexes = np.linspace(
+            0, vob_size, self.tp_world_size_ + 1, dtype=np.int64
+        )
         split_start = split_indexes[self.tp_rank_]
         split_end = split_indexes[self.tp_rank_ + 1]
         if "model.embed_tokens.weight" in weights:
-            self.wte_weight_ = self._cuda(weights["model.embed_tokens.weight"][split_start:split_end, :])
+            self.wte_weight_ = self._cuda(
+                weights["model.embed_tokens.weight"][split_start:split_end, :]
+            )
         if "lm_head.weight" in weights:
-            self.lm_head_weight_ = self._cuda(weights["lm_head.weight"][split_start:split_end, :]) / self.lm_head_scale
+            self.lm_head_weight_ = (
+                self._cuda(weights["lm_head.weight"][split_start:split_end, :])
+                / self.lm_head_scale
+            )
         if "model.norm.weight" in weights:
             self.final_norm_weight_ = self._cuda(weights["model.norm.weight"])
 

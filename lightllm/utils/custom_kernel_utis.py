@@ -15,7 +15,9 @@ def custom_cat(tensors):
     assert tensors[0].is_cuda and len(tensors[0].shape) == 1
     sizes = [t.shape[0] for t in tensors]
     dest_size = sum(sizes)
-    out_tensor = torch.empty((dest_size,), dtype=tensors[0].dtype, device="cpu", pin_memory=True)
+    out_tensor = torch.empty(
+        (dest_size,), dtype=tensors[0].dtype, device="cpu", pin_memory=True
+    )
 
     start_loc = 0
     for t, size in zip(tensors, sizes):
@@ -35,7 +37,10 @@ def torch_cat_3(tensors: List[torch.Tensor], dim=0):
     dim = dim % ref.ndim
 
     out = torch.empty(
-        [sum(t.size(dim) for t in tensors) if i == dim else ref.size(i) for i in range(ref.ndim)],
+        [
+            sum(t.size(dim) for t in tensors) if i == dim else ref.size(i)
+            for i in range(ref.ndim)
+        ],
         dtype=ref.dtype,
         device=ref.device,
     )
@@ -74,10 +79,14 @@ def _tensor_copy_3dim(
     for cur_index in range(start_index, total_len, step=grid_num):
         for cur_head in tl.range(head_num, num_stages=3):
             in_tensor = tl.load(
-                in_ptr + in_stride_0 * cur_index + in_stride_1 * cur_head + offs_d, mask=offs_d < head_dim, other=0
+                in_ptr + in_stride_0 * cur_index + in_stride_1 * cur_head + offs_d,
+                mask=offs_d < head_dim,
+                other=0,
             )
             tl.store(
-                out_ptr + out_stride_0 * cur_index + out_stride_1 * cur_head + offs_d, in_tensor, mask=offs_d < head_dim
+                out_ptr + out_stride_0 * cur_index + out_stride_1 * cur_head + offs_d,
+                in_tensor,
+                mask=offs_d < head_dim,
             )
     return
 
@@ -121,7 +130,12 @@ def pad2dim_tensor_to_new_batch(input: torch.Tensor, new_batch_size: int):
     assert input.ndim == 2
     origin_batch_size = input.shape[0]
     hidden = input.shape[1]
-    out = torch.empty((new_batch_size, hidden), dtype=input.dtype, device=input.device, requires_grad=False)
+    out = torch.empty(
+        (new_batch_size, hidden),
+        dtype=input.dtype,
+        device=input.device,
+        requires_grad=False,
+    )
     out[0:origin_batch_size, :] = input
     out[origin_batch_size:, :] = input[0:1, :]
     return out

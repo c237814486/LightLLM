@@ -63,7 +63,11 @@ def _fwd_kernel(
         + offs_d[None, :] * stride_qd
     )
 
-    q = tl.load(Q + off_q, mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim), other=0.0)
+    q = tl.load(
+        Q + off_q,
+        mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim),
+        other=0.0,
+    )
 
     # initialize pointer to m and l
     m_i = tl.zeros([BLOCK_M], dtype=tl.float32) - float("inf")
@@ -71,25 +75,40 @@ def _fwd_kernel(
     acc = tl.zeros([BLOCK_M, BLOCK_DMODEL], dtype=tl.float32)
 
     block_mask = tl.where(block_start_loc < cur_batch_seq_len, 1, 0)
-    block_end_loc = tl.minimum((start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len)
+    block_end_loc = tl.minimum(
+        (start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len
+    )
 
     for start_n in range(0, block_mask * block_end_loc, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         kv_loc = tl.load(
-            Req_to_tokens + stride_req_to_tokens_b * cur_batch_req_idx + stride_req_to_tokens_s * (start_n + offs_n),
+            Req_to_tokens
+            + stride_req_to_tokens_b * cur_batch_req_idx
+            + stride_req_to_tokens_s * (start_n + offs_n),
             mask=(start_n + offs_n) < block_end_loc,
             other=0,
         ).to(tl.int64)
-        off_k = kv_loc[None, :] * stride_kbs + cur_kv_head * stride_kh + offs_d[:, None] * stride_kd
+        off_k = (
+            kv_loc[None, :] * stride_kbs
+            + cur_kv_head * stride_kh
+            + offs_d[:, None] * stride_kd
+        )
         k = tl.load(
-            K + off_k, mask=((start_n + offs_n[None, :]) < block_end_loc) & (offs_d[:, None] < head_dim), other=0.0
+            K + off_k,
+            mask=((start_n + offs_n[None, :]) < block_end_loc)
+            & (offs_d[:, None] < head_dim),
+            other=0.0,
         )
 
         qk = tl.zeros([BLOCK_M, BLOCK_N], dtype=tl.float32)
         qk += tl.dot(q, k)
         qk *= sm_scale
-        qk = tl.where(offs_m[:, None] + prompt_cache_len >= start_n + offs_n[None, :], qk, float("-100000000.0"))
+        qk = tl.where(
+            offs_m[:, None] + prompt_cache_len >= start_n + offs_n[None, :],
+            qk,
+            float("-100000000.0"),
+        )
 
         # -- compute m_ij, p, l_ij
         m_ij = tl.max(qk, 1)
@@ -109,9 +128,16 @@ def _fwd_kernel(
         acc_scale = tl.where(offs_m + prompt_cache_len >= start_n, acc_scale, 1.0)
         acc = acc * acc_scale[:, None]
         # update acc
-        off_v = kv_loc[:, None] * stride_vbs + cur_kv_head * stride_vh + offs_d[None, :] * stride_vd
+        off_v = (
+            kv_loc[:, None] * stride_vbs
+            + cur_kv_head * stride_vh
+            + offs_d[None, :] * stride_vd
+        )
         v = tl.load(
-            V + off_v, mask=((start_n + offs_n[:, None]) < block_end_loc) & (offs_d[None, :] < head_dim), other=0.0
+            V + off_v,
+            mask=((start_n + offs_n[:, None]) < block_end_loc)
+            & (offs_d[None, :] < head_dim),
+            other=0.0,
         )
         p = p.to(v.dtype)
         acc += tl.dot(p, v)
@@ -125,13 +151,26 @@ def _fwd_kernel(
         + offs_d[None, :] * stride_od
     )
     out_ptrs = Out + off_o
-    tl.store(out_ptrs, acc, mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim))
+    tl.store(
+        out_ptrs,
+        acc,
+        mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim),
+    )
     return
 
 
 @torch.no_grad()
 def context_attention_fwd(
-    q, k, v, o, b_req_idx, b_start_loc, b_seq_len, b_prompt_cache_len, max_input_len, req_to_token_indexs
+    q,
+    k,
+    v,
+    o,
+    b_req_idx,
+    b_start_loc,
+    b_seq_len,
+    b_prompt_cache_len,
+    max_input_len,
+    req_to_token_indexs,
 ):
     BLOCK = 128 if not is_tesla() else 64
     # shape constraints
@@ -140,7 +179,7 @@ def context_attention_fwd(
     head_dim = Lq
     BLOCK_DMODEL = triton.next_power_of_2(head_dim)
 
-    sm_scale = 1.0 / (Lq ** 0.5)  # 计算scale系数
+    sm_scale = 1.0 / (Lq**0.5)  # 计算scale系数
     batch, head = b_seq_len.shape[0], q.shape[1]
     kv_group_num = q.shape[1] // k.shape[1]
 
@@ -230,10 +269,22 @@ def _fwd_kernel_no_prompt_cache(
         + cur_head * stride_qh
         + offs_d[None, :] * stride_qd
     )
-    off_k = offs_n[None, :] * stride_kbs + cur_kv_head * stride_kh + offs_d[:, None] * stride_kd
-    off_v = offs_n[:, None] * stride_vbs + cur_kv_head * stride_vh + offs_d[None, :] * stride_vd
+    off_k = (
+        offs_n[None, :] * stride_kbs
+        + cur_kv_head * stride_kh
+        + offs_d[:, None] * stride_kd
+    )
+    off_v = (
+        offs_n[:, None] * stride_vbs
+        + cur_kv_head * stride_vh
+        + offs_d[None, :] * stride_vd
+    )
 
-    q = tl.load(Q + off_q, mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim), other=0.0)
+    q = tl.load(
+        Q + off_q,
+        mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim),
+        other=0.0,
+    )
 
     k_ptrs = K + off_k
     v_ptrs = V + off_v
@@ -250,7 +301,8 @@ def _fwd_kernel_no_prompt_cache(
         # -- compute qk ----
         k = tl.load(
             k_ptrs + (cur_batch_in_all_start_index + start_n) * stride_kbs,
-            mask=((start_n + offs_n[None, :]) < cur_batch_seq_len) & (offs_d[:, None] < head_dim),
+            mask=((start_n + offs_n[None, :]) < cur_batch_seq_len)
+            & (offs_d[:, None] < head_dim),
             other=0.0,
         )
         # mask = tl.load(mask_ptrs + start_n, mask=start_n + offs_n < cur_batch_end_loc, other=0.0)
@@ -279,7 +331,8 @@ def _fwd_kernel_no_prompt_cache(
         # update acc
         v = tl.load(
             v_ptrs + (cur_batch_in_all_start_index + start_n) * stride_vbs,
-            mask=((start_n + offs_n[:, None]) < cur_batch_seq_len) & (offs_d[None, :] < head_dim),
+            mask=((start_n + offs_n[:, None]) < cur_batch_seq_len)
+            & (offs_d[None, :] < head_dim),
             other=0.0,
         )
 
@@ -295,19 +348,25 @@ def _fwd_kernel_no_prompt_cache(
         + offs_d[None, :] * stride_od
     )
     out_ptrs = Out + off_o
-    tl.store(out_ptrs, acc, mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim))
+    tl.store(
+        out_ptrs,
+        acc,
+        mask=(offs_m[:, None] < cur_batch_seq_len) & (offs_d[None, :] < head_dim),
+    )
     return
 
 
 @torch.no_grad()
-def context_attention_fwd_no_prompt_cache(q, k, v, o, b_start_loc, b_seq_len, max_input_len):
+def context_attention_fwd_no_prompt_cache(
+    q, k, v, o, b_start_loc, b_seq_len, max_input_len
+):
     BLOCK = 128 if not is_tesla() else 64
     # shape constraints
     Lq, Lk, Lv = q.shape[-1], k.shape[-1], v.shape[-1]
     assert Lq == Lk and Lk == Lv
     head_dim = Lq
     BLOCK_DMODEL = triton.next_power_of_2(head_dim)
-    sm_scale = 1.0 / (Lq ** 0.5)  # 计算scale系数
+    sm_scale = 1.0 / (Lq**0.5)  # 计算scale系数
     batch, head = b_seq_len.shape[0], q.shape[1]
     kv_group_num = q.shape[1] // k.shape[1]
 
@@ -349,8 +408,15 @@ def torch_att(xq, xk, xv, bs, seqlen, num_head, head_dim, prompt_cache_len):
     xq = xq.view(bs, seqlen, num_head, head_dim)
     xk = xk.view(bs, seqlen + prompt_cache_len, num_head, head_dim)
     xv = xv.view(bs, seqlen + prompt_cache_len, num_head, head_dim)
-    mask_cache = torch.ones((seqlen, prompt_cache_len)).cuda().unsqueeze(0).unsqueeze(0).cuda()
-    mask = torch.tril(torch.ones(seqlen, seqlen), diagonal=0).unsqueeze(0).unsqueeze(0).cuda()
+    mask_cache = (
+        torch.ones((seqlen, prompt_cache_len)).cuda().unsqueeze(0).unsqueeze(0).cuda()
+    )
+    mask = (
+        torch.tril(torch.ones(seqlen, seqlen), diagonal=0)
+        .unsqueeze(0)
+        .unsqueeze(0)
+        .cuda()
+    )
     mask[mask == 0.0] = -100000000.0
     mask = torch.cat([mask_cache, mask], dim=-1)
     mask = mask.repeat(bs, num_head, 1, 1)
@@ -361,7 +427,12 @@ def torch_att(xq, xk, xv, bs, seqlen, num_head, head_dim, prompt_cache_len):
     values = values.transpose(1, 2)
     scores = torch.matmul(xq, keys.transpose(2, 3)) / math.sqrt(head_dim)
     scores = F.softmax(scores.float() + mask, dim=-1).type_as(xq)
-    output = torch.matmul(scores, values).transpose(1, 2).contiguous().reshape(-1, num_head, head_dim)
+    output = (
+        torch.matmul(scores, values)
+        .transpose(1, 2)
+        .contiguous()
+        .reshape(-1, num_head, head_dim)
+    )
     return output
 
 
@@ -372,11 +443,21 @@ def test():
     Z, H, N_CTX, D_HEAD = 10, 6, 500, 96
     dtype = torch.float16
     Z = 1
-    q = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.1, std=0.2)
-    k = torch.empty((Z * N_CTX + 7000, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.4, std=0.2)
-    v = torch.empty((Z * N_CTX + 7000, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
-    o = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
-    req_to_token_indexs = torch.zeros((10, Z * N_CTX + 7000), dtype=torch.int32, device="cuda")
+    q = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.1, std=0.2
+    )
+    k = torch.empty((Z * N_CTX + 7000, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.4, std=0.2
+    )
+    v = torch.empty((Z * N_CTX + 7000, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.3, std=0.2
+    )
+    o = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.3, std=0.2
+    )
+    req_to_token_indexs = torch.zeros(
+        (10, Z * N_CTX + 7000), dtype=torch.int32, device="cuda"
+    )
     max_input_len = N_CTX
     Z = 1
     b_start_loc = torch.zeros((Z,), dtype=torch.int32, device="cuda")

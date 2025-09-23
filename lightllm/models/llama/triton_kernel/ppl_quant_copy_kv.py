@@ -34,7 +34,11 @@ def _fwd_kernel_destindex_copy_quantize_kv(
     dest_index = tl.load(Dest_loc + cur_index)
 
     src_data = tl.load(
-        K + cur_index * stride_k_bs + cur_head * stride_k_h + offs_g[:, None] * stride_k_g + offs_d[None, :],
+        K
+        + cur_index * stride_k_bs
+        + cur_head * stride_k_h
+        + offs_g[:, None] * stride_k_g
+        + offs_d[None, :],
         mask=offs_g[:, None] < group_size,
         other=0.0,
     )
@@ -42,7 +46,13 @@ def _fwd_kernel_destindex_copy_quantize_kv(
     data_scale = (tl.max(abs_data, axis=1) / 127.0).to(Out_scale.dtype.element_ty)
     q_src_data = (src_data / data_scale[:, None]).to(tl.int8)
 
-    o_ptrs = Out + dest_index * stride_o_bs + cur_head * stride_o_h + offs_g[:, None] * stride_o_g + offs_d[None, :]
+    o_ptrs = (
+        Out
+        + dest_index * stride_o_bs
+        + cur_head * stride_o_h
+        + offs_g[:, None] * stride_o_g
+        + offs_d[None, :]
+    )
     os_ptrs = Out_scale + dest_index * stride_os_bs + cur_head * stride_os_h + offs_g
     tl.store(o_ptrs, q_src_data, mask=offs_g[:, None] < group_size)
     tl.store(os_ptrs, data_scale, mask=offs_g < group_size)
@@ -56,7 +66,9 @@ def destindex_copy_quantize_kv(K, DestLoc, Out, Out_scale):
     head_dim = K.shape[2]
     quant_group_dim = 8
 
-    assert head_dim % quant_group_dim == 0, "error head dim, can not been supported to copy quant kv"
+    assert (
+        head_dim % quant_group_dim == 0
+    ), "error head dim, can not been supported to copy quant kv"
     grid = (seq_len, head_num)
     num_warps = 1
 
@@ -135,9 +147,15 @@ def _fwd_kernel_destindex_copy_dequantize_kv(
     offs_d = tl.arange(0, BLOCK_GROUP_DIM)
 
     kv_loc = tl.load(
-        req_to_token_indexs + cur_batch_req_idx * stride_req_to_tokens_b + offs_kv_loc, mask=offs_kv_loc < cur_seq_len
+        req_to_token_indexs + cur_batch_req_idx * stride_req_to_tokens_b + offs_kv_loc,
+        mask=offs_kv_loc < cur_seq_len,
     ).to(tl.int64)
-    offs_kv = kv_loc[:, None] * stride_kv_b + cur_head * stride_kv_h + cur_group * stride_kv_g + offs_d[None, :]
+    offs_kv = (
+        kv_loc[:, None] * stride_kv_b
+        + cur_head * stride_kv_h
+        + cur_group * stride_kv_g
+        + offs_d[None, :]
+    )
 
     src_data = tl.load(
         mem_kv_buffer + offs_kv,
@@ -145,21 +163,38 @@ def _fwd_kernel_destindex_copy_dequantize_kv(
         other=0.0,
     ).to(Out.dtype.element_ty)
 
-    s_ptrs = mem_kv_scale + kv_loc * stride_s_b + cur_head * stride_s_h + cur_group * stride_s_g
+    s_ptrs = (
+        mem_kv_scale
+        + kv_loc * stride_s_b
+        + cur_head * stride_s_h
+        + cur_group * stride_s_g
+    )
     data_scale = tl.load(
         s_ptrs,
         mask=offs_kv_loc < cur_seq_len,
     )
 
     out_data = src_data * data_scale[:, None]
-    o_ptrs = Out + cur_bh * stride_o_bh + offs_kv_loc[:, None] * stride_o_l + cur_group * stride_o_g + offs_d[None, :]
+    o_ptrs = (
+        Out
+        + cur_bh * stride_o_bh
+        + offs_kv_loc[:, None] * stride_o_l
+        + cur_group * stride_o_g
+        + offs_d[None, :]
+    )
     tl.store(o_ptrs, out_data, mask=offs_kv_loc[:, None] < cur_seq_len)
     return
 
 
 @torch.no_grad()
 def destindex_copy_dequantize_kv(
-    mem_kv_buffer, mem_kv_scale, req_to_token_indexs, b_seq_len, b_req_idx, max_len_in_batch, Out
+    mem_kv_buffer,
+    mem_kv_scale,
+    req_to_token_indexs,
+    b_seq_len,
+    b_req_idx,
+    max_len_in_batch,
+    Out,
 ):
     batch_size = b_seq_len.shape[0]
     head_num = mem_kv_buffer.shape[1]
@@ -168,11 +203,21 @@ def destindex_copy_dequantize_kv(
     BLOCK_SIZE = 128
     group_size = head_dim // quant_group_dim
     group_dim = quant_group_dim
-    assert head_dim % quant_group_dim == 0, "error head dim, can not been supported to copy quant kv"
-    grid = (group_size, triton.cdiv(max_len_in_batch, BLOCK_SIZE), batch_size * head_num)
+    assert (
+        head_dim % quant_group_dim == 0
+    ), "error head dim, can not been supported to copy quant kv"
+    grid = (
+        group_size,
+        triton.cdiv(max_len_in_batch, BLOCK_SIZE),
+        batch_size * head_num,
+    )
     num_warps = 1
-    mem_kv_buffer = mem_kv_buffer.view((mem_kv_buffer.shape[0], mem_kv_buffer.shape[1], group_size, group_dim))
-    mem_kv_scale = mem_kv_scale.view((mem_kv_buffer.shape[0], mem_kv_buffer.shape[1], -1))
+    mem_kv_buffer = mem_kv_buffer.view(
+        (mem_kv_buffer.shape[0], mem_kv_buffer.shape[1], group_size, group_dim)
+    )
+    mem_kv_scale = mem_kv_scale.view(
+        (mem_kv_buffer.shape[0], mem_kv_buffer.shape[1], -1)
+    )
     Out = Out.view(Out.shape[0] * Out.shape[1], -1, group_size, group_dim)
 
     _fwd_kernel_destindex_copy_dequantize_kv[grid](
@@ -212,7 +257,9 @@ def test2():
     B, N_CTX, H, D = 1, 3, 12, 128
     src = torch.randn((B * N_CTX, H, D), dtype=torch.float16).cuda()
     dest_loc = torch.arange(0, B * N_CTX, dtype=torch.int32).cuda()
-    value_dest = torch.randn((B * N_CTX, H, D), dtype=torch.float16).cuda().to(torch.int8)
+    value_dest = (
+        torch.randn((B * N_CTX, H, D), dtype=torch.float16).cuda().to(torch.int8)
+    )
     scale_dest = torch.randn((B * N_CTX, H, D // 8), dtype=torch.float16).cuda()
 
     for _ in range(10):
@@ -227,10 +274,22 @@ def test2():
     print("Time cost ", t2 - t1)
     value_dest = value_dest.view((B * N_CTX, H, D // 8, 8))
     scale_dest = scale_dest.view((B * N_CTX, H, D // 8, 1))
-    print("max ", torch.max(torch.abs((value_dest * scale_dest).view(B * N_CTX, H, D) - src)))
-    print("mean ", torch.mean(torch.abs((value_dest * scale_dest).view(B * N_CTX, H, D) - src)))
+    print(
+        "max ",
+        torch.max(torch.abs((value_dest * scale_dest).view(B * N_CTX, H, D) - src)),
+    )
+    print(
+        "mean ",
+        torch.mean(torch.abs((value_dest * scale_dest).view(B * N_CTX, H, D) - src)),
+    )
     cos = torch.nn.CosineSimilarity(0)
-    print("cos ", cos(src.flatten().to(torch.float32), (value_dest * scale_dest).flatten().to(torch.float32)))
+    print(
+        "cos ",
+        cos(
+            src.flatten().to(torch.float32),
+            (value_dest * scale_dest).flatten().to(torch.float32),
+        ),
+    )
 
 
 def torch_dequant(kv, kv_scale, o, b_req_idx, b_seq_len, req_to_token_indexs):
@@ -255,10 +314,18 @@ def test3():
     Z, H, N_CTX, D_HEAD = 1, 16, 3, 128
     dtype = torch.bfloat16
     kv = torch.empty((Z * N_CTX + 100, 2 * H, D_HEAD), dtype=torch.int8, device="cuda")
-    kv_scale = torch.randn((Z * N_CTX + 100, 2 * H, D_HEAD // 8), dtype=dtype, device="cuda")
-    out = torch.empty((Z, 2 * H, N_CTX, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.4, std=0.2)
-    torch_out = torch.empty((Z, N_CTX, 2 * H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
-    req_to_token_indexs = torch.empty((1000, N_CTX + 7000), dtype=torch.int32, device="cuda")
+    kv_scale = torch.randn(
+        (Z * N_CTX + 100, 2 * H, D_HEAD // 8), dtype=dtype, device="cuda"
+    )
+    out = torch.empty((Z, 2 * H, N_CTX, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.4, std=0.2
+    )
+    torch_out = torch.empty(
+        (Z, N_CTX, 2 * H, D_HEAD), dtype=dtype, device="cuda"
+    ).normal_(mean=0.3, std=0.2)
+    req_to_token_indexs = torch.empty(
+        (1000, N_CTX + 7000), dtype=torch.int32, device="cuda"
+    )
     max_input_len = N_CTX
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda")
     b_req_idx = torch.ones((Z,), dtype=torch.int32, device="cuda")
@@ -267,15 +334,20 @@ def test3():
         b_seq_len[i] = seq_len
         b_req_idx[i] = i
         req_to_token_indexs[i][:seq_len] = (
-            torch.tensor(np.arange(seq_len), dtype=torch.int32).cuda() + b_seq_len[0:i].sum()
+            torch.tensor(np.arange(seq_len), dtype=torch.int32).cuda()
+            + b_seq_len[0:i].sum()
         )
     print(b_seq_len)
-    destindex_copy_dequantize_kv(kv, kv_scale, req_to_token_indexs, b_seq_len, b_req_idx, max_input_len, out)
+    destindex_copy_dequantize_kv(
+        kv, kv_scale, req_to_token_indexs, b_seq_len, b_req_idx, max_input_len, out
+    )
     torch_dequant(kv, kv_scale, torch_out, b_req_idx, b_seq_len, req_to_token_indexs)
     torch.cuda.synchronize()
     t1 = time.time()
     for _ in range(1000):
-        destindex_copy_dequantize_kv(kv, kv_scale, req_to_token_indexs, b_seq_len, b_req_idx, max_input_len, out)
+        destindex_copy_dequantize_kv(
+            kv, kv_scale, req_to_token_indexs, b_seq_len, b_req_idx, max_input_len, out
+        )
     torch.cuda.synchronize()
     t2 = time.time()
     print((t2 - t1))
@@ -283,7 +355,12 @@ def test3():
     for i in range(Z):
         print("max ", torch.max(torch.abs(torch_out - out)[i][:, : b_seq_len[i]]))
         print("mean ", torch.mean(torch.abs(torch_out - out)[i][:, : b_seq_len[i]]))
-        assert torch.allclose(torch_out[i][:, : b_seq_len[i]], out[i][:, : b_seq_len[i]], atol=1e-2, rtol=0)
+        assert torch.allclose(
+            torch_out[i][:, : b_seq_len[i]],
+            out[i][:, : b_seq_len[i]],
+            atol=1e-2,
+            rtol=0,
+        )
     # print("max ", torch.max(torch.abs((value_dest * scale_dest).view(B * N_CTX, H, D) - src)))
     # print("mean ", torch.mean(torch.abs((value_dest * scale_dest).view(B * N_CTX, H, D) - src)))
     # cos = torch.nn.CosineSimilarity(0)

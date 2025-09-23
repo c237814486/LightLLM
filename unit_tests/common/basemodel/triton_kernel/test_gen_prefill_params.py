@@ -2,7 +2,9 @@ import torch
 import pytest
 import numpy as np
 from lightllm.utils.log_utils import init_logger
-from lightllm.common.basemodel.triton_kernel.gen_prefill_params import gen_prefill_params
+from lightllm.common.basemodel.triton_kernel.gen_prefill_params import (
+    gen_prefill_params,
+)
 
 
 def test_gen_prefill_params_basic():
@@ -27,15 +29,24 @@ def test_gen_prefill_params_basic():
     assert max_q_seq_len == true_b_q_seq_len.max().item()
     assert max_kv_seq_len == b_seq_len.max().item()
     assert torch.equal(b_q_seq_len, true_b_q_seq_len)
-    assert torch.equal(b1_cu_q_seq_len, torch.nn.functional.pad(torch.cumsum(true_b_q_seq_len, dim=0), (1, 0), value=0))
+    assert torch.equal(
+        b1_cu_q_seq_len,
+        torch.nn.functional.pad(torch.cumsum(true_b_q_seq_len, dim=0), (1, 0), value=0),
+    )
     assert torch.equal(b_kv_seq_len, b_seq_len)
-    assert torch.equal(b1_cu_kv_seq_len, torch.nn.functional.pad(torch.cumsum(b_seq_len, dim=0), (1, 0), value=0))
+    assert torch.equal(
+        b1_cu_kv_seq_len,
+        torch.nn.functional.pad(torch.cumsum(b_seq_len, dim=0), (1, 0), value=0),
+    )
 
     b_ready_cache_len_numpy = b_ready_cache_len.cpu().numpy()
     b_seq_len_numpy = b_seq_len.cpu().numpy()
     true_position_ids = torch.from_numpy(
         np.concatenate(
-            [np.arange(b_ready_cache_len_numpy[i], b_seq_len_numpy[i]) for i in range(len(b_seq_len_numpy))],
+            [
+                np.arange(b_ready_cache_len_numpy[i], b_seq_len_numpy[i])
+                for i in range(len(b_seq_len_numpy))
+            ],
             axis=0,
         )
     ).cuda()

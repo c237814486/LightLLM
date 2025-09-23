@@ -5,7 +5,11 @@ import bisect
 from typing import Optional
 from lightllm.utils.log_utils import init_logger
 from lightllm.utils.envs_utils import get_env_start_args
-from lightllm.distributed import dist_group_manager, lightllm_capture_graph, CustomProcessGroup
+from lightllm.distributed import (
+    dist_group_manager,
+    lightllm_capture_graph,
+    CustomProcessGroup,
+)
 from lightllm.common.basemodel.batch_objs import ModelInput, ModelOutput
 from .infer_struct import InferStateInfo
 
@@ -18,11 +22,15 @@ class CudaGraph:
 
     def __init__(self, max_batch_size=8, max_len_in_batch=8192):
         self.graph = {}
-        self.mempool = torch.cuda.graph_pool_handle() if torch.cuda.is_available() else None
+        self.mempool = (
+            torch.cuda.graph_pool_handle() if torch.cuda.is_available() else None
+        )
         self.max_batch_size = max_batch_size
         self.graph_max_len_in_batch = max_len_in_batch
         self.args = get_env_start_args()
-        self.enable_decode_microbatch_overlap = self.args.enable_decode_microbatch_overlap
+        self.enable_decode_microbatch_overlap = (
+            self.args.enable_decode_microbatch_overlap
+        )
 
         # gen cuda graph batch_sizes
         # cuda graph gen for batch size = [1, 2, 3, ..., graph_split_batch_size]
@@ -33,7 +41,11 @@ class CudaGraph:
         graph_grow_step_size = self.args.graph_grow_step_size
 
         batch_sizes = [i for i in range(1, graph_split_batch_size + 1)]
-        for _batch_size in range(graph_split_batch_size + graph_grow_step_size, max_batch_size, graph_grow_step_size):
+        for _batch_size in range(
+            graph_split_batch_size + graph_grow_step_size,
+            max_batch_size,
+            graph_grow_step_size,
+        ):
             batch_sizes.append(_batch_size)
 
         batch_sizes = list(set([e for e in batch_sizes if e < max_batch_size]))
@@ -45,7 +57,10 @@ class CudaGraph:
         logger.info(f"cuda graph batch_sizes: {self.cuda_graph_batch_sizes}")
 
     def can_run(self, batch_size, max_len_in_batch):
-        return batch_size <= self.max_batch_size and max_len_in_batch <= self.graph_max_len_in_batch
+        return (
+            batch_size <= self.max_batch_size
+            and max_len_in_batch <= self.graph_max_len_in_batch
+        )
 
     def need_capture(self, batch_size):
         find_batch_size = self.find_closest_graph_batch_size(batch_size)
@@ -62,7 +77,9 @@ class CudaGraph:
         else:
             return None
 
-    def _capture_decode(self, decode_func, input_ids: torch.Tensor, infer_state: InferStateInfo):
+    def _capture_decode(
+        self, decode_func, input_ids: torch.Tensor, infer_state: InferStateInfo
+    ):
         dist_group: CustomProcessGroup = infer_state.dist_group
         graph_obj = torch.cuda.CUDAGraph()
         batch_size = input_ids.shape[0]
@@ -107,12 +124,16 @@ class CudaGraph:
         # warmup
         for _ in range(1):
             torch.cuda.synchronize()
-            decode_func(input_ids, copy.copy(infer_state), input_ids1, copy.copy(infer_state1))
+            decode_func(
+                input_ids, copy.copy(infer_state), input_ids1, copy.copy(infer_state1)
+            )
             torch.cuda.synchronize()
         with lightllm_capture_graph(dist_group1):
             with lightllm_capture_graph(dist_group):
                 with torch.cuda.graph(graph_obj, pool=self.mempool):
-                    model_output, model_output1 = decode_func(input_ids, infer_state, input_ids1, infer_state1)
+                    model_output, model_output1 = decode_func(
+                        input_ids, infer_state, input_ids1, infer_state1
+                    )
         self.graph[batch_size] = (
             graph_obj,
             input_ids,
@@ -138,14 +159,18 @@ class CudaGraph:
         input_ids1 and infer_state1 is used for the overlap.
         """
         if self.enable_decode_microbatch_overlap:
-            return self._capture_decode_overlap(decode_func, input_ids, infer_state, input_ids1, infer_state1)
+            return self._capture_decode_overlap(
+                decode_func, input_ids, infer_state, input_ids1, infer_state1
+            )
         else:
             assert input_ids1 is None and infer_state1 is None
             return self._capture_decode(decode_func, input_ids, infer_state)
 
     def _replay(self, input_ids: torch.Tensor, infer_state: InferStateInfo):
         batch_size = input_ids.shape[0]
-        graph_obj, graph_input_ids, graph_infer_state, graph_output = self.graph[batch_size]
+        graph_obj, graph_input_ids, graph_infer_state, graph_output = self.graph[
+            batch_size
+        ]
         graph_input_ids.copy_(input_ids)
         graph_infer_state.copy_for_cuda_graph(infer_state)
         graph_obj.replay()
@@ -177,14 +202,18 @@ class CudaGraph:
 
     def replay(self, input_ids, infer_state, input_ids1=None, infer_state1=None):
         if self.enable_decode_microbatch_overlap:
-            return self._replay_overlap(input_ids, infer_state, input_ids1, infer_state1)
+            return self._replay_overlap(
+                input_ids, infer_state, input_ids1, infer_state1
+            )
         else:
             assert input_ids1 is None and infer_state1 is None
             return self._replay(input_ids, infer_state)
 
     @torch.no_grad()
     def warmup(self, model):
-        logger.info("Begin capture cudagraph, use the --disable_cudagraph to disable it.")
+        logger.info(
+            "Begin capture cudagraph, use the --disable_cudagraph to disable it."
+        )
         # for typing easy
         from .basemodel import TpPartBaseModel
 
@@ -195,10 +224,14 @@ class CudaGraph:
             seq_len = 2
             total_token_num = batch_size * seq_len
             max_len_in_batch = self.graph_max_len_in_batch
-            input_ids = torch.tensor([1 for _ in range(batch_size)], dtype=torch.int32, device="cuda")
+            input_ids = torch.tensor(
+                [1 for _ in range(batch_size)], dtype=torch.int32, device="cuda"
+            )
             mem_indexes = model.mem_manager.alloc(len(input_ids)).cuda()
             b_req_idx = torch.tensor(
-                [model.req_manager.HOLD_REQUEST_ID for _ in range(batch_size)], dtype=torch.int32, device="cuda"
+                [model.req_manager.HOLD_REQUEST_ID for _ in range(batch_size)],
+                dtype=torch.int32,
+                device="cuda",
             )
             b_seq_len = torch.empty(batch_size, dtype=torch.int32, device="cuda")
             b_seq_len.fill_(seq_len)
@@ -238,7 +271,9 @@ class CudaGraph:
 
     @torch.no_grad()
     def warmup_overlap(self, model):
-        logger.info("Begin capture overlap cudagraph, use the --disable_cudagraph to disable it.")
+        logger.info(
+            "Begin capture overlap cudagraph, use the --disable_cudagraph to disable it."
+        )
         # for typing easy
         from .basemodel import TpPartBaseModel
 
@@ -251,10 +286,14 @@ class CudaGraph:
                 seq_len = 2
                 total_token_num = batch_size * seq_len
                 max_len_in_batch = self.graph_max_len_in_batch
-                input_ids = torch.tensor([1 for _ in range(batch_size)], dtype=torch.int32, device="cuda")
+                input_ids = torch.tensor(
+                    [1 for _ in range(batch_size)], dtype=torch.int32, device="cuda"
+                )
                 mem_indexes = model.mem_manager.alloc(len(input_ids)).cuda()
                 b_req_idx = torch.tensor(
-                    [model.req_manager.HOLD_REQUEST_ID for _ in range(batch_size)], dtype=torch.int32, device="cuda"
+                    [model.req_manager.HOLD_REQUEST_ID for _ in range(batch_size)],
+                    dtype=torch.int32,
+                    device="cuda",
                 )
                 b_seq_len = torch.empty(batch_size, dtype=torch.int32, device="cuda")
                 b_seq_len.fill_(seq_len)

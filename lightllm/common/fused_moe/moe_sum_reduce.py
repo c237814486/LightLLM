@@ -40,10 +40,16 @@ def _moe_sum_reduce_kernel(
         accumulator = tl.zeros((BLOCK_DIM,), dtype=tl.float32)
         input_t_ptr = input_ptr + token_index * input_stride_0 + offs_dim
         for i in tl.range(0, topk_num, num_stages=NUM_STAGE):
-            tmp = tl.load(input_t_ptr + i * input_stride_1, mask=offs_dim < dim_end, other=0.0)
+            tmp = tl.load(
+                input_t_ptr + i * input_stride_1, mask=offs_dim < dim_end, other=0.0
+            )
             accumulator += tmp
         store_t_ptr = output_ptr + token_index * output_stride_0 + offs_dim
-        tl.store(store_t_ptr, accumulator.to(input_ptr.dtype.element_ty), mask=offs_dim < dim_end)
+        tl.store(
+            store_t_ptr,
+            accumulator.to(input_ptr.dtype.element_ty),
+            mask=offs_dim < dim_end,
+        )
 
 
 def moe_sum_reduce(input: torch.Tensor, output: torch.Tensor, **run_config):
@@ -55,7 +61,10 @@ def moe_sum_reduce(input: torch.Tensor, output: torch.Tensor, **run_config):
 
     if not run_config:
         run_config = MoeSumReduceKernelConfig.try_to_get_best_config(
-            M=token_num, topk_num=topk_num, hidden_dim=hidden_dim, out_dtype=str(output.dtype)
+            M=token_num,
+            topk_num=topk_num,
+            hidden_dim=hidden_dim,
+            out_dtype=str(output.dtype),
         )
 
     BLOCK_M = run_config["BLOCK_M"]

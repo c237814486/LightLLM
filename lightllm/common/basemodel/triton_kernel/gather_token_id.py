@@ -26,17 +26,21 @@ def _fwd_kernel_scatter(
     cur_next_token_id = tl.load(next_token_ids + block_range, mask=block_mask)
 
     if not HAS_OUT_IS_NONE:
-        
+
         cur_has_out = tl.load(b_has_out + block_range, mask=block_mask, other=False)
 
         tl.store(
-            req_to_next_token_ids + cur_req_idx * req_to_next_token_ids_stride + cur_mtp_index,
+            req_to_next_token_ids
+            + cur_req_idx * req_to_next_token_ids_stride
+            + cur_mtp_index,
             cur_next_token_id,
             mask=cur_has_out & block_mask,
         )
     else:
         tl.store(
-            req_to_next_token_ids + cur_req_idx * req_to_next_token_ids_stride + cur_mtp_index,
+            req_to_next_token_ids
+            + cur_req_idx * req_to_next_token_ids_stride
+            + cur_mtp_index,
             cur_next_token_id,
             mask=block_mask,
         )
@@ -66,7 +70,7 @@ def scatter_token(
 
     grid = (triton.cdiv(batch_size, BLOCK),)
     num_warps = 1
-   
+
     _fwd_kernel_scatter[grid](
         next_token_ids=next_token_ids,
         req_to_next_token_ids=req_to_next_token_ids,
@@ -101,13 +105,20 @@ def _fwd_kernel_gather(
     cur_req_idx = tl.load(b_req_idx + block_range, mask=block_mask)
     cur_mtp_index = tl.load(b_mtp_index + block_range, mask=block_mask)
     cur_next_token_id = tl.load(
-        req_to_next_token_ids + cur_req_idx * req_to_next_token_ids_stride + cur_mtp_index, mask=block_mask
+        req_to_next_token_ids
+        + cur_req_idx * req_to_next_token_ids_stride
+        + cur_mtp_index,
+        mask=block_mask,
     )
     tl.store(output + block_range, cur_next_token_id, mask=block_mask)
     return
 
 
-def gather_token(req_to_next_token_ids: torch.Tensor, b_req_idx: torch.Tensor, b_mtp_index: torch.Tensor):
+def gather_token(
+    req_to_next_token_ids: torch.Tensor,
+    b_req_idx: torch.Tensor,
+    b_mtp_index: torch.Tensor,
+):
     """
     This function is used to gather the token_info(CPU tensor) to the token_info(GPU tensor).
     Args:
@@ -144,7 +155,11 @@ def test_scatter_token_to_cpu():
     req_ids = torch.arange(20, 20 + batch_size, dtype=torch.int32).cuda()
     mtp_index = torch.zeros((batch_size,), dtype=torch.int32).cuda()
     scatter_token(token_info, req_to_token_info, req_ids, mtp_index)
-    diff = (req_to_token_info[20 : 20 + batch_size].cuda().view(-1) - token_info).abs().max()
+    diff = (
+        (req_to_token_info[20 : 20 + batch_size].cuda().view(-1) - token_info)
+        .abs()
+        .max()
+    )
     assert diff < 1e-6
     print("test_scatter_token_to_cpu passed")
 

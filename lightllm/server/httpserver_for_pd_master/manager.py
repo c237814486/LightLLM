@@ -45,7 +45,11 @@ class HttpServerManagerForPDMaster:
         self.req_id_to_out_inf: Dict[int, ReqStatus] = {}
         self.infos_queues = None  # 这个需要延迟初始化，否则使用的loop不对
 
-        self.tokenizer = get_tokenizer(args.model_dir, args.tokenizer_mode, trust_remote_code=args.trust_remote_code)
+        self.tokenizer = get_tokenizer(
+            args.model_dir,
+            args.tokenizer_mode,
+            trust_remote_code=args.trust_remote_code,
+        )
 
         self.first_time_costs = MovingAverage()
         self.per_token_costs = MovingAverage()
@@ -56,10 +60,18 @@ class HttpServerManagerForPDMaster:
         pd_client.websocket = websocket
         self.url_to_pd_nodes[pd_client.client_ip_port] = pd_client
         if pd_client.mode == "prefill":
-            self.prefill_nodes = [e for e in self.prefill_nodes if e.client_ip_port != pd_client.client_ip_port]
+            self.prefill_nodes = [
+                e
+                for e in self.prefill_nodes
+                if e.client_ip_port != pd_client.client_ip_port
+            ]
             self.prefill_nodes.append(pd_client)
         elif pd_client.mode == "decode":
-            self.decode_nodes = [e for e in self.decode_nodes if e.client_ip_port != pd_client.client_ip_port]
+            self.decode_nodes = [
+                e
+                for e in self.decode_nodes
+                if e.client_ip_port != pd_client.client_ip_port
+            ]
             self.decode_nodes.append(pd_client)
         else:
             assert False
@@ -73,8 +85,14 @@ class HttpServerManagerForPDMaster:
             del self.url_to_pd_nodes[pd_client.client_ip_port]
         except:
             pass
-        self.prefill_nodes = [e for e in self.prefill_nodes if e.client_ip_port != pd_client.client_ip_port]
-        self.decode_nodes = [e for e in self.decode_nodes if e.client_ip_port != pd_client.client_ip_port]
+        self.prefill_nodes = [
+            e
+            for e in self.prefill_nodes
+            if e.client_ip_port != pd_client.client_ip_port
+        ]
+        self.decode_nodes = [
+            e for e in self.decode_nodes if e.client_ip_port != pd_client.client_ip_port
+        ]
         logger.info(f"mode: {pd_client.mode} url: {pd_client.client_ip_port} removed")
         return
 
@@ -88,7 +106,9 @@ class HttpServerManagerForPDMaster:
             pass
         return
 
-    def tokens(self, prompt, multimodal_params, samping_params: SamplingParams, kwargs=None):
+    def tokens(
+        self, prompt, multimodal_params, samping_params: SamplingParams, kwargs=None
+    ):
         kwargs = {} if kwargs is None else kwargs
         prompt_ids = self.tokenizer.encode(prompt, None, **kwargs)
         image_tokens = 0
@@ -97,16 +117,23 @@ class HttpServerManagerForPDMaster:
         audio_count = 0
         for img in multimodal_params.images:
             img_count += 1
-            self.tokenizer.init_imageitem_extral_params(img, multimodal_params, samping_params)
+            self.tokenizer.init_imageitem_extral_params(
+                img, multimodal_params, samping_params
+            )
             image_tokens += self.tokenizer.get_image_token_length(img)
         for audio in multimodal_params.audios:
             audio_count += 1
-            self.tokenizer.init_audioitem_extral_params(audio, multimodal_params, samping_params)
+            self.tokenizer.init_audioitem_extral_params(
+                audio, multimodal_params, samping_params
+            )
             audio_tokens += self.tokenizer.get_audio_token_length(audio)
         return len(prompt_ids) + image_tokens + img_count + audio_tokens + audio_count
 
     async def select_p_d_node(
-        self, prompt: Union[str, List[int]], sampling_params: SamplingParams, multimodal_params: MultimodalParams
+        self,
+        prompt: Union[str, List[int]],
+        sampling_params: SamplingParams,
+        multimodal_params: MultimodalParams,
     ) -> Tuple[PD_Client_Obj, PD_Client_Obj]:
         import random
 
@@ -129,9 +156,13 @@ class HttpServerManagerForPDMaster:
             await self._log_req_header(request, group_request_id)
             # 监控
             self.metric_client.counter_inc("lightllm_request_count")
-            self.metric_client.histogram_observe("lightllm_request_max_new_tokens", sampling_params.max_new_tokens)
+            self.metric_client.histogram_observe(
+                "lightllm_request_max_new_tokens", sampling_params.max_new_tokens
+            )
 
-            p_node, d_node = await self.select_p_d_node(prompt, sampling_params, multimodal_params)
+            p_node, d_node = await self.select_p_d_node(
+                prompt, sampling_params, multimodal_params
+            )
 
             results_generator = self._wait_to_token_package(
                 p_node,
@@ -142,7 +173,12 @@ class HttpServerManagerForPDMaster:
                 multimodal_params,
                 request,
             )
-            async for sub_req_id, request_output, metadata, finish_status in results_generator:
+            async for (
+                sub_req_id,
+                request_output,
+                metadata,
+                finish_status,
+            ) in results_generator:
                 yield sub_req_id, request_output, metadata, finish_status
 
         except BaseException as e:
@@ -157,7 +193,9 @@ class HttpServerManagerForPDMaster:
     async def _log_req_header(self, request: Request, group_request_id: int):
         x_request_id = request.headers.get("X-Request-Id", "")
         x_session_id = request.headers.get("X-Session-Id", "")
-        format_in_time = datetime.datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
+        format_in_time = datetime.datetime.fromtimestamp(time.time()).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         logger.info(
             f"recieved req X-Request-Id:{x_request_id} "
             f"X-Session-Id:{x_session_id} start_time:{format_in_time} "
@@ -166,7 +204,10 @@ class HttpServerManagerForPDMaster:
         return
 
     async def _to_req_info(
-        self, prompt: Union[str, List[int]], sampling_params: SamplingParams, multimodal_params: MultimodalParams
+        self,
+        prompt: Union[str, List[int]],
+        sampling_params: SamplingParams,
+        multimodal_params: MultimodalParams,
     ):
         req = {
             "inputs": prompt,
@@ -202,10 +243,14 @@ class HttpServerManagerForPDMaster:
 
         old_max_new_tokens = sampling_params.max_new_tokens
         sampling_params.max_new_tokens = 1
-        sampling_params.move_kv_to_decode_node.initialize(decode_node_dict if old_max_new_tokens != 1 else None)
+        sampling_params.move_kv_to_decode_node.initialize(
+            decode_node_dict if old_max_new_tokens != 1 else None
+        )
         sampling_params.suggested_dp_index = -1
 
-        await p_node.websocket.send_bytes(pickle.dumps((ObjType.REQ, (prompt, sampling_params, multimodal_params))))
+        await p_node.websocket.send_bytes(
+            pickle.dumps((ObjType.REQ, (prompt, sampling_params, multimodal_params)))
+        )
 
         while True:
             await req_status.wait_to_ready()
@@ -233,14 +278,20 @@ class HttpServerManagerForPDMaster:
         try:
             await asyncio.wait_for(up_status_event.wait(), timeout=60)
         except asyncio.TimeoutError:
-            logger.warning(f"group_request_id: {group_request_id} kv move time out err, server is busy now.")
+            logger.warning(
+                f"group_request_id: {group_request_id} kv move time out err, server is busy now."
+            )
             raise ServerBusyError()
 
         sampling_params.move_kv_to_decode_node.initialize(None)
         sampling_params.max_new_tokens = old_max_new_tokens - 1
         sampling_params.suggested_dp_index = up_status_event.upkv_status.dp_index
 
-        await d_node.websocket.send_bytes(pickle.dumps((ObjType.REQ, (prompt_ids, sampling_params, multimodal_params))))
+        await d_node.websocket.send_bytes(
+            pickle.dumps(
+                (ObjType.REQ, (prompt_ids, sampling_params, multimodal_params))
+            )
+        )
 
         while True:
             await req_status.wait_to_ready()
@@ -289,13 +340,17 @@ class HttpServerManagerForPDMaster:
                 break
 
         total_cost_time_ms = (time.time() - start_time) * 1000
-        mean_per_token_cost_time_ms = (total_cost_time_ms - first_token_cost_ms) / out_token_counter
+        mean_per_token_cost_time_ms = (
+            total_cost_time_ms - first_token_cost_ms
+        ) / out_token_counter
         self.per_token_costs.add(mean_per_token_cost_time_ms)
         x_request_id = request.headers.get("X-Request-Id", "")
         x_session_id = request.headers.get("X-Session-Id", "")
         prompt_cache_len = metadata.pop("prompt_cache_len", 0)
         prompt_cache_ratio = prompt_cache_len / prompt_tokens
-        format_start_time = datetime.datetime.fromtimestamp(start_time).strftime("%Y-%m-%d %H:%M:%S")
+        format_start_time = datetime.datetime.fromtimestamp(start_time).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         logger.info(
             f"X-Request-Id:{x_request_id} "
             f"X-Session-Id:{x_session_id} start_time:{format_start_time} "
@@ -306,12 +361,19 @@ class HttpServerManagerForPDMaster:
             f"prompt_cache_len:{prompt_cache_len} "
             f"prompt_cache_ratio:{prompt_cache_ratio} "
         )
-        self.metric_client.histogram_observe("lightllm_request_inference_duration", total_cost_time_ms / 1000.0)
         self.metric_client.histogram_observe(
-            "lightllm_request_mean_time_per_token_duration", mean_per_token_cost_time_ms / 1000.0
+            "lightllm_request_inference_duration", total_cost_time_ms / 1000.0
         )
-        self.metric_client.histogram_observe("lightllm_request_first_token_duration", first_token_cost_ms / 1000.0)
-        self.metric_client.histogram_observe("lightllm_request_generated_tokens", out_token_counter)
+        self.metric_client.histogram_observe(
+            "lightllm_request_mean_time_per_token_duration",
+            mean_per_token_cost_time_ms / 1000.0,
+        )
+        self.metric_client.histogram_observe(
+            "lightllm_request_first_token_duration", first_token_cost_ms / 1000.0
+        )
+        self.metric_client.histogram_observe(
+            "lightllm_request_generated_tokens", out_token_counter
+        )
         self.metric_client.counter_inc("lightllm_request_success")
         return
 
@@ -325,12 +387,16 @@ class HttpServerManagerForPDMaster:
             pass
 
         try:
-            await req_status.p_node.websocket.send_bytes(pickle.dumps((ObjType.ABORT, group_request_id)))
+            await req_status.p_node.websocket.send_bytes(
+                pickle.dumps((ObjType.ABORT, group_request_id))
+            )
         except:
             pass
 
         try:
-            await req_status.d_node.websocket.send_bytes(pickle.dumps((ObjType.ABORT, group_request_id)))
+            await req_status.d_node.websocket.send_bytes(
+                pickle.dumps((ObjType.ABORT, group_request_id))
+            )
         except:
             pass
 
@@ -355,10 +421,14 @@ class HttpServerManagerForPDMaster:
         self.infos_queues = AsyncQueue()
         asyncio.create_task(self.timer_log())
 
-        use_config_server = self.args.config_server_host and self.args.config_server_port
+        use_config_server = (
+            self.args.config_server_host and self.args.config_server_port
+        )
 
         if use_config_server:
-            from lightllm.server.httpserver_for_pd_master.register_loop import register_loop
+            from lightllm.server.httpserver_for_pd_master.register_loop import (
+                register_loop,
+            )
 
             asyncio.create_task(register_loop(self))
 
@@ -372,9 +442,13 @@ class HttpServerManagerForPDMaster:
                             finish_status: FinishStatus = finish_status
                             group_req_id = convert_sub_id_to_group_id(sub_req_id)
                             try:
-                                req_status: ReqStatus = self.req_id_to_out_inf[group_req_id]
+                                req_status: ReqStatus = self.req_id_to_out_inf[
+                                    group_req_id
+                                ]
                                 async with req_status.lock:
-                                    req_status.out_token_info_list.append((sub_req_id, text, metadata, finish_status))
+                                    req_status.out_token_info_list.append(
+                                        (sub_req_id, text, metadata, finish_status)
+                                    )
                                     req_status.event.set()
                             except:
                                 pass

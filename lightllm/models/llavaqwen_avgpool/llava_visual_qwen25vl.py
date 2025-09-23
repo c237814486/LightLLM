@@ -20,9 +20,16 @@ from lightllm.utils.log_utils import init_logger
 from lightllm.utils.infer_utils import calculate_cpu_time_sync
 from lightllm.models.vit.triton_kernel.rms_norm_vit import rms_norm
 from lightllm.models.vit.triton_kernel.flashattention_nopad import flash_attention_fwd
-from lightllm.models.qwen2_vl.triton_kernel.rotary_pos_emb import apply_rotary_pos_emb_triton
-from lightllm.models.llavaqwen_avgpool.image_processor_opt import Qwen25VLImageProcessorOptimized
-from lightllm.models.llavaqwen_avgpool.avgpool import Qwen25VLAvgPoolProjector, get_adaptive_pool_size
+from lightllm.models.qwen2_vl.triton_kernel.rotary_pos_emb import (
+    apply_rotary_pos_emb_triton,
+)
+from lightllm.models.llavaqwen_avgpool.image_processor_opt import (
+    Qwen25VLImageProcessorOptimized,
+)
+from lightllm.models.llavaqwen_avgpool.avgpool import (
+    Qwen25VLAvgPoolProjector,
+    get_adaptive_pool_size,
+)
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import (
     Qwen2_5_VisionTransformerPretrainedModel,
     Qwen2_5_VisionPatchEmbed,
@@ -40,7 +47,7 @@ logger = init_logger(__name__)
 class Qwen2_5_VLPatchMerger(nn.Module):
     def __init__(self, context_dim: int, spatial_merge_size: int = 2) -> None:
         super().__init__()
-        self.hidden_size = context_dim * (spatial_merge_size ** 2)
+        self.hidden_size = context_dim * (spatial_merge_size**2)
         self.ln_q = Qwen2RMSNorm(context_dim, eps=1e-6)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -52,7 +59,9 @@ class Qwen25ViTPretrainedModel(Qwen2_5_VisionTransformerPretrainedModel):
     def __init__(self, config, *inputs, **kwargs):
         super().__init__(config, *inputs, **kwargs)
 
-        self.merger = Qwen2_5_VLPatchMerger(context_dim=config.hidden_size, spatial_merge_size=config.spatial_merge_size)
+        self.merger = Qwen2_5_VLPatchMerger(
+            context_dim=config.hidden_size, spatial_merge_size=config.spatial_merge_size
+        )
 
 
 class LlavaQwen25AvgpoolVisionModelAnyRes:
@@ -77,7 +86,9 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
 
     def load_bin_model(self, config, weight_dir):
 
-        vision_path = getattr(config, "mm_vision_tower", "/mnt/afs/share/qwen25_vl_encoder")
+        vision_path = getattr(
+            config, "mm_vision_tower", "/mnt/afs/share/qwen25_vl_encoder"
+        )
         if isinstance(vision_path, list):
             vision_path = vision_path[0]
         if vision_path.startswith("./"):
@@ -90,9 +101,13 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
         self.mm_downsample_ratio = config.mm_downsample_ratio
         self.hidden_size = config.mm_hidden_size
 
-        self.image_processor = Qwen25VLImageProcessorOptimized.from_pretrained(vision_path)
+        self.image_processor = Qwen25VLImageProcessorOptimized.from_pretrained(
+            vision_path
+        )
 
-        self.vision_tower = Qwen25ViTPretrainedModel._from_config(vision_config).to(torch.bfloat16)  # 精度
+        self.vision_tower = Qwen25ViTPretrainedModel._from_config(vision_config).to(
+            torch.bfloat16
+        )  # 精度
 
         self.spatial_patch_size = vision_config.spatial_patch_size
         self.spatial_merge_size = vision_config.spatial_merge_size
@@ -107,9 +122,13 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
                 d = safe_open(os.path.join(weight_dir, f), "pt", "cpu")
                 for k in d.keys():
                     if "model.mm_projector" in k:
-                        self.projector_weights[k.replace("model.mm_projector.", "")] = d.get_tensor(k)
+                        self.projector_weights[k.replace("model.mm_projector.", "")] = (
+                            d.get_tensor(k)
+                        )
                     elif "model.vision_tower.vision_tower" in k:
-                        self.vision_model_weights[k.replace("model.vision_tower.vision_tower.", "")] = d.get_tensor(k)
+                        self.vision_model_weights[
+                            k.replace("model.vision_tower.vision_tower.", "")
+                        ] = d.get_tensor(k)
 
         self.mm_projector.load_state_dict(self.projector_weights)
         self.vision_tower.load_state_dict(self.vision_model_weights)
@@ -129,8 +148,12 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
     @torch.no_grad()
     def forward(self, images, images_thw):
 
-        images_gpu = images.to(device=self.device, dtype=torch.bfloat16, non_blocking=True)
-        images_thw_gpu = images_thw.to(device=self.device, dtype=torch.int32, non_blocking=True)
+        images_gpu = images.to(
+            device=self.device, dtype=torch.bfloat16, non_blocking=True
+        )
+        images_thw_gpu = images_thw.to(
+            device=self.device, dtype=torch.int32, non_blocking=True
+        )
 
         image_embeds = self.vision_tower(images_gpu, images_thw_gpu)
         image_embeds = image_embeds.float()
@@ -172,7 +195,9 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
             try:
                 for item in items:
                     if not isinstance(item, int):
-                        raise Exception("Unsupport input types: {} for {}".format(type(item), item))
+                        raise Exception(
+                            "Unsupport input types: {} for {}".format(type(item), item)
+                        )
                     uuids.append(item)
                     image_data = read_shm(get_shm_name_data(item))
                     image = Image.open(BytesIO(image_data)).convert("RGB")
@@ -226,7 +251,9 @@ class LlavaQwen25AvgpoolVisionModelAnyRes:
         all_img_embeds = self.forward(img, img_thw)
         torch.cuda.synchronize()
         end = time.time()
-        logger.debug(f"[encode image] 推理耗时: {end - start:.4f} 秒 image num {round(len(valid_ids) / 2) * 2}")
+        logger.debug(
+            f"[encode image] 推理耗时: {end - start:.4f} 秒 image num {round(len(valid_ids) / 2) * 2}"
+        )
 
         return all_img_embeds, uuids, valid_ids
 
@@ -262,10 +289,16 @@ class FLOPCounter:
 
             # 确保输入格式正确，vision_tower期望的输入格式
             # 与forward方法中的调用保持一致
-            images_input = input_tensor.to(device=torch.device("cuda"), dtype=torch.bfloat16)
-            images_thw_input = images_thw.to(device=torch.device("cuda"), dtype=torch.int32)
+            images_input = input_tensor.to(
+                device=torch.device("cuda"), dtype=torch.bfloat16
+            )
+            images_thw_input = images_thw.to(
+                device=torch.device("cuda"), dtype=torch.int32
+            )
 
-            flops, params = profile(vit_model, inputs=(images_input, images_thw_input), verbose=True)
+            flops, params = profile(
+                vit_model, inputs=(images_input, images_thw_input), verbose=True
+            )
 
             return flops, params
 
@@ -283,7 +316,9 @@ class FLOPCounter:
         module_flops = {}
 
         def sum_module_flops(module):
-            total_ops = reduce(operator.add, (getattr(d, "total_ops", 0) for d in module.modules()))
+            total_ops = reduce(
+                operator.add, (getattr(d, "total_ops", 0) for d in module.modules())
+            )
 
             # 💡 **HERE IS THE FIX** 💡
             # Ensure the final result is a Python number, not a tensor.
@@ -296,7 +331,9 @@ class FLOPCounter:
             module_flops["patch_embed"] = sum_module_flops(vit_model.patch_embed)
 
         if hasattr(vit_model, "rotary_pos_emb"):
-            module_flops["rotary_pos_emb_module"] = sum_module_flops(vit_model.rotary_pos_emb)
+            module_flops["rotary_pos_emb_module"] = sum_module_flops(
+                vit_model.rotary_pos_emb
+            )
 
         if hasattr(vit_model, "blocks") and isinstance(vit_model.blocks, nn.ModuleList):
             for i, block in enumerate(vit_model.blocks):
@@ -321,7 +358,12 @@ class BenchmarkRunner:
 
         images = []
         for _ in range(batch_size):
-            fake_img_np = np.random.randint(0, 255, (self.config["image_height"], self.config["image_width"], 3), dtype=np.uint8)
+            fake_img_np = np.random.randint(
+                0,
+                255,
+                (self.config["image_height"], self.config["image_width"], 3),
+                dtype=np.uint8,
+            )
             images.append(Image.fromarray(fake_img_np))
         image_tensors, images_thw = image_processor(images)
         return image_tensors.cuda(), images_thw.cuda()
@@ -337,17 +379,25 @@ class BenchmarkRunner:
             image_tensors, images_thw = self._prepare_data(bs, image_processor)
 
             for model_name, model in self.models_to_test.items():
-                self.console.print("-> 评估模型: [bold magenta]{model_name}[/bold magenta]")
+                self.console.print(
+                    "-> 评估模型: [bold magenta]{model_name}[/bold magenta]"
+                )
                 # try:
                 # 测量FLOPs (只在第一个batch size时测量一次)
                 if bs == self.config["batch_sizes"][0]:
                     self.console.print("-> 测量ViT FLOPs...")
                     flop_counter = self.flop_counters[model_name]
-                    vit_flops, vit_params = flop_counter.measure_vit_flops(image_tensors, images_thw)
-                    flops_breakdown = flop_counter.get_flops_breakdown(image_tensors, images_thw)
+                    vit_flops, vit_params = flop_counter.measure_vit_flops(
+                        image_tensors, images_thw
+                    )
+                    flops_breakdown = flop_counter.get_flops_breakdown(
+                        image_tensors, images_thw
+                    )
 
                     if vit_flops is not None:
-                        self.console.print(f"  -> ViT FLOPs: {vit_flops/1e9:.2f} GFLOPs, Params: {vit_params/1e6:.2f}M")
+                        self.console.print(
+                            f"  -> ViT FLOPs: {vit_flops/1e9:.2f} GFLOPs, Params: {vit_params/1e6:.2f}M"
+                        )
                         if model_name not in self.results:
                             self.results[model_name] = {}
                         self.results[model_name]["flops"] = vit_flops
@@ -372,7 +422,10 @@ class BenchmarkRunner:
 
                 if model_name not in self.results:
                     self.results[model_name] = {}
-                self.results[model_name][bs] = {"latency": avg_latency_ms, "throughput": throughput}
+                self.results[model_name][bs] = {
+                    "latency": avg_latency_ms,
+                    "throughput": throughput,
+                }
 
                 # except Exception as e:
                 #     self.console.print(f"[bold red]  -> 错误: 模型 {model_name} 在 BS={bs} 时运行失败: {e}[/bold red]")
@@ -393,7 +446,9 @@ class BenchmarkRunner:
             return
 
         if baseline_name and baseline_name not in model_names:
-            self.console.print(f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]")
+            self.console.print(
+                f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]"
+            )
             baseline_name = None
 
         if baseline_name is None:
@@ -427,7 +482,9 @@ class BenchmarkRunner:
                 breakdown = model_results["flops_breakdown"]
 
                 # Sort by FLOPs descending for better readability
-                sorted_breakdown = sorted(breakdown.items(), key=lambda item: item[1], reverse=True)
+                sorted_breakdown = sorted(
+                    breakdown.items(), key=lambda item: item[1], reverse=True
+                )
 
                 is_first_row = True
                 for module_name, module_flops in sorted_breakdown:
@@ -435,10 +492,17 @@ class BenchmarkRunner:
                     percentage = (module_flops / total_flops) * 100
                     if is_first_row:
                         # Show model name only on the first row for this model
-                        breakdown_table.add_row(f"[bold]{name}[/bold]", module_name, f"{flops_g:.2f}", f"{percentage:.1f}%")
+                        breakdown_table.add_row(
+                            f"[bold]{name}[/bold]",
+                            module_name,
+                            f"{flops_g:.2f}",
+                            f"{percentage:.1f}%",
+                        )
                         is_first_row = False
                     else:
-                        breakdown_table.add_row("", module_name, f"{flops_g:.2f}", f"{percentage:.1f}%")
+                        breakdown_table.add_row(
+                            "", module_name, f"{flops_g:.2f}", f"{percentage:.1f}%"
+                        )
                 # Add a separator line between models
                 if len(self.results) > 1:
                     breakdown_table.add_row(end_section=True)
@@ -450,23 +514,37 @@ class BenchmarkRunner:
         table.add_column("Batch Size", justify="center", style="cyan")
         for name in model_names:
             table.add_column(f"{name}\nLatency (ms)", justify="center", style="magenta")
-            table.add_column(f"{name}\nThroughput (img/s)", justify="center", style="green")
+            table.add_column(
+                f"{name}\nThroughput (img/s)", justify="center", style="green"
+            )
 
         if len(model_names) > 1:
             table.add_column("Speedup 🚀", justify="center", style="yellow")
 
         for bs in self.config["batch_sizes"]:
             row_data = [str(bs)]
-            baseline_latency = self.results[baseline_name][bs].get("latency", float("inf"))
+            baseline_latency = self.results[baseline_name][bs].get(
+                "latency", float("inf")
+            )
 
             for name in model_names:
-                res = self.results[name].get(bs, {"latency": float("inf"), "throughput": 0})
+                res = self.results[name].get(
+                    bs, {"latency": float("inf"), "throughput": 0}
+                )
                 row_data.extend([f"{res['latency']:.2f}", f"{res['throughput']:.2f}"])
 
             if len(model_names) > 1:
-                optimized_model_name = next(n for n in model_names if n != baseline_name)
-                optimized_latency = self.results[optimized_model_name][bs].get("latency", float("inf"))
-                speedup = baseline_latency / optimized_latency if optimized_latency > 0 else float("inf")
+                optimized_model_name = next(
+                    n for n in model_names if n != baseline_name
+                )
+                optimized_latency = self.results[optimized_model_name][bs].get(
+                    "latency", float("inf")
+                )
+                speedup = (
+                    baseline_latency / optimized_latency
+                    if optimized_latency > 0
+                    else float("inf")
+                )
                 row_data.append(f"{speedup:.2f}x")
 
             table.add_row(*row_data)

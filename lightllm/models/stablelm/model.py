@@ -2,10 +2,16 @@ import os
 import json
 import torch
 from lightllm.models.registry import ModelRegistry
-from lightllm.models.stablelm.layer_infer.transformer_layer_infer import StablelmTransformerLayerInfer
+from lightllm.models.stablelm.layer_infer.transformer_layer_infer import (
+    StablelmTransformerLayerInfer,
+)
 from lightllm.models.bloom.layer_infer.post_layer_infer import BloomPostLayerInfer
-from lightllm.models.stablelm.layer_weights.pre_and_post_layer_weight import StableLMPreAndPostLayerWeight
-from lightllm.models.stablelm.layer_weights.transformer_layer_weight import StablelmTransformerLayerWeight
+from lightllm.models.stablelm.layer_weights.pre_and_post_layer_weight import (
+    StableLMPreAndPostLayerWeight,
+)
+from lightllm.models.stablelm.layer_weights.transformer_layer_weight import (
+    StablelmTransformerLayerWeight,
+)
 from lightllm.models.llama.model import LlamaTpPartModel
 from lightllm.common.build_utils import repair_config
 
@@ -25,5 +31,8 @@ class StablelmTpPartModel(LlamaTpPartModel):
 
     def _init_config(self):
         super()._init_config()
-        repair_config(self.config, same_names=["rms_norm_eps", "layer_norm_eps", "layer_norm_epsilon"])
+        repair_config(
+            self.config,
+            same_names=["rms_norm_eps", "layer_norm_eps", "layer_norm_epsilon"],
+        )
         return

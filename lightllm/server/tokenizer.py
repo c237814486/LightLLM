@@ -61,13 +61,17 @@ def get_tokenizer(
         # return tokenizer
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs)
+        tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs
+        )
     except TypeError as e:
         # The LLaMA tokenizer causes a protobuf error in some environments, using slow mode.
         # you can try pip install protobuf==3.20.0 to try repair
         logger.warning(f"load fast tokenizer fail: {str(e)}")
         kwargs["use_fast"] = False
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs)
+        tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs
+        )
 
     if not isinstance(tokenizer, PreTrainedTokenizerFast):
         logger.info(
@@ -81,7 +85,9 @@ def get_tokenizer(
         from ..models.qwen2_vl.vision_process import Qwen2VLImageProcessor
 
         image_processor = Qwen2VLImageProcessor.from_pretrained(tokenizer_name)
-        tokenizer = Tarsier2Tokenizer(tokenizer=tokenizer, image_processor=image_processor, model_cfg=model_cfg)
+        tokenizer = Tarsier2Tokenizer(
+            tokenizer=tokenizer, image_processor=image_processor, model_cfg=model_cfg
+        )
     elif model_type == "llava" or model_type == "internlmxcomposer2":
         tokenizer = LlavaTokenizer(tokenizer, model_cfg)
     elif model_type == "qwen" and "visual" in model_cfg:
@@ -91,7 +97,9 @@ def get_tokenizer(
 
         processor = AutoProcessor.from_pretrained(tokenizer_name)
         tokenizer = QWen2VLTokenizer(
-            tokenizer=tokenizer, image_processor=processor.image_processor, model_cfg=model_cfg
+            tokenizer=tokenizer,
+            image_processor=processor.image_processor,
+            model_cfg=model_cfg,
         )
     elif model_type == "internvl_chat":
         tokenizer = InternvlTokenizer(tokenizer, model_cfg, weight_dir=tokenizer_name)

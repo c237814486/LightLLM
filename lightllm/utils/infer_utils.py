@@ -20,7 +20,9 @@ def mark_cost_time(func_name):
                 start_time = time.time()
                 ans = func(*args, **kwargs)
                 torch.cuda.synchronize()
-                logger.debug(f"{func_name} cost time: {(time.time() - start_time) * 1000}")
+                logger.debug(
+                    f"{func_name} cost time: {(time.time() - start_time) * 1000}"
+                )
                 return ans
             else:
                 torch.cuda.synchronize()
@@ -62,12 +64,15 @@ def calculate_time(show=False, min_cost_ms=0.0):
             if show:
                 cost_time = (time.time() - start_time) * 1000
                 if cost_time > min_cost_ms:
-                    logger.debug(f"Function {func.__name__} took {cost_time} ms to run.")
+                    logger.debug(
+                        f"Function {func.__name__} took {cost_time} ms to run."
+                    )
             return result
 
         return inner_func
 
     return wrapper
+
 
 def calculate_cpu_time_sync(show=False):
     def wrapper(func):
@@ -79,8 +84,11 @@ def calculate_cpu_time_sync(show=False):
             if show:
                 logger.debug(f"Function {func.__name__} took {cost_time} ms to run.")
             return result
+
         return inner_func
+
     return wrapper
+
 
 def calculate_cpu_time_async(show=False):
     def wrapper(func):
@@ -90,12 +98,19 @@ def calculate_cpu_time_async(show=False):
             result = await func(*args, **kwargs)
             cost_time = (time.time() - start_time) * 1000
             if show:
-                logger.debug(f"Async Function {func.__name__} took {cost_time} ms to run.")
+                logger.debug(
+                    f"Async Function {func.__name__} took {cost_time} ms to run."
+                )
             return result
+
         return inner_func
+
     return wrapper
 
-def benchmark_time(func: Callable, *args, warmup: int = 1, repeat: int = 5, **kwargs) -> float:
+
+def benchmark_time(
+    func: Callable, *args, warmup: int = 1, repeat: int = 5, **kwargs
+) -> float:
     torch.cuda.synchronize()
     for _ in range(warmup):
         func(*args, **kwargs)

@@ -27,11 +27,15 @@ if torch.cuda.is_available():
         for c in [1, 8, 256, 1024, 2048, 4096, 8192]
     ],
 )
-def test_grouped_topk(expert_num, topk_group, group_num, topk_num, scoring_func, token_num):
+def test_grouped_topk(
+    expert_num, topk_group, group_num, topk_num, scoring_func, token_num
+):
     print("test", expert_num, topk_group, group_num, topk_num, scoring_func, token_num)
     dtype = torch.float32
     hidden_state = torch.randn((token_num, 1), dtype=dtype, device="cuda")
-    gating_output = torch.randn((token_num, expert_num), dtype=dtype, device="cuda") * 10
+    gating_output = (
+        torch.randn((token_num, expert_num), dtype=dtype, device="cuda") * 10
+    )
     correction_bias = torch.randn((expert_num,), dtype=dtype, device="cuda")
     correction_bias[correction_bias <= 0.0] = 0.0
 
@@ -89,9 +93,14 @@ def test_grouped_topk(expert_num, topk_group, group_num, topk_num, scoring_func,
     torch.cuda.synchronize()
     print(f"new cost time {time.time() - start} s")
 
-    assert torch.equal(torch.sort(old_topk_ids, dim=1)[0], torch.sort(new_topk_ids, dim=1)[0])
+    assert torch.equal(
+        torch.sort(old_topk_ids, dim=1)[0], torch.sort(new_topk_ids, dim=1)[0]
+    )
     assert torch.allclose(
-        torch.sort(old_topk_weights, dim=1)[0], torch.sort(new_topk_weights, dim=1)[0], atol=1e-3, rtol=1e-1
+        torch.sort(old_topk_weights, dim=1)[0],
+        torch.sort(new_topk_weights, dim=1)[0],
+        atol=1e-3,
+        rtol=1e-1,
     ), f"max delta {torch.max(torch.sort(old_topk_weights, dim=1)[0] - torch.sort(new_topk_weights, dim=1)[0])}"
     return
 

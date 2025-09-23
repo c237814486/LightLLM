@@ -50,7 +50,9 @@ def _fwd_kernel_flash_decode_stage2(
         sum_exp = sum_exp * old_scale + exp_logic
         max_logic = new_max_logic
 
-    tl.store(Out + cur_batch * stride_obs + cur_head * stride_oh + offs_d, acc / sum_exp)
+    tl.store(
+        Out + cur_batch * stride_obs + cur_head * stride_oh + offs_d, acc / sum_exp
+    )
     return
 
 

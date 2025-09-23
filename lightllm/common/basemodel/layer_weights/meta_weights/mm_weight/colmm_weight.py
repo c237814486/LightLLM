@@ -35,9 +35,13 @@ class UnquantizedCOLMMWeight(MMWeightTpl):
         self.has_bias = bias_name is not None
 
     def _slice_weight(self, tensor):
-        assert tensor.shape[1] % self.tp_world_size_ == 0, f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
+        assert (
+            tensor.shape[1] % self.tp_world_size_ == 0
+        ), f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
         tp_size = tensor.shape[1] // self.tp_world_size_
-        return tensor[:, tp_size * self.tp_rank_ : tp_size * (self.tp_rank_ + 1)].to(self.data_type_)
+        return tensor[:, tp_size * self.tp_rank_ : tp_size * (self.tp_rank_ + 1)].to(
+            self.data_type_
+        )
 
     def _slice_bias(self, bias):
         """
@@ -69,7 +73,9 @@ class W8A8B128COLMMWeight(MMWeightTpl):
         self.quantized_weight = True
 
     def _slice_weight(self, tensor):
-        assert tensor.shape[1] % self.tp_world_size_ == 0, f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
+        assert (
+            tensor.shape[1] % self.tp_world_size_ == 0
+        ), f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
         tp_size = tensor.shape[1] // self.tp_world_size_
         return tensor[:, tp_size * self.tp_rank_ : tp_size * (self.tp_rank_ + 1)]
 

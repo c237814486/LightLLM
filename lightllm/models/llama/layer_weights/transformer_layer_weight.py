@@ -2,7 +2,12 @@ import torch
 import math
 import numpy as np
 from lightllm.common.basemodel import TransformerLayerWeight
-from lightllm.common.basemodel.layer_weights.meta_weights import ROWMMWeight, COLMMWeight, NormWeight, MultiROWMMWeight
+from lightllm.common.basemodel.layer_weights.meta_weights import (
+    ROWMMWeight,
+    COLMMWeight,
+    NormWeight,
+    MultiROWMMWeight,
+)
 
 
 class LlamaTransformerLayerWeight(TransformerLayerWeight):
@@ -28,7 +33,9 @@ class LlamaTransformerLayerWeight(TransformerLayerWeight):
         self.n_head = self.network_config_["num_attention_heads"]
         self.n_inter = self.network_config_["intermediate_size"]
         self.n_kv_head = self.network_config_["num_key_value_heads"]
-        self.head_dim = self.network_config_.get("head_dim", self.n_embed // self.n_head)
+        self.head_dim = self.network_config_.get(
+            "head_dim", self.n_embed // self.n_head
+        )
 
     def _init_weight_names(self):
         self._q_weight_name = f"model.layers.{self.layer_num_}.self_attn.q_proj.weight"
@@ -37,7 +44,9 @@ class LlamaTransformerLayerWeight(TransformerLayerWeight):
         self._k_bias_name = None
         self._v_weight_name = f"model.layers.{self.layer_num_}.self_attn.v_proj.weight"
         self._v_bias_name = None
-        self._kv_weight_name = f"model.layers.{self.layer_num_}.self_attn.kv_proj.weight"
+        self._kv_weight_name = (
+            f"model.layers.{self.layer_num_}.self_attn.kv_proj.weight"
+        )
         self._kv_bias_name = None
         self._o_weight_name = f"model.layers.{self.layer_num_}.self_attn.o_proj.weight"
         self._o_bias_name = None
@@ -46,14 +55,20 @@ class LlamaTransformerLayerWeight(TransformerLayerWeight):
         self._gate_bias_name = None
         self._up_weight_name = f"model.layers.{self.layer_num_}.mlp.up_proj.weight"
         self._up_bias_name = None
-        self._gate_up_weight_name = f"model.layers.{self.layer_num_}.mlp.gate_up_proj.weight"
+        self._gate_up_weight_name = (
+            f"model.layers.{self.layer_num_}.mlp.gate_up_proj.weight"
+        )
         self._gate_up_bias_name = None
         self._down_weight_name = f"model.layers.{self.layer_num_}.mlp.down_proj.weight"
         self._down_bias_name = None
 
-        self._att_norm_weight_name = f"model.layers.{self.layer_num_}.input_layernorm.weight"
+        self._att_norm_weight_name = (
+            f"model.layers.{self.layer_num_}.input_layernorm.weight"
+        )
         self._att_norm_bias_name = None
-        self._ffn_norm_weight_name = f"model.layers.{self.layer_num_}.post_attention_layernorm.weight"
+        self._ffn_norm_weight_name = (
+            f"model.layers.{self.layer_num_}.post_attention_layernorm.weight"
+        )
         self._ffn_norm_bias_name = None
 
     def _init_qkv(self):
@@ -104,8 +119,12 @@ class LlamaTransformerLayerWeight(TransformerLayerWeight):
 
     def _init_norm(self):
         self.att_norm_weight_ = NormWeight(
-            self._att_norm_weight_name, self.data_type_, bias_name=self._att_norm_bias_name
+            self._att_norm_weight_name,
+            self.data_type_,
+            bias_name=self._att_norm_bias_name,
         )
         self.ffn_norm_weight_ = NormWeight(
-            self._ffn_norm_weight_name, self.data_type_, bias_name=self._ffn_norm_bias_name
+            self._ffn_norm_weight_name,
+            self.data_type_,
+            bias_name=self._ffn_norm_bias_name,
         )

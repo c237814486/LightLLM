@@ -8,8 +8,12 @@ from lightllm.utils.log_utils import init_logger
 
 logger = init_logger(__name__)
 
-LIGHTLLM_RPC_BYTE_SIZE = int(os.getenv("LIGHTLLM_RPC_BYTE_SIZE", 1024 * 1024 * 16))  # 默认16M buf
-LIGHTLLM_RPC_RESULT_BYTE_SIZE = int(os.getenv("LIGHTLLM_RPC_RESULT_BYTE_SIZE", 1024 * 1024))  # 默认1M buf
+LIGHTLLM_RPC_BYTE_SIZE = int(
+    os.getenv("LIGHTLLM_RPC_BYTE_SIZE", 1024 * 1024 * 16)
+)  # 默认16M buf
+LIGHTLLM_RPC_RESULT_BYTE_SIZE = int(
+    os.getenv("LIGHTLLM_RPC_RESULT_BYTE_SIZE", 1024 * 1024)
+)  # 默认1M buf
 
 
 class RpcShmParams:
@@ -19,19 +23,27 @@ class RpcShmParams:
 
     def create_or_link_shm(self):
         try:
-            shm = shared_memory.SharedMemory(name=self.name, create=True, size=LIGHTLLM_RPC_BYTE_SIZE)
+            shm = shared_memory.SharedMemory(
+                name=self.name, create=True, size=LIGHTLLM_RPC_BYTE_SIZE
+            )
         except:
-            shm = shared_memory.SharedMemory(name=self.name, create=False, size=LIGHTLLM_RPC_BYTE_SIZE)
+            shm = shared_memory.SharedMemory(
+                name=self.name, create=False, size=LIGHTLLM_RPC_BYTE_SIZE
+            )
 
         if shm.size != LIGHTLLM_RPC_BYTE_SIZE:
             logger.warning(f"size not same, unlink shm {self.name} and create again")
             shm.close()
             shm.unlink()
             try:
-                shm = shared_memory.SharedMemory(name=self.name, create=True, size=LIGHTLLM_RPC_BYTE_SIZE)
+                shm = shared_memory.SharedMemory(
+                    name=self.name, create=True, size=LIGHTLLM_RPC_BYTE_SIZE
+                )
                 logger.info(f"create shm {self.name}")
             except:
-                shm = shared_memory.SharedMemory(name=self.name, create=False, size=LIGHTLLM_RPC_BYTE_SIZE)
+                shm = shared_memory.SharedMemory(
+                    name=self.name, create=False, size=LIGHTLLM_RPC_BYTE_SIZE
+                )
                 logger.info(f"link shm {self.name}")
 
         self.shm = shm
@@ -56,19 +68,27 @@ class RpcShmResults:
 
     def create_or_link_shm(self):
         try:
-            shm = shared_memory.SharedMemory(name=self.name, create=True, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE)
+            shm = shared_memory.SharedMemory(
+                name=self.name, create=True, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE
+            )
         except:
-            shm = shared_memory.SharedMemory(name=self.name, create=False, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE)
+            shm = shared_memory.SharedMemory(
+                name=self.name, create=False, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE
+            )
 
         if shm.size != LIGHTLLM_RPC_RESULT_BYTE_SIZE:
             logger.warning(f"size not same, unlink shm {self.name} and create again")
             shm.close()
             shm.unlink()
             try:
-                shm = shared_memory.SharedMemory(name=self.name, create=True, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE)
+                shm = shared_memory.SharedMemory(
+                    name=self.name, create=True, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE
+                )
                 logger.info(f"create shm {self.name}")
             except:
-                shm = shared_memory.SharedMemory(name=self.name, create=False, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE)
+                shm = shared_memory.SharedMemory(
+                    name=self.name, create=False, size=LIGHTLLM_RPC_RESULT_BYTE_SIZE
+                )
                 logger.info(f"link shm {self.name}")
 
         self.shm = shm
@@ -98,19 +118,27 @@ class ShmSyncStatusArray:
 
     def create_or_link_shm(self):
         try:
-            shm = shared_memory.SharedMemory(name=self.name, create=True, size=self.dest_size)
+            shm = shared_memory.SharedMemory(
+                name=self.name, create=True, size=self.dest_size
+            )
         except:
-            shm = shared_memory.SharedMemory(name=self.name, create=False, size=self.dest_size)
+            shm = shared_memory.SharedMemory(
+                name=self.name, create=False, size=self.dest_size
+            )
 
         if shm.size != self.dest_size:
             logger.warning(f"size not same, unlink shm {self.name} and create again")
             shm.close()
             shm.unlink()
             try:
-                shm = shared_memory.SharedMemory(name=self.name, create=True, size=self.dest_size)
+                shm = shared_memory.SharedMemory(
+                    name=self.name, create=True, size=self.dest_size
+                )
                 logger.info(f"create shm {self.name}")
             except:
-                shm = shared_memory.SharedMemory(name=self.name, create=False, size=self.dest_size)
+                shm = shared_memory.SharedMemory(
+                    name=self.name, create=False, size=self.dest_size
+                )
                 logger.info(f"link shm {self.name}")
 
         self.shm = shm

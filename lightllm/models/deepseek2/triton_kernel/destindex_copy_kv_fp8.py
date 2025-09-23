@@ -38,11 +38,23 @@ def _fwd_kernel_destindex_copy_kv_fp8(
 
     dest_index = tl.load(Dest_loc + cur_index).to(tl.int64)
 
-    kv_nope_ptrs = KV_nope + cur_index * stride_kv_nope_bs + stride_kv_nope_d * offs_d_nope[None, :]
-    kv_rope_ptrs = KV_rope + cur_index * stride_kv_rope_bs + stride_kv_rope_d * offs_d_rope[None, :]
+    kv_nope_ptrs = (
+        KV_nope
+        + cur_index * stride_kv_nope_bs
+        + stride_kv_nope_d * offs_d_nope[None, :]
+    )
+    kv_rope_ptrs = (
+        KV_rope
+        + cur_index * stride_kv_rope_bs
+        + stride_kv_rope_d * offs_d_rope[None, :]
+    )
 
-    o_nope_ptrs = O_nope + dest_index * stride_o_nope_bs + stride_o_nope_d * offs_d_nope[None, :]
-    o_rope_ptrs = O_rope + dest_index * stride_o_rope_bs + stride_o_rope_d * offs_d_rope[None, :]
+    o_nope_ptrs = (
+        O_nope + dest_index * stride_o_nope_bs + stride_o_nope_d * offs_d_nope[None, :]
+    )
+    o_rope_ptrs = (
+        O_rope + dest_index * stride_o_rope_bs + stride_o_rope_d * offs_d_rope[None, :]
+    )
 
     # to fp8
     kv_nope = tl.load(kv_nope_ptrs)
@@ -51,12 +63,18 @@ def _fwd_kernel_destindex_copy_kv_fp8(
     max_rope = tl.max(tl.abs(kv_rope), axis=1)
     max_kv = tl.maximum(tl.maximum(max_nope, max_rope), 1e-12)
     kv_scale = (max_kv / FP8_MAX).to(kv_nope.dtype)
-    kv_nope_fp8 = tl.clamp(kv_nope / kv_scale, min=FP8_MIN, max=FP8_MAX).to(tl.float8e4nv)
-    kv_rope_fp8 = tl.clamp(kv_rope / kv_scale, min=FP8_MIN, max=FP8_MAX).to(tl.float8e4nv)
+    kv_nope_fp8 = tl.clamp(kv_nope / kv_scale, min=FP8_MIN, max=FP8_MAX).to(
+        tl.float8e4nv
+    )
+    kv_rope_fp8 = tl.clamp(kv_rope / kv_scale, min=FP8_MIN, max=FP8_MAX).to(
+        tl.float8e4nv
+    )
 
     # save kv_scale
     offs_d_scale = tl.arange(0, 1)
-    o_scale_ptrs = O_scale + dest_index * stride_o_scale_bs + stride_o_scale_d * offs_d_scale
+    o_scale_ptrs = (
+        O_scale + dest_index * stride_o_scale_bs + stride_o_scale_d * offs_d_scale
+    )
     tl.store(o_scale_ptrs, kv_scale)
 
     # save fp8 kv
@@ -137,7 +155,9 @@ if __name__ == "__main__":
     NUM = 20
     dest_loc = torch.arange(NUM).cuda()
     kv = torch.randn((len(dest_loc), H, NOPE_HEAD + ROPE_HEAD), dtype=dtype).cuda()
-    out = torch.zeros((B * N_CTX, H, NOPE_HEAD + ROPE_HEAD + 2), dtype=torch.uint8).cuda()
+    out = torch.zeros(
+        (B * N_CTX, H, NOPE_HEAD + ROPE_HEAD + 2), dtype=torch.uint8
+    ).cuda()
 
     fp8_type = torch.float8_e4m3fn
     kv_nope = kv[:, :, :NOPE_HEAD]

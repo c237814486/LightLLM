@@ -35,7 +35,11 @@ class _ModelRegistries:
             model_types = [model_type] if isinstance(model_type, str) else model_type
             for mt in model_types:
                 self._registry[mt].append(
-                    ModelConfig(model_class=model_class, is_multimodal=is_multimodal, condition=condition)
+                    ModelConfig(
+                        model_class=model_class,
+                        is_multimodal=is_multimodal,
+                        condition=condition,
+                    )
                 )
             return model_class
 

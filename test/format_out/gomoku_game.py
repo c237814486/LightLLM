@@ -5,7 +5,9 @@ from pydantic import BaseModel, constr
 from enum import Enum
 from typing import List
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 from format_out.impl import ChatSession
@@ -29,9 +31,13 @@ class Map(BaseModel):
             if self.map_state[row - 1][col - 1] is Piece.Kong:
                 self.map_state[row - 1][col - 1] = piece_state
             else:
-                raise Exception(f"location row {row} col {col} is not '{Piece.Kong.value}'")
+                raise Exception(
+                    f"location row {row} col {col} is not '{Piece.Kong.value}'"
+                )
         else:
-            raise Exception(f"input row {row} col {col} is not ok, should 1 <= row <= {MapSize}, 1 <= col <= {MapSize}")
+            raise Exception(
+                f"input row {row} col {col} is not ok, should 1 <= row <= {MapSize}, 1 <= col <= {MapSize}"
+            )
 
     def to_str(self):
         ans = " ".ljust(3)
@@ -59,12 +65,18 @@ class Map(BaseModel):
                         return True
         return False
 
-    def check_direction(self, row: int, col: int, piece: Piece, delta_row: int, delta_col: int) -> bool:
+    def check_direction(
+        self, row: int, col: int, piece: Piece, delta_row: int, delta_col: int
+    ) -> bool:
         count = 0
         for i in range(5):
             r = row + i * delta_row
             c = col + i * delta_col
-            if 0 <= r < len(self.map_state) and 0 <= c < len(self.map_state[r]) and self.map_state[r][c] == piece:
+            if (
+                0 <= r < len(self.map_state)
+                and 0 <= c < len(self.map_state[r])
+                and self.map_state[r][c] == piece
+            ):
                 count += 1
             else:
                 break
@@ -115,13 +127,20 @@ game_env_start = """<|start_header_id|>game_system<|end_header_id|>"""
 game_env_end = """<|eot_id|>"""
 
 chat_session = ChatSession(
-    chat_his=system_prompt, url="http://localhost:8017/generate", sampling_param=SamplingParams(do_sample=True)
+    chat_his=system_prompt,
+    url="http://localhost:8017/generate",
+    sampling_param=SamplingParams(do_sample=True),
 )
 chat_session.sampling_param.top_p = 0.7
 chat_session.sampling_param.top_k = 12
 chat_session.disable_log = True
 # 修改采样参数
-chat_session.sampling_param.stop_sequences = [assistant_end, " " + assistant_end, "<|end_of_text|>", " <|end_of_text|>"]
+chat_session.sampling_param.stop_sequences = [
+    assistant_end,
+    " " + assistant_end,
+    "<|end_of_text|>",
+    " <|end_of_text|>",
+]
 
 current_is_user = True
 
@@ -166,7 +185,9 @@ for _ in range(MapSize * MapSize):
     else:
         while True:
             chat_session.add_prompt(assistant_start)
-            json_ans_str = chat_session.gen_json_object(ThoughtLoc, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}")
+            json_ans_str = chat_session.gen_json_object(
+                ThoughtLoc, max_new_tokens=1000, prefix_regex=r"[\s]{0,20}"
+            )
             print("tmp:", json_ans_str)
             json_ans_str: str = json_ans_str.strip()
             json_ans_str = json_ans_str.replace("”", '"')  # 修复 json 格式问题

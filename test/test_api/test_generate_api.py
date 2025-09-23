@@ -12,7 +12,9 @@ class RequestThread(threading.Thread):
         self.data = data
 
     def run(self):
-        response = requests.post(self.url, headers=self.headers, data=json.dumps(self.data))
+        response = requests.post(
+            self.url, headers=self.headers, data=json.dumps(self.data)
+        )
         if response.status_code == 200:
             print(response.json())
         else:

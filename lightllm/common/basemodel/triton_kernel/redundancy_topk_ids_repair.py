@@ -22,9 +22,11 @@ def _redundancy_topk_ids_repair_kernel(
 
     if ENABLE_COUNTER:
         tl.atomic_add(expert_counter_ptr + current_topk_ids, 1, mask=mask)
-    
+
     # Remap original expert IDs to a new space that accounts for redundant expert slots.
-    new_current_topk_ids = (current_topk_ids // ep_expert_num) * redundancy_expert_num + current_topk_ids
+    new_current_topk_ids = (
+        current_topk_ids // ep_expert_num
+    ) * redundancy_expert_num + current_topk_ids
 
     for i in tl.range(0, redundancy_expert_num, step=1, num_stages=3):
         cur_redundancy_expert_id = tl.load(redundancy_expert_ids_ptr + i)

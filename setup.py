@@ -4,7 +4,17 @@ package_data = {"lightllm": ["common/all_kernel_configs/*/*.json"]}
 setup(
     name="lightllm",
     version="1.0.1",
-    packages=find_packages(exclude=("build", "include", "test", "dist", "docs", "benchmarks", "lightllm.egg-info")),
+    packages=find_packages(
+        exclude=(
+            "build",
+            "include",
+            "test",
+            "dist",
+            "docs",
+            "benchmarks",
+            "lightllm.egg-info",
+        )
+    ),
     author="model toolchain",
     author_email="",
     description="lightllm for inference LLM",

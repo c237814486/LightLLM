@@ -8,9 +8,15 @@ from lightllm.common.mem_manager import MemoryManager
 from lightllm.models.registry import ModelRegistry
 from lightllm.models.cohere.infer_struct import CohereInferStateInfo
 from lightllm.models.cohere.layer_infer.post_layer_infer import CoherePostLayerInfer
-from lightllm.models.cohere.layer_infer.transformer_layer_infer import CohereTransformerLayerInfer
-from lightllm.models.cohere.layer_weights.pre_and_post_layer_weight import CoherePreAndPostLayerWeight
-from lightllm.models.cohere.layer_weights.transformer_layer_weight import CohereTransformerLayerWeight
+from lightllm.models.cohere.layer_infer.transformer_layer_infer import (
+    CohereTransformerLayerInfer,
+)
+from lightllm.models.cohere.layer_weights.pre_and_post_layer_weight import (
+    CoherePreAndPostLayerWeight,
+)
+from lightllm.models.cohere.layer_weights.transformer_layer_weight import (
+    CohereTransformerLayerWeight,
+)
 from lightllm.models.llama.layer_infer.pre_layer_infer import LlamaPreLayerInfer
 from lightllm.models.llama.model import LlamaTpPartModel
 from lightllm.utils.log_utils import init_logger
@@ -30,7 +36,9 @@ class CohereTpPartModel(LlamaTpPartModel):
     infer_state_class = CohereInferStateInfo
 
     def _init_to_get_rotary(self, default_base=10000):
-        partial_head_dim = int(self.config.get("partial_rotary_factor", 1) * self.head_dim_)
+        partial_head_dim = int(
+            self.config.get("partial_rotary_factor", 1) * self.head_dim_
+        )
         if self.config.get("rope_scaling", {}) is None:
             rope_scaling_factor = 1.0
         else:
@@ -53,14 +61,23 @@ class CohereTpPartModel(LlamaTpPartModel):
             if ntk_alpha > 1:
                 logger.info(f"Note: NTK enabled, alpha set to {ntk_alpha}")
             max_seq_len *= ntk_alpha
-            base = base * (ntk_alpha ** (partial_head_dim / (partial_head_dim - 2)))  # Base change formula
+            base = base * (
+                ntk_alpha ** (partial_head_dim / (partial_head_dim - 2))
+            )  # Base change formula
         except:
             pass
 
         inv_freq = 1.0 / (
-            base ** (torch.arange(0, partial_head_dim, 2, device="cpu", dtype=torch.float32) / partial_head_dim)
+            base
+            ** (
+                torch.arange(0, partial_head_dim, 2, device="cpu", dtype=torch.float32)
+                / partial_head_dim
+            )
         )
-        t = torch.arange(max_seq_len + 1024 * 128, device="cpu", dtype=torch.float32) / rope_scaling_factor
+        t = (
+            torch.arange(max_seq_len + 1024 * 128, device="cpu", dtype=torch.float32)
+            / rope_scaling_factor
+        )
         freqs = torch.outer(t, inv_freq)
         freqs = torch.repeat_interleave(freqs, 2, dim=-1)
 

@@ -1,7 +1,9 @@
 import torch
 import torch.functional as F
 import torch.distributed as dist
-from lightllm.models.vit.layer_weights.pre_and_post_layer_weight import ViTPreAndPostLayerWeight
+from lightllm.models.vit.layer_weights.pre_and_post_layer_weight import (
+    ViTPreAndPostLayerWeight,
+)
 from lightllm.utils.dist_utils import get_current_rank_in_dp, get_dp_world_size
 from lightllm.models.vit.triton_kernel.gelu_vit import gelu_fwd
 
@@ -25,7 +27,12 @@ class ViTPostLayerInfer:
         # N, W, H * scale, C // scale --> N, H * scale, W, C // scale
         x = x.permute(0, 2, 1, 3).contiguous()
         # N, H * scale, W, C // scale --> N, H * scale, W * scale, C // (scale ** 2)
-        x = x.view(n, int(h * scale_factor), int(w * scale_factor), int(c / (scale_factor * scale_factor)))
+        x = x.view(
+            n,
+            int(h * scale_factor),
+            int(w * scale_factor),
+            int(c / (scale_factor * scale_factor)),
+        )
         x = x.permute(0, 2, 1, 3).contiguous()
         return x
 
@@ -42,7 +49,9 @@ class ViTPostLayerInfer:
         )
 
         vit_embeds_1 = torch.addmm(
-            layer_weight.mlp1_1_bias_, vit_embeds_norm.view(-1, vit_embeds_norm.shape[-1]), layer_weight.mlp1_1_weight_
+            layer_weight.mlp1_1_bias_,
+            vit_embeds_norm.view(-1, vit_embeds_norm.shape[-1]),
+            layer_weight.mlp1_1_weight_,
         )
 
         vit_embeds_gelu = gelu_fwd(vit_embeds_1, use_custom_tensor_mananger=True)

@@ -21,7 +21,12 @@ class ChunkedBeamContinuesBatchQueue(BaseQueue):
         return
 
     # @calculate_time(show=True, min_cost_ms=0.1)
-    def _can_add_new_group_reqs(self, cur_handle_group_reqs: List[Req], is_busy, new_batch_first_router_need_tokens):
+    def _can_add_new_group_reqs(
+        self,
+        cur_handle_group_reqs: List[Req],
+        is_busy,
+        new_batch_first_router_need_tokens,
+    ):
         for req in cur_handle_group_reqs:
             self.cache_len_list.append(
                 (req, req.get_tuple_tokens(is_busy, self.router_max_new_token_len))
@@ -32,23 +37,30 @@ class ChunkedBeamContinuesBatchQueue(BaseQueue):
         need_max_token_num = 0
         cumsum_len = 0
         exist_group_req_set = set()
-        for index, (req, (cur_input_len, cur_ouput_len)) in enumerate(self.cache_len_list, 1):
+        for index, (req, (cur_input_len, cur_ouput_len)) in enumerate(
+            self.cache_len_list, 1
+        ):
             if req.group_req_id not in exist_group_req_set:
                 exist_group_req_set.add(req.group_req_id)
                 cumsum_len += cur_input_len
-                need_max_token_num = max(need_max_token_num, cumsum_len + index * cur_ouput_len)
+                need_max_token_num = max(
+                    need_max_token_num, cumsum_len + index * cur_ouput_len
+                )
             else:
                 # 因为有共享的token，所以
                 assert cur_input_len - req.input_len >= 0
                 cumsum_len += cur_input_len - req.input_len  # 减去共享的部分
-                need_max_token_num = max(need_max_token_num, cumsum_len + index * cur_ouput_len)
+                need_max_token_num = max(
+                    need_max_token_num, cumsum_len + index * cur_ouput_len
+                )
 
         # prefill token 计算
         for req in cur_handle_group_reqs:
             new_batch_first_router_need_tokens += req.shm_cur_output_len
         new_batch_first_router_need_tokens += req.get_first_router_need_tokens()
         ok_token_num = (
-            need_max_token_num + self.router.shared_token_load.get_frozened_token_count(self.dp_index)
+            need_max_token_num
+            + self.router.shared_token_load.get_frozened_token_count(self.dp_index)
             < self.max_total_tokens
         )
 
@@ -58,9 +70,16 @@ class ChunkedBeamContinuesBatchQueue(BaseQueue):
         ok_prefill = new_batch_first_router_need_tokens <= self.batch_max_tokens
 
         if ok_token_num and ok_req_num and ok_prefill:
-            self.router.shared_token_load.set_estimated_peak_token_count(need_max_token_num, self.dp_index)
+            self.router.shared_token_load.set_estimated_peak_token_count(
+                need_max_token_num, self.dp_index
+            )
             self.router.shared_token_load.set_dynamic_max_load(
-                (need_max_token_num + self.router.shared_token_load.get_frozened_token_count(self.dp_index))
+                (
+                    need_max_token_num
+                    + self.router.shared_token_load.get_frozened_token_count(
+                        self.dp_index
+                    )
+                )
                 / self.max_total_tokens,
                 self.dp_index,
             )
@@ -87,7 +106,9 @@ class ChunkedBeamContinuesBatchQueue(BaseQueue):
         self._init_cache_list(current_batch, is_busy)
         can_run_list = []
         abort_req_list = []
-        new_batch_first_router_need_tokens = 0  # 主要是对 prefill 大块计算时候的token数量限制
+        new_batch_first_router_need_tokens = (
+            0  # 主要是对 prefill 大块计算时候的token数量限制
+        )
         aborted_count = 0
         cur_group_reqs = []
         for req in self.waiting_req_list:
@@ -99,8 +120,10 @@ class ChunkedBeamContinuesBatchQueue(BaseQueue):
             if self._add_to_group(cur_group_reqs, req):
                 continue
 
-            ok_insert, new_batch_first_router_need_tokens = self._can_add_new_group_reqs(
-                cur_group_reqs, is_busy, new_batch_first_router_need_tokens
+            ok_insert, new_batch_first_router_need_tokens = (
+                self._can_add_new_group_reqs(
+                    cur_group_reqs, is_busy, new_batch_first_router_need_tokens
+                )
             )
             if ok_insert:
                 can_run_list.extend(cur_group_reqs)
@@ -110,19 +133,25 @@ class ChunkedBeamContinuesBatchQueue(BaseQueue):
                 break
 
         if len(cur_group_reqs) != 0:
-            ok_insert, new_batch_first_router_need_tokens = self._can_add_new_group_reqs(
-                cur_group_reqs, is_busy, new_batch_first_router_need_tokens
+            ok_insert, new_batch_first_router_need_tokens = (
+                self._can_add_new_group_reqs(
+                    cur_group_reqs, is_busy, new_batch_first_router_need_tokens
+                )
             )
             if ok_insert:
                 can_run_list.extend(cur_group_reqs)
 
         new_batch = None
         if len(can_run_list) != 0:
-            new_batch = Batch(uuid.uuid4().int, can_run_list, dp_size_in_node=self.dp_size_in_node)
+            new_batch = Batch(
+                uuid.uuid4().int, can_run_list, dp_size_in_node=self.dp_size_in_node
+            )
 
         for req in abort_req_list:
             self.router.shm_req_manager.put_back_req_obj(req)
-        self.waiting_req_list = self.waiting_req_list[len(can_run_list) + aborted_count :]
+        self.waiting_req_list = self.waiting_req_list[
+            len(can_run_list) + aborted_count :
+        ]
         return new_batch
 
     def _add_to_group(self, cur_group_reqs, req: Req):
@@ -143,18 +172,27 @@ class ChunkedBeamContinuesBatchQueue(BaseQueue):
         need_max_token_num = 0
         cumsum_len = 0
         exist_group_req_set = set()
-        for index, (req, (cur_input_len, cur_ouput_len)) in enumerate(self.cache_len_list, 1):
+        for index, (req, (cur_input_len, cur_ouput_len)) in enumerate(
+            self.cache_len_list, 1
+        ):
             if req.group_req_id not in exist_group_req_set:
                 exist_group_req_set.add(req.group_req_id)
                 cumsum_len += cur_input_len
-                need_max_token_num = max(need_max_token_num, cumsum_len + index * cur_ouput_len)
+                need_max_token_num = max(
+                    need_max_token_num, cumsum_len + index * cur_ouput_len
+                )
             else:
                 # 因为有共享的token
                 assert cur_input_len - req.input_len >= 0
                 cumsum_len += cur_input_len - req.input_len  # 减去共享的部分
-                need_max_token_num = max(need_max_token_num, cumsum_len + index * cur_ouput_len)
+                need_max_token_num = max(
+                    need_max_token_num, cumsum_len + index * cur_ouput_len
+                )
         return (
             need_max_token_num,
-            (need_max_token_num + self.router.shared_token_load.get_frozened_token_count(self.dp_index))
+            (
+                need_max_token_num
+                + self.router.shared_token_load.get_frozened_token_count(self.dp_index)
+            )
             / self.max_total_tokens,
         )

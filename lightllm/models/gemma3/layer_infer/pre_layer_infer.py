@@ -1,14 +1,18 @@
 import torch
 from lightllm.common.basemodel.triton_kernel.multimodal_emb import multimodal_emb
 from lightllm.distributed.communication_op import all_reduce
-from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import LlamaMultimodalPreLayerInfer
+from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import (
+    LlamaMultimodalPreLayerInfer,
+)
 from lightllm.server.embed_cache.utils import bytes2tensor, get_shm_name_embed, read_shm
 
 
 class Gemma3PreLayerInfer(LlamaMultimodalPreLayerInfer):
     def __init__(self, network_config, mode):
         super().__init__(network_config, mode)
-        self.embed_scale = torch.tensor(network_config["hidden_size"] ** 0.5, dtype=torch.float32)
+        self.embed_scale = torch.tensor(
+            network_config["hidden_size"] ** 0.5, dtype=torch.float32
+        )
         self.boi_token_index: int = 255_999
         self.eoi_token_index: int = 256_000
         return
@@ -44,7 +48,9 @@ class Gemma3PreLayerInfer(LlamaMultimodalPreLayerInfer):
                     continue
                 # pull the img_embeds by uid from shm
                 data = read_shm(get_shm_name_embed(img["uuid"]))
-                img_weight.append(bytes2tensor(data).cuda().reshape(img["token_num"], -1))
+                img_weight.append(
+                    bytes2tensor(data).cuda().reshape(img["token_num"], -1)
+                )
                 img_start_token_ids.append(img["token_id"])
                 img_token_lens.append(img["token_num"])
                 img_start_locs.append(img_start_loc)
@@ -60,9 +66,15 @@ class Gemma3PreLayerInfer(LlamaMultimodalPreLayerInfer):
         )
         # each tp will fill the img embeds, should divide by world_size
         img_weight = img_weight / self.tp_world_size_
-        img_start_token_ids = torch.Tensor(img_start_token_ids).to(device=device, dtype=torch.long)
-        img_token_lens = torch.Tensor(img_token_lens).to(device=device, dtype=torch.long)
-        img_start_locs = torch.Tensor(img_start_locs).to(device=device, dtype=torch.long)
+        img_start_token_ids = torch.Tensor(img_start_token_ids).to(
+            device=device, dtype=torch.long
+        )
+        img_token_lens = torch.Tensor(img_token_lens).to(
+            device=device, dtype=torch.long
+        )
+        img_start_locs = torch.Tensor(img_start_locs).to(
+            device=device, dtype=torch.long
+        )
 
         multimodal_emb(
             out,
@@ -77,10 +89,18 @@ class Gemma3PreLayerInfer(LlamaMultimodalPreLayerInfer):
         )
         input_dtype = out.dtype
         if self.tp_world_size_ > 1:
-            all_reduce(out, group=infer_state.dist_group, op=torch.dist.ReduceOp.SUM, async_op=False)
+            all_reduce(
+                out,
+                group=infer_state.dist_group,
+                op=torch.dist.ReduceOp.SUM,
+                async_op=False,
+            )
         return (out.float() * weight_mask.unsqueeze(1).float()).to(input_dtype)
 
     def token_forward(self, input_ids, infer_state, layer_weight):
         input_embedding = super().token_forward(input_ids, infer_state, layer_weight)
         input_dtype = input_embedding.dtype
-        return (input_embedding.float() * self.embed_scale.to(input_embedding.device).float()).to(input_dtype)
+        return (
+            input_embedding.float()
+            * self.embed_scale.to(input_embedding.device).float()
+        ).to(input_dtype)

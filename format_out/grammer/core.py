@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict, deque
 from typing import Any, Union, Dict, List, Tuple, Set, FrozenSet
 
+
 # 项中的点标识，主要用于格式化输出
 @dataclass
 class Dot:
@@ -71,7 +72,9 @@ class Item:
     item_id: int = None
 
     def __post_init__(self):
-        self.item_id = self.gen.gen_id * 100000000 + self.loc  # 很难出现文法长度超过这个界限的，可以认为可以保证唯一性
+        self.item_id = (
+            self.gen.gen_id * 100000000 + self.loc
+        )  # 很难出现文法长度超过这个界限的，可以认为可以保证唯一性
         return
 
     def __hash__(self) -> int:
@@ -239,7 +242,10 @@ class ItemSet:
         for item1 in self.item_dict.keys():
             for item2 in self.item_dict.keys():
                 if item1 != item2:
-                    if isinstance(item1.gen.gen_tuple[-1], NT) and item1.loc == len(item1.gen.gen_tuple) - 1:
+                    if (
+                        isinstance(item1.gen.gen_tuple[-1], NT)
+                        and item1.loc == len(item1.gen.gen_tuple) - 1
+                    ):
                         if item2.loc == 0 and item2.gen.nt == item1.gen.gen_tuple[-1]:
                             self.back_pair_list.append((item1, item2))
 
@@ -309,7 +315,9 @@ class Graph:
         return ans
 
 
-def grammar_to_dict(grammar: List[Tuple[NT, List[Union[NT, T]]]]) -> Dict[NT, List[Gen]]:
+def grammar_to_dict(
+    grammar: List[Tuple[NT, List[Union[NT, T]]]]
+) -> Dict[NT, List[Gen]]:
     grammar_dict: Dict[NT, List[List[Union[NT, T]]]] = defaultdict(list)
     for index, (nt, gen_list) in enumerate(grammar):
         grammar_dict[nt].append(Gen(gen_id=index, nt=nt, gen_tuple=tuple(gen_list)))
@@ -395,7 +403,9 @@ def compute_graph(grammar: List[Tuple[NT, List[Union[NT, T]]]], start_symbol):
     first_graph_node.node_id = 0
     while len(handle_queue) != 0:
         cur_graph_node: ItemSet = handle_queue.popleft()
-        new_graph_nodes: List[Tuple[Union[NT, T], ItemSet]] = cur_graph_node.get_next_graphs(first_map, grammar_dict)
+        new_graph_nodes: List[Tuple[Union[NT, T], ItemSet]] = (
+            cur_graph_node.get_next_graphs(first_map, grammar_dict)
+        )
         for nt_or_t, new_graph in new_graph_nodes:
             if new_graph not in graph_dict:
                 graph_dict[new_graph] = new_graph

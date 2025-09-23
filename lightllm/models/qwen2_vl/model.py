@@ -3,28 +3,43 @@ import numpy as np
 import unicodedata
 from lightllm.common.basemodel.multimodal_tokenizer import BaseMultiModalTokenizer
 from lightllm.models.qwen.model import QWenTpPartModel
-from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import LlamaMultimodalPreLayerInfer
+from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import (
+    LlamaMultimodalPreLayerInfer,
+)
 from lightllm.server.multimodal_params import AudioItem, MultimodalParams, ImageItem
 from transformers.feature_extraction_utils import BatchFeature
 from transformers.image_utils import ImageInput
 from transformers.processing_utils import ProcessorMixin
 from lightllm.server.core.objs import SamplingParams
-from transformers.tokenization_utils_base import PaddingStrategy, PreTokenizedInput, TextInput, TruncationStrategy
+from transformers.tokenization_utils_base import (
+    PaddingStrategy,
+    PreTokenizedInput,
+    TextInput,
+    TruncationStrategy,
+)
 from typing import List, Optional, Union
 from transformers.utils import TensorType, logging
-from lightllm.models.qwen2_vl.flashattention_infer_struct import Qwen2VLFlashAttentionStateInfo
+from lightllm.models.qwen2_vl.flashattention_infer_struct import (
+    Qwen2VLFlashAttentionStateInfo,
+)
 from lightllm.common.build_utils import repair_config
 from lightllm.models.registry import ModelRegistry
 from lightllm.models.qwen2_vl.infer_struct import Qwen2VLInferStateInfo
-from lightllm.models.qwen2_vl.layer_infer.transformer_layer_infer import Qwen2VLTransformerLayerInfer
+from lightllm.models.qwen2_vl.layer_infer.transformer_layer_infer import (
+    Qwen2VLTransformerLayerInfer,
+)
 
 import torch
 from PIL import Image
 from .vision_process import smart_resize
 from lightllm.utils.envs_utils import enable_env_vars, get_env_start_args
-from lightllm.models.qwen2.layer_weights import transformer_layer_weight, pre_and_post_layer_weight
+from lightllm.models.qwen2.layer_weights import (
+    transformer_layer_weight,
+    pre_and_post_layer_weight,
+)
 from lightllm.models.qwen2.model import Qwen2TpPartModel
 import os
+
 
 # Warp of the origal tokenizer
 class QWen2VLTokenizer(BaseMultiModalTokenizer):
@@ -40,22 +55,34 @@ class QWen2VLTokenizer(BaseMultiModalTokenizer):
         self.image_token_id = kwargs["model_cfg"]["image_token_id"]
 
     def init_imageitem_extral_params(
-        self, img: ImageItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        img: ImageItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         return
 
     def init_audioitem_extral_params(
-        self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        audio: AudioItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         raise NotImplementedError
 
     def get_image_token_length(self, img: ImageItem):
         width, height = img.image_w, img.image_h
         resized_height, resized_width = smart_resize(
-            height=height, width=width, min_pixels=self.min_pixel, max_pixels=self.max_pixel
+            height=height,
+            width=width,
+            min_pixels=self.min_pixel,
+            max_pixels=self.max_pixel,
         )
-        grid_h, grid_w = resized_height // self.patch_size, resized_width // self.patch_size
-        token_num = (grid_h * grid_w) // (self.merge_size ** 2)
+        grid_h, grid_w = (
+            resized_height // self.patch_size,
+            resized_width // self.patch_size,
+        )
+        token_num = (grid_h * grid_w) // (self.merge_size**2)
         return token_num
 
     def get_audio_token_length(self, audio: AudioItem):

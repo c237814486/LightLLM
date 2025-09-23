@@ -43,7 +43,9 @@ class ShmReqManager:
         self._init_reqs_shm()
 
         if self.reqs_shm.size != self.req_shm_byte_size:
-            logger.info(f"size not same, unlink lock shm {self.reqs_shm.name} and create again")
+            logger.info(
+                f"size not same, unlink lock shm {self.reqs_shm.name} and create again"
+            )
             self.reqs_shm.close()
             self.reqs_shm.unlink()
             self.reqs_shm = None
@@ -52,16 +54,22 @@ class ShmReqManager:
     def _init_reqs_shm(self):
         shm_name = f"{get_unique_server_name()}_req_shm_total"
         try:
-            shm = shared_memory.SharedMemory(name=shm_name, create=True, size=self.req_shm_byte_size)
+            shm = shared_memory.SharedMemory(
+                name=shm_name, create=True, size=self.req_shm_byte_size
+            )
             logger.info(f"create lock shm {shm_name}")
         except:
-            shm = shared_memory.SharedMemory(name=shm_name, create=False, size=self.req_shm_byte_size)
+            shm = shared_memory.SharedMemory(
+                name=shm_name, create=False, size=self.req_shm_byte_size
+            )
             logger.info(f"link lock shm {shm_name}")
         self.reqs_shm = shm
         return
 
     def init_to_req_objs(self):
-        self.reqs: List[Req] = (self.req_class * self.max_req_num).from_buffer(self.reqs_shm.buf)
+        self.reqs: List[Req] = (self.req_class * self.max_req_num).from_buffer(
+            self.reqs_shm.buf
+        )
         for i in range(self.max_req_num):
             self.reqs[i].ref_count = 0
             self.reqs[i].index_in_shm_mem = i
@@ -83,12 +91,16 @@ class ShmReqManager:
     def init_alloc_state_shm(self):
         shm_name = f"{get_unique_server_name()}_req_alloc_states"
         req_link_list_name = f"{get_unique_server_name()}_req_linked_states"
-        self.linked_req_manager = ReqLinkedListManager(req_link_list_name, self.max_req_num)
+        self.linked_req_manager = ReqLinkedListManager(
+            req_link_list_name, self.max_req_num
+        )
         self.alloc_state_shm = ShmArray(shm_name, (self.max_req_num,), np.int32)
         self.alloc_state_shm.create_shm()
         self.alloc_state_shm.arr[:] = 0
         # 用来做为每个进程独立的状态管理，用于申请和
-        self.proc_private_get_state = np.zeros(shape=(self.max_req_num,), dtype=np.int32)
+        self.proc_private_get_state = np.zeros(
+            shape=(self.max_req_num,), dtype=np.int32
+        )
         return
 
     # alloc_req_index 和 release_req_index 是分配资源时使用的接口。
@@ -112,7 +124,10 @@ class ShmReqManager:
             self.alloc_state_shm.arr[req_index_in_mem] = 0
             self.linked_req_manager.free(req_index_in_mem)
 
-        if np.sum(self.alloc_state_shm.arr) == 0 and self.linked_req_manager.test_is_full():
+        if (
+            np.sum(self.alloc_state_shm.arr) == 0
+            and self.linked_req_manager.test_is_full()
+        ):
             logger.info("all shm req has been release ok")
         return
 
@@ -153,7 +168,9 @@ class ReqLinkedListManager:
 
     def __init__(self, name: str, size: int) -> None:
         self.size = size + 1  # +1 , 0 号节点用于链表头
-        self._shm_array = ShmArray(name, shape=(self.size, 1), dtype=np.int64)  # 只需一列
+        self._shm_array = ShmArray(
+            name, shape=(self.size, 1), dtype=np.int64
+        )  # 只需一列
         self._shm_array.create_shm()
         self._values = self._shm_array.arr
 

@@ -1,10 +1,16 @@
 import torch
 from lightllm.models.registry import ModelRegistry
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
-from lightllm.models.starcoder2.layer_weights.pre_and_post_layer_weight import Starcoder2PreAndPostLayerWeight
-from lightllm.models.starcoder2.layer_weights.transformer_layer_weight import Starcoder2TransformerLayerWeight
+from lightllm.models.starcoder2.layer_weights.pre_and_post_layer_weight import (
+    Starcoder2PreAndPostLayerWeight,
+)
+from lightllm.models.starcoder2.layer_weights.transformer_layer_weight import (
+    Starcoder2TransformerLayerWeight,
+)
 from lightllm.models.llama.layer_infer.pre_layer_infer import LlamaPreLayerInfer
-from lightllm.models.starcoder2.layer_infer.transformer_layer_infer import Starcoder2TransformerLayerInfer
+from lightllm.models.starcoder2.layer_infer.transformer_layer_infer import (
+    Starcoder2TransformerLayerInfer,
+)
 from lightllm.models.bloom.layer_infer.post_layer_infer import BloomPostLayerInfer
 
 from lightllm.common.build_utils import repair_config
@@ -30,7 +36,10 @@ class Starcoder2TpPartModel(TpPartBaseModel):
 
     def _init_config(self):
         super()._init_config()
-        repair_config(self.config, same_names=["norm_epsilon", "rms_norm_eps", "layer_norm_epsilon"])
+        repair_config(
+            self.config,
+            same_names=["norm_epsilon", "rms_norm_eps", "layer_norm_epsilon"],
+        )
         if self.config["sliding_window"] is None:
             self.config["sliding_window"] = self.max_total_token_num
         # rename key [SYM: to be confirmed]
@@ -78,9 +87,16 @@ class Starcoder2TpPartModel(TpPartBaseModel):
             max_seq_len = max_position_embeddings * rope_scaling_factor
 
         inv_freq = 1.0 / (
-            base ** (torch.arange(0, self.head_dim_, 2, device="cpu", dtype=torch.float32) / self.head_dim_)
+            base
+            ** (
+                torch.arange(0, self.head_dim_, 2, device="cpu", dtype=torch.float32)
+                / self.head_dim_
+            )
         )
-        t = torch.arange(max_seq_len + 1024 * 64, device="cpu", dtype=torch.float32) / rope_scaling_factor
+        t = (
+            torch.arange(max_seq_len + 1024 * 64, device="cpu", dtype=torch.float32)
+            / rope_scaling_factor
+        )
         freqs = torch.outer(t, inv_freq)
 
         self._cos_cached = torch.cos(freqs).to(self.data_type).cuda()

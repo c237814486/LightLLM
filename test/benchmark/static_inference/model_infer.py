@@ -45,7 +45,14 @@ def test_model_inference(args):
         }
         proc = multiprocessing.Process(
             target=tppart_model_infer,
-            args=(args, model_kvargs, args.batch_size, args.input_len, args.output_len, ans_queue),
+            args=(
+                args,
+                model_kvargs,
+                args.batch_size,
+                args.input_len,
+                args.output_len,
+                ans_queue,
+            ),
         )
         proc.start()
         workers.append(proc)
@@ -120,7 +127,14 @@ def overlap_prefill(
 
 
 def overlap_decode(
-    model_part, batch_size, max_len_in_batch, input_ids, mem_indexes, b_req_idx, b_seq_len, total_token_num
+    model_part,
+    batch_size,
+    max_len_in_batch,
+    input_ids,
+    mem_indexes,
+    b_req_idx,
+    b_seq_len,
+    total_token_num,
 ):
     _0_batch_size = batch_size // 2
     _0_total_token_num = total_token_num // 2
@@ -189,7 +203,16 @@ def prefill(
     return model_output.logits
 
 
-def decode(model_part, batch_size, max_len_in_batch, input_ids, mem_indexes, b_req_idx, b_seq_len, total_token_num):
+def decode(
+    model_part,
+    batch_size,
+    max_len_in_batch,
+    input_ids,
+    mem_indexes,
+    b_req_idx,
+    b_seq_len,
+    total_token_num,
+):
     model_input = ModelInput(
         batch_size,
         total_token_num,
@@ -218,9 +241,17 @@ def torch_profile(fn, log_dir=None):
 
 
 def run_forward_once(
-    model_kvargs, input_len, output_len, batch_size, model_part, enable_overlap, enable_torch_profile=False
+    model_kvargs,
+    input_len,
+    output_len,
+    batch_size,
+    model_part,
+    enable_overlap,
+    enable_torch_profile=False,
 ):
-    test_data = np.vstack([np.random.randint(0, 50256, input_len) for _ in range(batch_size)])
+    test_data = np.vstack(
+        [np.random.randint(0, 50256, input_len) for _ in range(batch_size)]
+    )
     test_data = test_data.reshape(-1)
     test_data = torch.from_numpy(test_data).cuda()
     import torch.distributed as dist
@@ -234,7 +265,9 @@ def run_forward_once(
     prefill_start_time = time.time()
 
     b_req_idx = torch.tensor(
-        [model_part.req_manager.alloc() for _ in range(batch_size)], dtype=torch.int32, device="cuda"
+        [model_part.req_manager.alloc() for _ in range(batch_size)],
+        dtype=torch.int32,
+        device="cuda",
     )
     b_seq_len = torch.zeros(batch_size, dtype=torch.int32, device="cuda")
     b_ready_cache_len = torch.zeros(batch_size, dtype=torch.int32, device="cuda")
@@ -303,7 +336,9 @@ def run_forward_once(
         step_start = time.time()
         total_token_num += batch_size
         b_seq_len += 1
-        mem_indexes = model_part.req_manager.mem_manager.alloc(predict_ids.shape[0]).cuda()
+        mem_indexes = model_part.req_manager.mem_manager.alloc(
+            predict_ids.shape[0]
+        ).cuda()
         max_len_in_batch = input_len + i + 1
         logits = decode_fn(
             model_part,
@@ -351,7 +386,9 @@ def run_forward_once(
     torch.cuda.empty_cache()
 
 
-def tppart_model_infer(args, model_kvargs, batch_size, input_len, output_len, ans_queue):
+def tppart_model_infer(
+    args, model_kvargs, batch_size, input_len, output_len, ans_queue
+):
     args = get_env_start_args()
     import triton.profiler as proton
     import torch
@@ -378,7 +415,9 @@ def tppart_model_infer(args, model_kvargs, batch_size, input_len, output_len, an
     dist.barrier()
 
     torch.cuda.empty_cache()
-    enable_overlap = args.enable_decode_microbatch_overlap or args.enable_prefill_microbatch_overlap
+    enable_overlap = (
+        args.enable_decode_microbatch_overlap or args.enable_prefill_microbatch_overlap
+    )
 
     model_part, _ = get_model(model_cfg, model_kvargs)
 

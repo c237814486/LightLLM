@@ -5,10 +5,16 @@ from lightllm.common.basemodel.basemodel import TpPartBaseModel
 from lightllm.common.mem_manager import MemoryManager
 from lightllm.models.llama.layer_infer.post_layer_infer import LlamaPostLayerInfer
 from lightllm.models.llama.layer_infer.pre_layer_infer import LlamaPreLayerInfer
-from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import LlamaPreAndPostLayerWeight
+from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import (
+    LlamaPreAndPostLayerWeight,
+)
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
-from lightllm.models.mixtral.layer_infer.transformer_layer_infer import MixtralTransformerLayerInfer
-from lightllm.models.mixtral.layer_weights.transformer_layer_weight import MixtralTransformerLayerWeight
+from lightllm.models.mixtral.layer_infer.transformer_layer_infer import (
+    MixtralTransformerLayerInfer,
+)
+from lightllm.models.mixtral.layer_weights.transformer_layer_weight import (
+    MixtralTransformerLayerWeight,
+)
 
 from lightllm.utils.log_utils import init_logger
 
@@ -76,9 +82,16 @@ class MixtralTpPartModel(TpPartBaseModel):
             max_seq_len = max_position_embeddings * rope_scaling_factor
 
         inv_freq = 1.0 / (
-            base ** (torch.arange(0, self.head_dim_, 2, device="cpu", dtype=torch.float32) / self.head_dim_)
+            base
+            ** (
+                torch.arange(0, self.head_dim_, 2, device="cpu", dtype=torch.float32)
+                / self.head_dim_
+            )
         )
-        t = torch.arange(max_seq_len + 1024 * 64, device="cpu", dtype=torch.float32) / rope_scaling_factor
+        t = (
+            torch.arange(max_seq_len + 1024 * 64, device="cpu", dtype=torch.float32)
+            / rope_scaling_factor
+        )
         freqs = torch.outer(t, inv_freq)
 
         self._cos_cached = torch.cos(freqs).to(self.data_type).cuda()

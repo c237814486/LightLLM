@@ -15,8 +15,12 @@ def rotate_half(x):
 
 def apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim=1):
     mrope_section = mrope_section * 2
-    cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(unsqueeze_dim)
-    sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(unsqueeze_dim)
+    cos = torch.cat(
+        [m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1
+    ).unsqueeze(unsqueeze_dim)
+    sin = torch.cat(
+        [m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1
+    ).unsqueeze(unsqueeze_dim)
 
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
@@ -49,7 +53,9 @@ def test_mrope_triton_correctness(B, H_q, H_k, L, D, mrope_section):
     cos = torch.rand((3, 1, L, D), dtype=torch.float32, device=device)
     sin = torch.rand((3, 1, L, D), dtype=torch.float32, device=device)
 
-    ref_q, ref_k = apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim=1)
+    ref_q, ref_k = apply_multimodal_rotary_pos_emb(
+        q, k, cos, sin, mrope_section, unsqueeze_dim=1
+    )
 
     out_q, out_k = mrope_triton(q, k, cos, sin, axis_map)
 

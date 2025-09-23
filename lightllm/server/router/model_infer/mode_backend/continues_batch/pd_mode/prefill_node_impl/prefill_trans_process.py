@@ -9,7 +9,12 @@ from datetime import timedelta
 from typing import List, Dict, Union
 from lightllm.utils.log_utils import init_logger
 from lightllm.common.mem_manager import MemoryManager
-from lightllm.server.pd_io_struct import KVMoveTask, PDTransJoinInfo, PDTransLeaveInfo, KVMoveTaskGroup
+from lightllm.server.pd_io_struct import (
+    KVMoveTask,
+    PDTransJoinInfo,
+    PDTransLeaveInfo,
+    KVMoveTaskGroup,
+)
 from lightllm.utils.device_utils import kv_trans_use_p2p
 from lightllm.utils.graceful_utils import graceful_registry
 from lightllm.distributed.pynccl import StatelessP2PProcessGroup, PyNcclCommunicator
@@ -35,11 +40,21 @@ def _handle_kvmove_task(
             cur_mem = mem_managers[device_index]
             if kv_trans_use_p2p():
                 cur_mem.send_to_decode_node_p2p(
-                    move_tasks, mem_managers, dp_size_in_node, connect_id_to_comm[connect_id]
+                    move_tasks,
+                    mem_managers,
+                    dp_size_in_node,
+                    connect_id_to_comm[connect_id],
                 )
             else:
-                cur_mem.send_to_decode_node(move_tasks, mem_managers, dp_size_in_node, connect_id_to_comm[connect_id])
-            logger.info(f"trans finished: {move_tasks[0].to_prefill_log_info()} move len: {total_move_kv_len}")
+                cur_mem.send_to_decode_node(
+                    move_tasks,
+                    mem_managers,
+                    dp_size_in_node,
+                    connect_id_to_comm[connect_id],
+                )
+            logger.info(
+                f"trans finished: {move_tasks[0].to_prefill_log_info()} move len: {total_move_kv_len}"
+            )
         torch.cuda.synchronize()
         logger.info(
             f"trans cost time: {(time.time() - start)},"
@@ -66,7 +81,9 @@ def _handle_decode_join(
 
         def async_connect():
             torch.cuda.set_device(node_info.prefill_device_id)
-            group = StatelessP2PProcessGroup.create(src_id=src_id, dest_id=dest_id, is_server=True, store=store)
+            group = StatelessP2PProcessGroup.create(
+                src_id=src_id, dest_id=dest_id, is_server=True, store=store
+            )
             comm = PyNcclCommunicator(group, node_info.prefill_device_id)
             result_list.append(comm)
             return
@@ -106,29 +123,46 @@ def _init_env(
         torch.cuda.set_device(device_id)
         graceful_registry(inspect.currentframe().f_code.co_name)
         master_store = TCPStore(
-            host_name=store_ip, port=store_port, is_master=True, use_libuv=True, timeout=timedelta(seconds=30)
+            host_name=store_ip,
+            port=store_port,
+            is_master=True,
+            use_libuv=True,
+            timeout=timedelta(seconds=30),
         )
         dp_size_in_node = max(1, args.dp // args.nnodes)
         task_out_queue.put("proc_start")
-        mem_managers: List[MemoryManager] = [mem_queue.get(timeout=60) for mem_queue in mem_queues]
+        mem_managers: List[MemoryManager] = [
+            mem_queue.get(timeout=60) for mem_queue in mem_queues
+        ]
         task_out_queue.put("get_mem_managers_ok")
         connect_id_to_comm: Dict[str, PyNcclCommunicator] = {}
 
         while True:
-            task: Union[KVMoveTaskGroup, PDTransJoinInfo, PDTransLeaveInfo] = task_in_queue.get()
+            task: Union[KVMoveTaskGroup, PDTransJoinInfo, PDTransLeaveInfo] = (
+                task_in_queue.get()
+            )
             if isinstance(task, KVMoveTaskGroup):
                 _handle_kvmove_task(
-                    task.tasks, task_out_queue, mem_managers, connect_id_to_comm, task.connect_id, dp_size_in_node
+                    task.tasks,
+                    task_out_queue,
+                    mem_managers,
+                    connect_id_to_comm,
+                    task.connect_id,
+                    dp_size_in_node,
                 )
             elif isinstance(task, PDTransJoinInfo):
-                _handle_decode_join(task, task_out_queue, connect_id_to_comm, master_store)
+                _handle_decode_join(
+                    task, task_out_queue, connect_id_to_comm, master_store
+                )
             elif isinstance(task, PDTransLeaveInfo):
                 if task.connect_id in connect_id_to_comm:
                     connect_id_to_comm[task.connect_id].destroy()
                     connect_id_to_comm.pop(task.connect_id, None)
                     logger.info(f"destory {task} nccl communicator.")
                 else:
-                    logger.error(f"connect id {task.connect_id} dont exist in connect_id_to_comm")
+                    logger.error(
+                        f"connect id {task.connect_id} dont exist in connect_id_to_comm"
+                    )
             else:
                 logger.warning(f"unexpected task type: {task}")
 
@@ -147,7 +181,16 @@ def start_prefill_trans_process(
     mem_queues: List[mp.Queue],
 ):
     proc = mp.Process(
-        target=_init_env, args=(args, store_ip, store_port, device_id, task_in_queue, task_out_queue, mem_queues)
+        target=_init_env,
+        args=(
+            args,
+            store_ip,
+            store_port,
+            device_id,
+            task_in_queue,
+            task_out_queue,
+            mem_queues,
+        ),
     )
     proc.start()
     assert proc.is_alive()

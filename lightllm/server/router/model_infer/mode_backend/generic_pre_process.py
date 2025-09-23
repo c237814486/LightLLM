@@ -30,7 +30,9 @@ def prepare_prefill_inputs(
         else:
             input_token_ids = req.get_input_token_ids()
 
-        b_prefill_has_output.append(False if len(input_token_ids) < req.get_cur_total_len() else True)
+        b_prefill_has_output.append(
+            False if len(input_token_ids) < req.get_cur_total_len() else True
+        )
 
         seq_len = len(input_token_ids)
         input_token_len = seq_len - req.cur_kv_len
@@ -55,7 +57,9 @@ def prepare_prefill_inputs(
     # dynamic prompt cache 准备 token
     g_infer_state_lock.acquire()
     if g_infer_context.radix_cache is not None:
-        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(input_ids.shape[0])
+        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(
+            input_ids.shape[0]
+        )
     mem_indexes = g_infer_context.req_manager.mem_manager.alloc(input_ids.shape[0])
     g_infer_state_lock.release()
 
@@ -78,7 +82,9 @@ def prepare_prefill_inputs(
     return model_input, run_reqs
 
 
-def prepare_decode_inputs(req_objs: List[InferReq]) -> Tuple[ModelInput, List[InferReq]]:
+def prepare_decode_inputs(
+    req_objs: List[InferReq],
+) -> Tuple[ModelInput, List[InferReq]]:
     run_reqs = []
     total_token_num = 0
     max_len_in_batch = 0
@@ -111,7 +117,9 @@ def prepare_decode_inputs(req_objs: List[InferReq]) -> Tuple[ModelInput, List[In
     # dynamic prompt cache 准备 token
     g_infer_state_lock.acquire()
     if g_infer_context.radix_cache is not None:
-        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(b_seq_len.shape[0])
+        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(
+            b_seq_len.shape[0]
+        )
     mem_indexes = g_infer_context.req_manager.mem_manager.alloc(b_seq_len.shape[0])
     g_infer_state_lock.release()
 

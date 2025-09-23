@@ -23,12 +23,16 @@ class XgrammarBackend(ChunkedPrefillBackend):
         import xgrammar as xgr
 
         self.tokenizer = get_tokenizer(
-            self.args.model_dir, self.args.tokenizer_mode, trust_remote_code=self.args.trust_remote_code
+            self.args.model_dir,
+            self.args.tokenizer_mode,
+            trust_remote_code=self.args.trust_remote_code,
         )
 
         self.tokenizer_info = xgr.TokenizerInfo.from_huggingface(self.tokenizer)
         self.xgrammar_compiler = xgr.GrammarCompiler(self.tokenizer_info, max_threads=8)
-        self.xgrammar_token_bitmask = xgr.allocate_token_bitmask(1, self.tokenizer_info.vocab_size)
+        self.xgrammar_token_bitmask = xgr.allocate_token_bitmask(
+            1, self.tokenizer_info.vocab_size
+        )
 
         @functools.lru_cache(maxsize=200)
         def get_cached_grammar(type: str, grammar: str):
@@ -49,7 +53,9 @@ class XgrammarBackend(ChunkedPrefillBackend):
 
     def _decode_mask_callback(self, run_reqs: List[InferReq], logits: torch.Tensor):
         self._init_req_xgrammer_matcher_infos(run_reqs=run_reqs)
-        all_has_no_constraint = all([not e.sampling_param.has_constraint_setting() for e in run_reqs])
+        all_has_no_constraint = all(
+            [not e.sampling_param.has_constraint_setting() for e in run_reqs]
+        )
         if not all_has_no_constraint:
             for i, run_obj in enumerate(run_reqs):
                 self._mask_req_out_token(i, run_obj, logits[i])
@@ -70,7 +76,9 @@ class XgrammarBackend(ChunkedPrefillBackend):
         logits[:, self.tokenizer_info.vocab_size :] = -1000000.0
         return
 
-    def _update_xgrammer_fsm(self, req_obj: InferReq, next_token_id, next_token_logprob):
+    def _update_xgrammer_fsm(
+        self, req_obj: InferReq, next_token_id, next_token_logprob
+    ):
         import xgrammar as xgr
 
         if not hasattr(req_obj.sampling_param, "xgrammar_matcher"):
@@ -87,9 +95,16 @@ class XgrammarBackend(ChunkedPrefillBackend):
 
         if run_obj.get_chuncked_input_token_len() == run_obj.get_cur_total_len():
             sample_params = run_obj.sampling_param
-            if sample_params.guided_grammar is not None or sample_params.guided_json is not None:
-                sample_params.xgrammar_matcher.fill_next_token_bitmask(self.xgrammar_token_bitmask)
-                xgr.apply_token_bitmask_inplace(logits, self.xgrammar_token_bitmask.to(logits.device))
+            if (
+                sample_params.guided_grammar is not None
+                or sample_params.guided_json is not None
+            ):
+                sample_params.xgrammar_matcher.fill_next_token_bitmask(
+                    self.xgrammar_token_bitmask
+                )
+                xgr.apply_token_bitmask_inplace(
+                    logits, self.xgrammar_token_bitmask.to(logits.device)
+                )
         return
 
     def _init_req_xgrammer_matcher_infos(self, run_reqs: List[InferReq]):
@@ -100,7 +115,9 @@ class XgrammarBackend(ChunkedPrefillBackend):
             sample_params = run_obj.sampling_param
             if sample_params.guided_grammar is not None:
                 if not hasattr(sample_params, "xgrammar_matcher"):
-                    ctx = self.get_cached_grammar("grammar", sample_params.guided_grammar)
+                    ctx = self.get_cached_grammar(
+                        "grammar", sample_params.guided_grammar
+                    )
                     sample_params.xgrammar_matcher = xgr.GrammarMatcher(ctx)
             elif sample_params.guided_json is not None:
                 if not hasattr(sample_params, "xgrammar_matcher"):

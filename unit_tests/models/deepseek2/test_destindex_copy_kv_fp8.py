@@ -1,6 +1,8 @@
 import torch
 import pytest
-from lightllm.models.deepseek2.triton_kernel.destindex_copy_kv_fp8 import destindex_copy_kv_fp8
+from lightllm.models.deepseek2.triton_kernel.destindex_copy_kv_fp8 import (
+    destindex_copy_kv_fp8,
+)
 from lightllm.utils.log_utils import init_logger
 import torch.nn.functional as F
 
@@ -27,12 +29,21 @@ if torch.cuda.is_available():
     ],
 )
 def test_destindex_copy_kv_fp8(batch, seqlen, heads, nope_head, rope_head, copy_len):
-    B, N_CTX, H, NOPE_HEAD, ROPE_HEAD, COPY_LEN = batch, seqlen, heads, nope_head, rope_head, copy_len
+    B, N_CTX, H, NOPE_HEAD, ROPE_HEAD, COPY_LEN = (
+        batch,
+        seqlen,
+        heads,
+        nope_head,
+        rope_head,
+        copy_len,
+    )
     dtype = torch.bfloat16
     NUM = COPY_LEN
     dest_loc = torch.arange(NUM).cuda()
     kv = torch.randn((len(dest_loc), H, NOPE_HEAD + ROPE_HEAD), dtype=dtype).cuda()
-    out = torch.zeros((B * N_CTX, H, NOPE_HEAD + ROPE_HEAD + 2), dtype=torch.uint8).cuda()
+    out = torch.zeros(
+        (B * N_CTX, H, NOPE_HEAD + ROPE_HEAD + 2), dtype=torch.uint8
+    ).cuda()
 
     fp8_type = torch.float8_e4m3fn
     kv_nope = kv[:, :, :NOPE_HEAD]

@@ -1,6 +1,10 @@
 from lightllm.models.deepseek2.model import Deepseek2TpPartModel
-from lightllm.models.deepseek_mtp.layer_infer.pre_layer_infer import Deepseek3MTPPreLayerInfer
-from lightllm.models.deepseek_mtp.layer_weights.pre_and_post_layer_weight import Deepseek3MTPPreAndPostLayerWeight
+from lightllm.models.deepseek_mtp.layer_infer.pre_layer_infer import (
+    Deepseek3MTPPreLayerInfer,
+)
+from lightllm.models.deepseek_mtp.layer_weights.pre_and_post_layer_weight import (
+    Deepseek3MTPPreAndPostLayerWeight,
+)
 from lightllm.common.basemodel import TpPartBaseModel
 
 
@@ -35,7 +39,9 @@ class Deepseek3MTPModel(Deepseek2TpPartModel):
     def _init_weights(self):
         super()._init_weights()
         self.pre_post_weight.wte_weight_ = self.main_model.pre_post_weight.wte_weight_
-        self.pre_post_weight.lm_head_weight_ = self.main_model.pre_post_weight.lm_head_weight_
+        self.pre_post_weight.lm_head_weight_ = (
+            self.main_model.pre_post_weight.lm_head_weight_
+        )
         return
 
     def _init_infer_layer(self):

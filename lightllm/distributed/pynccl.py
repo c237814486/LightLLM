@@ -102,13 +102,18 @@ class StatelessP2PProcessGroup:
 
     def recv_obj(self) -> Any:
         """Receive an object from a source rank."""
-        obj = pickle.loads(self.store.get(f"send_to/{self.dest_id}/{self.recv_src_counter}"))
+        obj = pickle.loads(
+            self.store.get(f"send_to/{self.dest_id}/{self.recv_src_counter}")
+        )
         self.recv_src_counter += 1
         return obj
 
     @staticmethod
     def create(
-        src_id: int, dest_id: int, is_server: bool, store: torch._C._distributed_c10d.Store
+        src_id: int,
+        dest_id: int,
+        is_server: bool,
+        store: torch._C._distributed_c10d.Store,
     ) -> "StatelessP2PProcessGroup":
         """A replacement for `torch.distributed.init_process_group` that does not
         pollute the global state.
@@ -125,7 +130,9 @@ class StatelessP2PProcessGroup:
         can call `StatelessProcessGroup.create` to form a group, and then process A, B,
         C, and D can call `StatelessProcessGroup.create` to form another group.
         """  # noqa
-        return StatelessP2PProcessGroup(src_id=src_id, dest_id=dest_id, is_server=is_server, store=store)
+        return StatelessP2PProcessGroup(
+            src_id=src_id, dest_id=dest_id, is_server=is_server, store=store
+        )
 
 
 class PyNcclCommunicator:
@@ -210,7 +217,9 @@ class PyNcclCommunicator:
         # `torch.cuda.device` is a context manager that changes the
         # current cuda device to the specified one
         with torch.cuda.device(device):
-            self.comm: ncclComm_t = self.nccl.ncclCommInitRank(self.world_size, self.unique_id, self.rank)
+            self.comm: ncclComm_t = self.nccl.ncclCommInitRank(
+                self.world_size, self.unique_id, self.rank
+            )
 
             stream = current_stream()
             # A small all_reduce for warmup.
@@ -222,7 +231,9 @@ class PyNcclCommunicator:
     def destroy(self):
         self.nccl.ncclCommDestroy(self.comm)
 
-    def all_reduce(self, in_tensor: torch.Tensor, op: ReduceOp = ReduceOp.SUM, stream=None) -> torch.Tensor:
+    def all_reduce(
+        self, in_tensor: torch.Tensor, op: ReduceOp = ReduceOp.SUM, stream=None
+    ) -> torch.Tensor:
         if self.disabled:
             return None
         # nccl communicator created on a specific device

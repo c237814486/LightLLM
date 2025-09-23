@@ -35,7 +35,9 @@ from lightllm.server.multimodal_params import ImageItem
 from lightllm.models.qwen2_vl.vision_process import resize_image, Qwen2VLImageProcessor
 from lightllm.models.vit.triton_kernel.flashattention_nopad import flash_attention_fwd
 from lightllm.common.basemodel.layer_infer.cache_tensor_manager import g_cache_manager
-from lightllm.models.qwen2_vl.triton_kernel.rotary_pos_emb import apply_rotary_pos_emb_triton
+from lightllm.models.qwen2_vl.triton_kernel.rotary_pos_emb import (
+    apply_rotary_pos_emb_triton,
+)
 
 # adapted from
 # https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2_vl/modeling_qwen2_vl.py
@@ -56,11 +58,21 @@ class PatchEmbed(nn.Module):
         self.embed_dim = embed_dim
 
         kernel_size = [temporal_patch_size, patch_size, patch_size]
-        self.proj = nn.Conv3d(in_channels, embed_dim, kernel_size=kernel_size, stride=kernel_size, bias=False)
+        self.proj = nn.Conv3d(
+            in_channels,
+            embed_dim,
+            kernel_size=kernel_size,
+            stride=kernel_size,
+            bias=False,
+        )
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         hidden_states = hidden_states.view(
-            -1, self.in_channels, self.temporal_patch_size, self.patch_size, self.patch_size
+            -1,
+            self.in_channels,
+            self.temporal_patch_size,
+            self.patch_size,
+            self.patch_size,
         )
         hidden_states = self.proj(hidden_states).view(-1, self.embed_dim)
         return hidden_states
@@ -69,7 +81,7 @@ class PatchEmbed(nn.Module):
 class PatchMerger(nn.Module):
     def __init__(self, dim: int, context_dim: int, spatial_merge_size: int = 2) -> None:
         super().__init__()
-        self.hidden_size = context_dim * (spatial_merge_size ** 2)
+        self.hidden_size = context_dim * (spatial_merge_size**2)
         self.ln_q = LayerNorm(context_dim, eps=1e-6)
         self.mlp = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size),
@@ -99,7 +111,9 @@ class VisionRotaryEmbedding(nn.Module):
         super().__init__()
         self.dim = dim
         self.theta = theta
-        self.inv_freq = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.float) / dim))
+        self.inv_freq = 1.0 / (
+            theta ** (torch.arange(0, dim, 2, dtype=torch.float) / dim)
+        )
         self._seq_len_cached = 0
         self._freqs_cos_cached = None
         self._freqs_sin_cached = None
@@ -109,9 +123,17 @@ class VisionRotaryEmbedding(nn.Module):
             seqlen *= 2
             self._seq_len_cached = seqlen
             self.inv_freq = 1.0 / (
-                self.theta ** (torch.arange(0, self.dim, 2, dtype=torch.float, device=self.inv_freq.device) / self.dim)
+                self.theta
+                ** (
+                    torch.arange(
+                        0, self.dim, 2, dtype=torch.float, device=self.inv_freq.device
+                    )
+                    / self.dim
+                )
             )
-            seq = torch.arange(seqlen, device=self.inv_freq.device, dtype=self.inv_freq.dtype)
+            seq = torch.arange(
+                seqlen, device=self.inv_freq.device, dtype=self.inv_freq.dtype
+            )
             freqs = torch.outer(seq, self.inv_freq)
             self._freqs_cos_cached = freqs.cos()
             self._freqs_sin_cached = freqs.sin()
@@ -137,7 +159,12 @@ class VisionFlashAttention(nn.Module):
         rotary_sin: torch.Tensor = None,
     ) -> torch.Tensor:
         seq_length = hidden_states.shape[0]
-        q, k, v = self.qkv(hidden_states).reshape(seq_length, 3, self.num_heads, -1).permute(1, 0, 2, 3).unbind(0)
+        q, k, v = (
+            self.qkv(hidden_states)
+            .reshape(seq_length, 3, self.num_heads, -1)
+            .permute(1, 0, 2, 3)
+            .unbind(0)
+        )
         q = apply_rotary_pos_emb_triton(q, rotary_cos, rotary_sin)
         k = apply_rotary_pos_emb_triton(k, rotary_cos, rotary_sin)
 
@@ -157,9 +184,13 @@ class Qwen2VLVisionBlock(nn.Module):
         mlp_hidden_dim = int(embed_dim * mlp_ratio)
 
         self.attn = VisionFlashAttention(embed_dim, num_heads=num_heads)
-        self.mlp = VisionMlp(dim=embed_dim, hidden_dim=mlp_hidden_dim, hidden_act=hidden_act)
+        self.mlp = VisionMlp(
+            dim=embed_dim, hidden_dim=mlp_hidden_dim, hidden_act=hidden_act
+        )
 
-    def forward(self, hidden_states, cu_seqlens, max_seqlen, rotary_cos, rotary_sin) -> torch.Tensor:
+    def forward(
+        self, hidden_states, cu_seqlens, max_seqlen, rotary_cos, rotary_sin
+    ) -> torch.Tensor:
         hidden_states = hidden_states + self.attn(
             self.norm1(hidden_states),
             cu_seqlens=cu_seqlens,
@@ -213,7 +244,9 @@ class Qwen2VisionTransformerPretrainedModel(nn.Module):
 
         self.blocks = nn.ModuleList(
             [
-                Qwen2VLVisionBlock(self.embed_dim, self.mlp_ratio, self.num_heads, self.hidden_act)
+                Qwen2VLVisionBlock(
+                    self.embed_dim, self.mlp_ratio, self.num_heads, self.hidden_act
+                )
                 for _ in range(self.depth)
             ]
         )
@@ -241,7 +274,9 @@ class Qwen2VisionTransformerPretrainedModel(nn.Module):
             processor_config_dict = json.load(f)
         self.processor = Qwen2VLImageProcessor(**processor_config_dict)
 
-        bin_weight_files = [file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")]
+        bin_weight_files = [
+            file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")
+        ]
         if bin_weight_files:
             weight_dict = {}
             for file_ in bin_weight_files:
@@ -250,7 +285,11 @@ class Qwen2VisionTransformerPretrainedModel(nn.Module):
                     if "visual" in k:
                         weight_dict[k[len("visual.") :]] = v
         else:
-            hf_weight_files = [file_ for file_ in os.listdir(weight_dir) if file_.endswith(".safetensors")]
+            hf_weight_files = [
+                file_
+                for file_ in os.listdir(weight_dir)
+                if file_.endswith(".safetensors")
+            ]
             weight_dict = {}
             for file_ in hf_weight_files:
                 f = safe_open(os.path.join(weight_dir, file_), "pt", "cpu")
@@ -278,14 +317,16 @@ class Qwen2VisionTransformerPretrainedModel(nn.Module):
         sin = sin_full[pos_ids].flatten(1)
         return cos, sin
 
-    def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, hidden_states: torch.Tensor, grid_thw: torch.Tensor
+    ) -> torch.Tensor:
         hidden_states = self.patch_embed(hidden_states)
         rotary_cos, rotary_sin = self.rot_pos_emb(grid_thw)
         rotary_cos = rotary_cos.to("cuda", non_blocking=True)
         rotary_sin = rotary_sin.to("cuda", non_blocking=True)
-        cu_seqlens = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cumsum(
-            dim=0, dtype=torch.int32
-        )
+        cu_seqlens = torch.repeat_interleave(
+            grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]
+        ).cumsum(dim=0, dtype=torch.int32)
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
         max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
 
@@ -316,10 +357,12 @@ class Qwen2VisionTransformerPretrainedModel(nn.Module):
                 img_tensors.append(pixel_values)
                 img_grids.append(image_grid_thw)
             else:
-                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
+                raise Exception(
+                    "Unsupport input types: {} for {}".format(type(img), img)
+                )
 
             # must devide merge_length
-            cur_num = img_tensors[-1].shape[0] // (self.spatial_merge_size ** 2)
+            cur_num = img_tensors[-1].shape[0] // (self.spatial_merge_size**2)
 
             valid_ids.append([valid_id, valid_id + cur_num])
             valid_id += cur_num

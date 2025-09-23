@@ -24,7 +24,9 @@ def _fix_connect(
     keepalive=False,
     attempts=6,
 ):
-    family, socktype, proto, _, sockaddr = socket.getaddrinfo(host, port, family, socktype, proto)[0]
+    family, socktype, proto, _, sockaddr = socket.getaddrinfo(
+        host, port, family, socktype, proto
+    )[0]
     s = socket_backoff_connect(family, socktype, proto, sockaddr, timeout, attempts)
     try:
         if nodelay:
@@ -33,7 +35,9 @@ def _fix_connect(
         old_s_buf = s.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF)
         old_r_buf = s.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
 
-        logger.info(f"change socket buffer from {old_s_buf} {old_r_buf} change to {_BUFF_SIZE}")
+        logger.info(
+            f"change socket buffer from {old_s_buf} {old_r_buf} change to {_BUFF_SIZE}"
+        )
 
         # set buffer
         s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, _BUFF_SIZE)
@@ -82,7 +86,9 @@ def fix_unix_connect(cls, path, timeout=3):
         old_s_buf = s.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF)
         old_r_buf = s.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
 
-        logger.info(f"change socket buffer from {old_s_buf} {old_r_buf} change to {_BUFF_SIZE}")
+        logger.info(
+            f"change socket buffer from {old_s_buf} {old_r_buf} change to {_BUFF_SIZE}"
+        )
 
         # set buffer
         s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, _BUFF_SIZE)
@@ -110,7 +116,9 @@ def fix_accept(self):
             old_s_buf = sock.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF)
             old_r_buf = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
 
-            logger.info(f"change socket buffer from {old_s_buf} {old_r_buf} change to {_BUFF_SIZE}")
+            logger.info(
+                f"change socket buffer from {old_s_buf} {old_r_buf} change to {_BUFF_SIZE}"
+            )
 
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, _BUFF_SIZE)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, _BUFF_SIZE)

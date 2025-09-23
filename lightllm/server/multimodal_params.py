@@ -1,4 +1,5 @@
 """Multimodal parameters for text generation."""
+
 import os
 import librosa
 import base64
@@ -33,7 +34,9 @@ class AudioItem:
             if self._type == "url":
                 timeout = int(os.getenv("REQUEST_TIMEOUT", "5"))
                 proxy = os.getenv("REQUEST_PROXY", None)
-                audio_data = await fetch_resource(self._data, request, timeout=timeout, proxy=proxy)
+                audio_data = await fetch_resource(
+                    self._data, request, timeout=timeout, proxy=proxy
+                )
             elif self._type == "base64":
                 audio_data = base64.b64decode(self._data)
             else:
@@ -43,12 +46,16 @@ class AudioItem:
             audio_values, _ = librosa.load(BytesIO(audio_data), sr=16000)
             from lightllm.models.whisper.defaults import MIN_AUDIO_LEN, MAX_AUDIO_LEN
 
-            self.audio_length = min(max(audio_values.shape[0], MIN_AUDIO_LEN), MAX_AUDIO_LEN)  # 如果音频过短或过长，会被截断或者pad
+            self.audio_length = min(
+                max(audio_values.shape[0], MIN_AUDIO_LEN), MAX_AUDIO_LEN
+            )  # 如果音频过短或过长，会被截断或者pad
             self._preload_data = audio_data
             return
 
         except Exception as e:
-            raise ValueError(f"Failed to read image type={self._type}, data[:100]={self._data[:100]}: {e}!")
+            raise ValueError(
+                f"Failed to read image type={self._type}, data[:100]={self._data[:100]}: {e}!"
+            )
 
     def read(self):
         assert self._preload_data is not None
@@ -86,7 +93,9 @@ class ImageItem:
             if self._type == "url":
                 timeout = int(os.getenv("REQUEST_TIMEOUT", "5"))
                 proxy = os.getenv("REQUEST_PROXY", None)
-                img_data = await fetch_resource(self._data, request, timeout=timeout, proxy=proxy)
+                img_data = await fetch_resource(
+                    self._data, request, timeout=timeout, proxy=proxy
+                )
             elif self._type == "base64":
                 img_data = base64.b64decode(self._data)
             elif self._type == "image_size":
@@ -106,7 +115,9 @@ class ImageItem:
             return
 
         except Exception as e:
-            raise ValueError(f"Failed to read image type={self._type}, data[:100]={self._data[:100]}: {e}!")
+            raise ValueError(
+                f"Failed to read image type={self._type}, data[:100]={self._data[:100]}: {e}!"
+            )
 
     def read(self):
         assert self._preload_data is not None

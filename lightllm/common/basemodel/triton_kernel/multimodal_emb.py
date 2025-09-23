@@ -33,35 +33,61 @@ def _fwd_kernel(
     # load store text emb
     for _ in range(
         0,
-        tl.where((img_handle_id == 0) & (token_id < tp_text_end_token_id) & (token_id >= tp_text_start_token_id), 1, 0),
-        1,
-    ):
-        load_emb = tl.load(
-            Text_weight_embs + stride_text_emb_s * (token_id - tp_text_start_token_id) + off_d * stride_text_emb_d,
-            mask=off_d < hidden_size,
-            other=0,
-        )
-        tl.store(Out + stride_out_s * seq_index + stride_out_d * off_d, load_emb, mask=off_d < hidden_size)
-
-    img_start_token_id = tl.load(Img_start_token_ids + img_handle_id - 1, mask=img_handle_id >= 1, other=0)
-    img_start_loc = tl.load(Img_start_locs + img_handle_id - 1, mask=img_handle_id >= 1, other=0)
-    img_token_len = tl.load(Img_token_lens + img_handle_id - 1, mask=img_handle_id >= 1, other=0)
-    # load store img emb
-    for _ in range(
-        0,
         tl.where(
-            (img_handle_id != 0) & (token_id >= img_start_token_id) & (token_id < img_start_token_id + img_token_len),
+            (img_handle_id == 0)
+            & (token_id < tp_text_end_token_id)
+            & (token_id >= tp_text_start_token_id),
             1,
             0,
         ),
         1,
     ):
         load_emb = tl.load(
-            Img_embs + stride_img_emb_s * (img_start_loc + token_id - img_start_token_id) + off_d * stride_img_emb_d,
+            Text_weight_embs
+            + stride_text_emb_s * (token_id - tp_text_start_token_id)
+            + off_d * stride_text_emb_d,
             mask=off_d < hidden_size,
             other=0,
         )
-        tl.store(Out + stride_out_s * seq_index + stride_out_d * off_d, load_emb, mask=off_d < hidden_size)
+        tl.store(
+            Out + stride_out_s * seq_index + stride_out_d * off_d,
+            load_emb,
+            mask=off_d < hidden_size,
+        )
+
+    img_start_token_id = tl.load(
+        Img_start_token_ids + img_handle_id - 1, mask=img_handle_id >= 1, other=0
+    )
+    img_start_loc = tl.load(
+        Img_start_locs + img_handle_id - 1, mask=img_handle_id >= 1, other=0
+    )
+    img_token_len = tl.load(
+        Img_token_lens + img_handle_id - 1, mask=img_handle_id >= 1, other=0
+    )
+    # load store img emb
+    for _ in range(
+        0,
+        tl.where(
+            (img_handle_id != 0)
+            & (token_id >= img_start_token_id)
+            & (token_id < img_start_token_id + img_token_len),
+            1,
+            0,
+        ),
+        1,
+    ):
+        load_emb = tl.load(
+            Img_embs
+            + stride_img_emb_s * (img_start_loc + token_id - img_start_token_id)
+            + off_d * stride_img_emb_d,
+            mask=off_d < hidden_size,
+            other=0,
+        )
+        tl.store(
+            Out + stride_out_s * seq_index + stride_out_d * off_d,
+            load_emb,
+            mask=off_d < hidden_size,
+        )
     return
 
 
@@ -122,15 +148,23 @@ def _mark_multimodal_obj_need_kernel(
 
     for block_start in range(0, input_size, BLOCK_SIZE):
         block_range = block_start + tl.arange(0, BLOCK_SIZE)
-        cur_input_ids = tl.load(input_ids_ptr + block_range, mask=block_range < input_size, other=0)
-        mark = tl.where((cur_input_ids >= start_id) & (cur_input_ids < start_id + token_len), 1, 0)
+        cur_input_ids = tl.load(
+            input_ids_ptr + block_range, mask=block_range < input_size, other=0
+        )
+        mark = tl.where(
+            (cur_input_ids >= start_id) & (cur_input_ids < start_id + token_len), 1, 0
+        )
         mark = tl.sum(mark)
         tl.store(obj_marks_ptr + obj_index, 1, mask=mark > 0)
     return
 
 
 @torch.no_grad()
-def mark_multimodal_obj(obj_start_token_ids: torch.Tensor, obj_token_lens: torch.Tensor, input_ids: torch.Tensor):
+def mark_multimodal_obj(
+    obj_start_token_ids: torch.Tensor,
+    obj_token_lens: torch.Tensor,
+    input_ids: torch.Tensor,
+):
     out_mark = torch.empty_like(obj_start_token_ids)
     out_mark.fill_(0)
     assert obj_start_token_ids.shape == obj_token_lens.shape

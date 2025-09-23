@@ -4,7 +4,11 @@ import rpyc
 from typing import Dict, List, Tuple
 from rpyc.utils.classic import obtain
 from .prefill_impl import ChunckedPrefillForPrefillNode
-from lightllm.common.basemodel.infer_lock import g_router_lock, acquire_lock_until_ready, release_acquired_lock
+from lightllm.common.basemodel.infer_lock import (
+    g_router_lock,
+    acquire_lock_until_ready,
+    release_acquired_lock,
+)
 from .prefill_task_cache import g_kv_move_task_cache
 from lightllm.utils.log_utils import init_logger
 

@@ -11,7 +11,13 @@ from functools import partial
 from PIL import Image
 from typing import Callable, Optional, Sequence, Tuple, List, Union
 import numpy as np
-from lightllm.server.embed_cache.utils import tensor2bytes, read_shm, create_shm, get_shm_name_data, get_shm_name_embed
+from lightllm.server.embed_cache.utils import (
+    tensor2bytes,
+    read_shm,
+    create_shm,
+    get_shm_name_data,
+    get_shm_name_embed,
+)
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -83,7 +89,7 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     assert embed_dim % 2 == 0
     omega = np.arange(embed_dim // 2, dtype=np.float32)
     omega /= embed_dim / 2.0
-    omega = 1.0 / 10000 ** omega  # (D/2,)
+    omega = 1.0 / 10000**omega  # (D/2,)
 
     pos = pos.reshape(-1)  # (M,)
     out = np.einsum("m,d->md", pos, omega)  # (M, D/2), outer product
@@ -103,9 +109,11 @@ class Resampler(nn.Module):
         A tensor with the shape of (grid_size**2, embed_dim)
     """
 
-    def __init__(self, grid_size, embed_dim, num_heads, kv_dim=None, norm_layer=nn.LayerNorm):
+    def __init__(
+        self, grid_size, embed_dim, num_heads, kv_dim=None, norm_layer=nn.LayerNorm
+    ):
         super().__init__()
-        self.num_queries = grid_size ** 2
+        self.num_queries = grid_size**2
         self.embed_dim = embed_dim
         self.num_heads = num_heads
 
@@ -146,7 +154,10 @@ class Resampler(nn.Module):
         N = x.shape[1]
         q = self.ln_q(self.query)
         out = self.attn(
-            self._repeat(q, N) + self.pos_embed.unsqueeze(1), x + pos_embed.unsqueeze(1), x, attn_mask=attn_mask
+            self._repeat(q, N) + self.pos_embed.unsqueeze(1),
+            x + pos_embed.unsqueeze(1),
+            x,
+            attn_mask=attn_mask,
         )[0]
         return out.permute(1, 0, 2)
 
@@ -198,26 +209,36 @@ class VisualAttention(nn.Module):
         mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
 
         # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
-        query_layer, key_layer, value_layer = mixed_x_layer.split(self.hidden_size_per_attention_head, dim=-1)
+        query_layer, key_layer, value_layer = mixed_x_layer.split(
+            self.hidden_size_per_attention_head, dim=-1
+        )
 
         # [sq, b, np, hn] -> [sq, b * np, hn]
         query_layer = query_layer.view(
-            sq, b * self.num_attention_heads_per_partition, self.hidden_size_per_attention_head
+            sq,
+            b * self.num_attention_heads_per_partition,
+            self.hidden_size_per_attention_head,
         ).transpose(0, 1)
         # [sk, b, np, hn] -> [sk, b * np, hn]
         key_layer = key_layer.view(
-            sk, b * self.num_attention_heads_per_partition, self.hidden_size_per_attention_head
+            sk,
+            b * self.num_attention_heads_per_partition,
+            self.hidden_size_per_attention_head,
         ).transpose(0, 1)
 
         q_scaled = query_layer / self.norm_factor
         if attn_mask is not None:
-            attention_probs = torch.baddbmm(attn_mask, q_scaled, key_layer.transpose(-2, -1))
+            attention_probs = torch.baddbmm(
+                attn_mask, q_scaled, key_layer.transpose(-2, -1)
+            )
         else:
             attention_probs = torch.bmm(q_scaled, key_layer.transpose(-2, -1))
         attention_probs = attention_probs.softmax(dim=-1)
 
         value_layer = value_layer.view(
-            sk, b * self.num_attention_heads_per_partition, self.hidden_size_per_attention_head
+            sk,
+            b * self.num_attention_heads_per_partition,
+            self.hidden_size_per_attention_head,
         ).transpose(0, 1)
 
         # matmul: [b * np, sq, hn]
@@ -225,14 +246,19 @@ class VisualAttention(nn.Module):
 
         # change view [b, np, sq, hn]
         context_layer = context_layer.view(
-            b, self.num_attention_heads_per_partition, sq, self.hidden_size_per_attention_head
+            b,
+            self.num_attention_heads_per_partition,
+            sq,
+            self.hidden_size_per_attention_head,
         )
 
         # [b, np, sq, hn] --> [sq, b, np, hn]
         context_layer = context_layer.permute(2, 0, 1, 3).contiguous()
 
         # [sq, b, np, hn] --> [sq, b, hp]
-        new_context_layer_shape = context_layer.size()[:-2] + (self.hidden_size_per_partition,)
+        new_context_layer_shape = context_layer.size()[:-2] + (
+            self.hidden_size_per_partition,
+        )
         context_layer = context_layer.view(*new_context_layer_shape)
 
         output = self.out_proj(context_layer)
@@ -289,10 +315,16 @@ class VisualAttentionBlock(nn.Module):
         v_x: Optional[torch.Tensor] = None,
         attn_mask: Optional[torch.Tensor] = None,
     ):
-        k_x = self.ln_1_kv(k_x) if hasattr(self, "ln_1_kv") and k_x is not None else None
-        v_x = self.ln_1_kv(v_x) if hasattr(self, "ln_1_kv") and v_x is not None else None
+        k_x = (
+            self.ln_1_kv(k_x) if hasattr(self, "ln_1_kv") and k_x is not None else None
+        )
+        v_x = (
+            self.ln_1_kv(v_x) if hasattr(self, "ln_1_kv") and v_x is not None else None
+        )
 
-        x = q_x + self.attention(q_x=self.ln_1(q_x), k_x=k_x, v_x=v_x, attn_mask=attn_mask)
+        x = q_x + self.attention(
+            q_x=self.ln_1(q_x), k_x=k_x, v_x=v_x, attn_mask=attn_mask
+        )
         x = x + self.mlp(self.ln_2(x))
         return x
 
@@ -313,7 +345,9 @@ class TransformerBlock(nn.Module):
 
         self.resblocks = nn.ModuleList(
             [
-                VisualAttentionBlock(width, heads, mlp_ratio, act_layer=act_layer, norm_layer=norm_layer)
+                VisualAttentionBlock(
+                    width, heads, mlp_ratio, act_layer=act_layer, norm_layer=norm_layer
+                )
                 for _ in range(layers)
             ]
         )
@@ -353,16 +387,24 @@ class QWenVisionTransformer(nn.Module):
         std = (0.26862954, 0.26130258, 0.27577711)
         self.image_transform = transforms.Compose(
             [
-                transforms.Resize((image_size, image_size), interpolation=InterpolationMode.BICUBIC),
+                transforms.Resize(
+                    (image_size, image_size), interpolation=InterpolationMode.BICUBIC
+                ),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=mean, std=std),
             ]
         )
 
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
+        self.conv1 = nn.Conv2d(
+            in_channels=3,
+            out_channels=width,
+            kernel_size=patch_size,
+            stride=patch_size,
+            bias=False,
+        )
 
         # class embeddings and positional embeddings
-        scale = width ** -0.5
+        scale = width**-0.5
         self.positional_embedding = nn.Parameter(scale * torch.randn(256, width))
 
         norm_layer = partial(nn.LayerNorm, eps=1e-6)
@@ -386,7 +428,9 @@ class QWenVisionTransformer(nn.Module):
             norm_layer=norm_layer,
         )
         self.ln_post = norm_layer(output_dim)
-        self.proj = nn.Parameter((output_dim ** -0.5) * torch.randn(output_dim, output_dim))
+        self.proj = nn.Parameter(
+            (output_dim**-0.5) * torch.randn(output_dim, output_dim)
+        )
 
     def forward(self, x: torch.Tensor):
         x = x.to(
@@ -427,7 +471,9 @@ class QWenVisionTransformer(nn.Module):
                 t = self.image_transform(image_data)
                 img_tensors.append(t)
             else:
-                raise Exception("Unsupport input types: {} for {}".format(type(item), item))
+                raise Exception(
+                    "Unsupport input types: {} for {}".format(type(item), item)
+                )
 
             valid_ids.append([valid_id, valid_id + 1])
             valid_id += 1
@@ -442,7 +488,9 @@ class QWenVisionTransformer(nn.Module):
     def load_model(self, weight_dir):
         import os
 
-        weight_files = [file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")]
+        weight_files = [
+            file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")
+        ]
         weight_dict = {}
         for file_ in weight_files:
             f_weight_dict = torch.load(os.path.join(weight_dir, file_), "cpu")

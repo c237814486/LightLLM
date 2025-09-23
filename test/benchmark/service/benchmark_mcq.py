@@ -72,7 +72,14 @@ def sample_requests(
     for question in questions:
         question = json.loads(question.strip())
         file_name = question["file_name"].split(".")[0]
-        data.append((file_name, question["question_id"], question["instruction"], question["answer"]))
+        data.append(
+            (
+                file_name,
+                question["question_id"],
+                question["instruction"],
+                question["answer"],
+            )
+        )
         if file_name not in QUESTION:
             QUESTION[file_name] = {}
         QUESTION[file_name][question["question_id"]] = [question["answer"]]
@@ -178,9 +185,15 @@ def main(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Benchmark the online serving throughput.")
-    parser.add_argument("--dataset", type=str, required=True, help="Path to the dataset.")
-    parser.add_argument("--tokenizer", type=str, required=True, help="Name or path of the tokenizer.")
+    parser = argparse.ArgumentParser(
+        description="Benchmark the online serving throughput."
+    )
+    parser.add_argument(
+        "--dataset", type=str, required=True, help="Path to the dataset."
+    )
+    parser.add_argument(
+        "--tokenizer", type=str, required=True, help="Name or path of the tokenizer."
+    )
     parser.add_argument(
         "--request-rate",
         type=float,

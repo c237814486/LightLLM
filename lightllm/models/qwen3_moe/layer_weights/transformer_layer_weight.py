@@ -3,7 +3,9 @@ import torch
 import math
 import numpy as np
 from lightllm.common.basemodel import TransformerLayerWeight
-from lightllm.models.qwen3.layer_weights.transformer_layer_weight import Qwen3TransformerLayerWeight
+from lightllm.models.qwen3.layer_weights.transformer_layer_weight import (
+    Qwen3TransformerLayerWeight,
+)
 from lightllm.utils.envs_utils import enable_env_vars
 from lightllm.common.basemodel.layer_weights.meta_weights import (
     ROWMMWeight,
@@ -37,21 +39,33 @@ class Qwen3MOETransformerLayerWeight(Qwen3TransformerLayerWeight):
         self._k_bias_name = None
         self._v_weight_name = f"model.layers.{self.layer_num_}.self_attn.v_proj.weight"
         self._v_bias_name = None
-        self._kv_weight_name = f"model.layers.{self.layer_num_}.self_attn.kv_proj.weight"
+        self._kv_weight_name = (
+            f"model.layers.{self.layer_num_}.self_attn.kv_proj.weight"
+        )
         self._kv_bias_name = None
         self._o_weight_name = f"model.layers.{self.layer_num_}.self_attn.o_proj.weight"
         self._o_bias_name = None
-        self._att_norm_weight_name = f"model.layers.{self.layer_num_}.input_layernorm.weight"
+        self._att_norm_weight_name = (
+            f"model.layers.{self.layer_num_}.input_layernorm.weight"
+        )
         self._att_norm_bias_name = None
-        self._ffn_norm_weight_name = f"model.layers.{self.layer_num_}.post_attention_layernorm.weight"
+        self._ffn_norm_weight_name = (
+            f"model.layers.{self.layer_num_}.post_attention_layernorm.weight"
+        )
         self._ffn_norm_bias_name = None
 
     def load_hf_weights(self, weights):
-        kv_b_quant_method = self.quant_cfg.get_quant_method(self.layer_num_, "kv_b_proj")
+        kv_b_quant_method = self.quant_cfg.get_quant_method(
+            self.layer_num_, "kv_b_proj"
+        )
         if self.quant_cfg.quantized_weight:
-            _k_scale_weight_name = self._k_weight_name.replace("weight", kv_b_quant_method.weight_scale_suffix)
+            _k_scale_weight_name = self._k_weight_name.replace(
+                "weight", kv_b_quant_method.weight_scale_suffix
+            )
             self._repeat_weight(_k_scale_weight_name, weights)
-            _v_scale_weight_name = self._v_weight_name.replace("weight", kv_b_quant_method.weight_scale_suffix)
+            _v_scale_weight_name = self._v_weight_name.replace(
+                "weight", kv_b_quant_method.weight_scale_suffix
+            )
             self._repeat_weight(_v_scale_weight_name, weights)
         return super().load_hf_weights(weights)
 

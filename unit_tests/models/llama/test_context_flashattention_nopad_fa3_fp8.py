@@ -10,7 +10,9 @@ from lightllm.models.llama.triton_kernel.context_flashattention_nopad import (
 )
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 from lightllm.utils.sgl_utils import flash_attn_with_kvcache
-from lightllm.common.basemodel.triton_kernel.q_per_head_fp8_quant import q_per_head_fp8_quant
+from lightllm.common.basemodel.triton_kernel.q_per_head_fp8_quant import (
+    q_per_head_fp8_quant,
+)
 
 logger = init_logger(__name__)
 
@@ -32,7 +34,9 @@ def kv_quantize_per_head_fp8(kv_buffer: torch.Tensor, seq_lens):
     valid_mask = (seq_range < seq_lens[:, None]).view(B, S_max, 1, 1)
     masked = kv_buffer * valid_mask
     max_per_bh = masked.abs().amax(dim=(1, 3))  # [B, H]
-    scales = torch.where(max_per_bh > 0, max_per_bh / max_fp8, torch.ones_like(max_per_bh)).to(torch.float32)
+    scales = torch.where(
+        max_per_bh > 0, max_per_bh / max_fp8, torch.ones_like(max_per_bh)
+    ).to(torch.float32)
     scales_exp = scales.view(B, 1, H, 1)
     q = (kv_buffer / scales_exp).clamp(min_fp8, max_fp8).to(torch.float8_e4m3fn)
     return q, scales
@@ -57,13 +61,19 @@ def test_context_attention_fwd_fa3_fp8(batch, seqlen, q_heads, kv_heads, head_di
     #     kv[i] = torch.randn((2 * KV_HEADS, HEAD_DIM), dtype=dtype, device="cuda") * (i % 10 + 1)
 
     max_input_len = Z * N_CTX
-    req_to_token_indexs = torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    req_to_token_indexs = (
+        torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    )
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda") * (N_CTX // 2)
-    rand_num = torch.randint_like(b_seq_len, high=(N_CTX // 2), dtype=torch.int32, device="cuda")
+    rand_num = torch.randint_like(
+        b_seq_len, high=(N_CTX // 2), dtype=torch.int32, device="cuda"
+    )
     b_seq_len += rand_num
     b_ready_cache_len = torch.zeros_like(b_seq_len, dtype=torch.int32, device="cuda")
     if N_CTX > 1:
-        b_ready_cache_len = torch.randint_like(b_seq_len, high=(N_CTX - 1) // 2, dtype=torch.int32, device="cuda")
+        b_ready_cache_len = torch.randint_like(
+            b_seq_len, high=(N_CTX - 1) // 2, dtype=torch.int32, device="cuda"
+        )
     b_req_idx = torch.randperm(Z, dtype=torch.int32).cuda()
     q_lens = b_seq_len - b_ready_cache_len
     q_start_loc = q_lens.cumsum(0) - q_lens
@@ -123,7 +133,9 @@ def test_context_attention_fwd_fa3_fp8(batch, seqlen, q_heads, kv_heads, head_di
     #     return_softmax_lse=False,
     # )
 
-    q, q_scale = q_per_head_fp8_quant(q.view(q.shape[0], kv_heads, -1), q_lens, q_starts)
+    q, q_scale = q_per_head_fp8_quant(
+        q.view(q.shape[0], kv_heads, -1), q_lens, q_starts
+    )
     k, k_scale = kv_quantize_per_head_fp8(k_cache[page_table], b_seq_len)
     v, v_scale = kv_quantize_per_head_fp8(v_cache[page_table], b_seq_len)
     o1 = flash_attn_with_kvcache(

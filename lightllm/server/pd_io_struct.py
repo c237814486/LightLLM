@@ -9,6 +9,7 @@ from lightllm.utils.log_utils import init_logger
 
 logger = init_logger(__name__)
 
+
 # 节点的行为
 class NodeRole(enum.Enum):
     P = "prefill"
@@ -43,7 +44,9 @@ class PD_Client_Obj:
     node_id: int
     client_ip_port: str
     mode: str  # 只能是 prefill 或者 decode 节点
-    start_args: object  # 节点的启动参数信息，用于做匹配性的校验，防止运行过程中出现问题。
+    start_args: (
+        object  # 节点的启动参数信息，用于做匹配性的校验，防止运行过程中出现问题。
+    )
     websocket: WebSocket = None  # 用于通信的 websocket 连接对象
 
     def __post_init__(self):
@@ -127,7 +130,9 @@ class PDTransLeaveInfo:
 class KVMoveTask:
     group_request_id: int
     input_tokens: List[int]  # 代表输入的token_id 序列
-    prefill_token_indexes: List[int]  # 在prefill节点上 mem manager kv buffer中的token index
+    prefill_token_indexes: List[
+        int
+    ]  # 在prefill节点上 mem manager kv buffer中的token index
     # 在decode节点上 mem manager kv buffer中的token index, 其代表的是真实占用的额外token，并不与prefill_token_indexes 一样长
     decode_token_indexes: List[int]
     move_kv_len: int  # 因为 prompt cache 的原因，当prefill节点和decode节点沟通后，传输的kv的数量可能少于 prefill_value 的长度
@@ -148,14 +153,22 @@ class KVMoveTask:
             raise ValueError(error_info)
 
     def to_prefill_log_info(self):
-        v_len = None if self.prefill_token_indexes is None else len(self.prefill_token_indexes)
+        v_len = (
+            None
+            if self.prefill_token_indexes is None
+            else len(self.prefill_token_indexes)
+        )
         d_i = self.prefill_dp_index
         id = self.group_request_id
         log = f"id: {id} in_len:{len(self.input_tokens)} v_len: {v_len} move_len: {self.move_kv_len} dp_index:{d_i}"
         return log + f" connect_id: {self.connect_id}"
 
     def to_decode_log_info(self):
-        v_len = None if self.decode_token_indexes is None else len(self.decode_token_indexes)
+        v_len = (
+            None
+            if self.decode_token_indexes is None
+            else len(self.decode_token_indexes)
+        )
         d_i = self.decode_dp_index
         id = self.group_request_id
         log = f"id: {id} in_len:{len(self.input_tokens)} v_len: {v_len} move_len: {self.move_kv_len} dp_index:{d_i}"

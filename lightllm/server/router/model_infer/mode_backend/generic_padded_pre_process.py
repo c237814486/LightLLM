@@ -43,7 +43,9 @@ def padded_prepare_prefill_inputs(
         b_req_idx.append(req.req_idx)
 
         input_token_ids = req.get_chuncked_input_token_ids()
-        b_prefill_has_output.append(False if len(input_token_ids) < req.get_cur_total_len() else True)
+        b_prefill_has_output.append(
+            False if len(input_token_ids) < req.get_cur_total_len() else True
+        )
         seq_len = len(input_token_ids)
         input_token_len = seq_len - req.cur_kv_len
         input_id = input_token_ids[req.cur_kv_len :]
@@ -77,8 +79,12 @@ def padded_prepare_prefill_inputs(
     # dynamic prompt cache 准备 token
     g_infer_state_lock.acquire()
     if g_infer_context.radix_cache is not None:
-        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(input_ids.shape[0] - padded_req_num)
-    mem_indexes = g_infer_context.req_manager.mem_manager.alloc(input_ids.shape[0] - padded_req_num)
+        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(
+            input_ids.shape[0] - padded_req_num
+        )
+    mem_indexes = g_infer_context.req_manager.mem_manager.alloc(
+        input_ids.shape[0] - padded_req_num
+    )
     g_infer_state_lock.release()
 
     if padded_req_num > 0:
@@ -162,8 +168,12 @@ def padded_prepare_decode_inputs(
     # dynamic prompt cache 准备 token
     g_infer_state_lock.acquire()
     if g_infer_context.radix_cache is not None:
-        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(b_seq_len.shape[0] - padded_req_num)
-    mem_indexes = g_infer_context.req_manager.mem_manager.alloc(b_seq_len.shape[0] - padded_req_num)
+        g_infer_context.radix_cache.free_radix_cache_to_get_enough_token(
+            b_seq_len.shape[0] - padded_req_num
+        )
+    mem_indexes = g_infer_context.req_manager.mem_manager.alloc(
+        b_seq_len.shape[0] - padded_req_num
+    )
     g_infer_state_lock.release()
 
     if padded_req_num > 0:
@@ -206,14 +216,25 @@ def padded_overlap_prepare_decode_inputs(
 
     micro_batch_size = max(1, micro_batch_size)
 
-    micro_input, run_reqs, padded_req_num = padded_prepare_decode_inputs(req_objs_0, dest_batch_size=micro_batch_size)
+    micro_input, run_reqs, padded_req_num = padded_prepare_decode_inputs(
+        req_objs_0, dest_batch_size=micro_batch_size
+    )
     micro_input1, run_reqs1, padded_req_num1 = padded_prepare_decode_inputs(
         req_objs_1, dest_batch_size=micro_batch_size
     )
-    return micro_input, run_reqs, padded_req_num, micro_input1, run_reqs1, padded_req_num1
+    return (
+        micro_input,
+        run_reqs,
+        padded_req_num,
+        micro_input1,
+        run_reqs1,
+        padded_req_num1,
+    )
 
 
-def padded_overlap_prepare_prefill_inputs(req_objs: List[InferReq], is_multimodal=False):
+def padded_overlap_prepare_prefill_inputs(
+    req_objs: List[InferReq], is_multimodal=False
+):
     micro_batch1_req_num = triton.cdiv(len(req_objs), 2)
 
     micro_input, run_reqs, padded_req_num = padded_prepare_prefill_inputs(
@@ -224,4 +245,11 @@ def padded_overlap_prepare_prefill_inputs(req_objs: List[InferReq], is_multimoda
         req_objs[micro_batch1_req_num:], is_multimodal=is_multimodal
     )
 
-    return micro_input, run_reqs, padded_req_num, micro_input1, run_reqs1, padded_req_num1
+    return (
+        micro_input,
+        run_reqs,
+        padded_req_num,
+        micro_input1,
+        run_reqs1,
+        padded_req_num1,
+    )

@@ -117,10 +117,22 @@ def bmm_scaled_fp8_kernel(
     offs_am = tl.max_contiguous(tl.multiple_of(offs_am, BLOCK_SIZE_M), BLOCK_SIZE_M)
     offs_bn = tl.max_contiguous(tl.multiple_of(offs_bn, BLOCK_SIZE_N), BLOCK_SIZE_N)
     offs_k = tl.arange(0, BLOCK_SIZE_K)
-    a_ptrs = a_ptr + head_id * stride_ah + (offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)
-    b_ptrs = b_ptr + head_id * stride_bh + (offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
-    a_scale_ptrs = a_scale_ptr + head_id * stride_scale_ah + offs_am[:, None] * stride_scale_am
-    b_scale_ptrs = b_scale_ptr + head_id * stride_scale_bh + offs_bn[None, :] * stride_scale_bn
+    a_ptrs = (
+        a_ptr
+        + head_id * stride_ah
+        + (offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)
+    )
+    b_ptrs = (
+        b_ptr
+        + head_id * stride_bh
+        + (offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
+    )
+    a_scale_ptrs = (
+        a_scale_ptr + head_id * stride_scale_ah + offs_am[:, None] * stride_scale_am
+    )
+    b_scale_ptrs = (
+        b_scale_ptr + head_id * stride_scale_bh + offs_bn[None, :] * stride_scale_bn
+    )
     a_scale = tl.load(a_scale_ptrs)
     b_scale = tl.load(b_scale_ptrs)
 
@@ -137,7 +149,12 @@ def bmm_scaled_fp8_kernel(
 
     offs_cm = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
     offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
-    c_ptrs = c_ptr + head_id * stride_ch + stride_cm * offs_cm[:, None] + stride_cn * offs_cn[None, :]
+    c_ptrs = (
+        c_ptr
+        + head_id * stride_ch
+        + stride_cm * offs_cm[:, None]
+        + stride_cn * offs_cn[None, :]
+    )
     c_mask = (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
     tl.store(c_ptrs, c, mask=c_mask)
 

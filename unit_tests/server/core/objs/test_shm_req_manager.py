@@ -6,7 +6,13 @@ from lightllm.server.core.objs.shm_req_manager import ShmReqManager
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_env():
-    set_env_start_args({"running_max_req_size": 10, "disable_chunked_prefill": True, "token_healing_mode": False})
+    set_env_start_args(
+        {
+            "running_max_req_size": 10,
+            "disable_chunked_prefill": True,
+            "token_healing_mode": False,
+        }
+    )
     yield
 
 

@@ -23,6 +23,7 @@ Parameter description:
 Example:
     python benchmark_multi_server.py
 """
+
 import os
 import itertools
 from easydict import EasyDict
@@ -40,7 +41,9 @@ num_turns = [5, 10]
 num_workers = [1, 8, 16, 24, 32]
 num_users = [60]
 result_dir = "./llama"
-result_path = os.path.join(result_dir, f"summary_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.md")
+result_path = os.path.join(
+    result_dir, f"summary_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.md"
+)
 heads = [
     "model_name",
     "first_input_len",
@@ -66,8 +69,20 @@ heads = [
 ]
 
 results = []
-for first_input_len, subsequent_input_len, output_len, num_turn, num_worker, num_user in itertools.product(
-    first_input_lens, subsequent_input_lens, output_lens, num_turns, num_workers, num_users
+for (
+    first_input_len,
+    subsequent_input_len,
+    output_len,
+    num_turn,
+    num_worker,
+    num_user,
+) in itertools.product(
+    first_input_lens,
+    subsequent_input_lens,
+    output_lens,
+    num_turns,
+    num_workers,
+    num_users,
 ):
     for model_name, model_url in models.items():
         args = EasyDict(

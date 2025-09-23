@@ -27,7 +27,10 @@ from .multimodal_params import MultimodalParams
 from .httpserver.manager import HttpServerManager
 from .httpserver_for_pd_master.manager import HttpServerManagerForPDMaster
 from .api_lightllm import lightllm_get_score
-from lightllm.utils.envs_utils import get_env_start_args, get_lightllm_websocket_max_message_size
+from lightllm.utils.envs_utils import (
+    get_env_start_args,
+    get_lightllm_websocket_max_message_size,
+)
 
 from lightllm.utils.log_utils import init_logger
 from lightllm.server.metrics.manager import MetricClient
@@ -63,7 +66,9 @@ def create_error_response(status_code: HTTPStatus, message: str) -> JSONResponse
     return JSONResponse({"message": message}, status_code=status_code.value)
 
 
-async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Request) -> Response:
+async def chat_completions_impl(
+    request: ChatCompletionRequest, raw_request: Request
+) -> Response:
     from .api_http import g_objs
 
     if request.logit_bias is not None:
@@ -73,7 +78,9 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
         )
 
     if request.function_call != "none":
-        return create_error_response(HTTPStatus.BAD_REQUEST, "The function call feature is not supported")
+        return create_error_response(
+            HTTPStatus.BAD_REQUEST, "The function call feature is not supported"
+        )
 
     created_time = int(time.time())
 
@@ -87,13 +94,17 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
                 elif content.type == "image_url" and content.image_url is not None:
                     img = content.image_url.url
                     if img.startswith("http://") or img.startswith("https://"):
-                        multimodal_params_dict["images"].append({"type": "url", "data": img})
+                        multimodal_params_dict["images"].append(
+                            {"type": "url", "data": img}
+                        )
                     elif img.startswith("data:image"):
                         # "data:image/jpeg;base64,{base64_image}"
                         data_str = img.split(";", 1)[1]
                         if data_str.startswith("base64,"):
                             data = data_str[7:]
-                            multimodal_params_dict["images"].append({"type": "base64", "data": data})
+                            multimodal_params_dict["images"].append(
+                                {"type": "base64", "data": data}
+                            )
                         else:
                             raise ValueError("Unrecognized image input.")
                     else:
@@ -135,7 +146,9 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
             # guided_json takes str instead of dict obj
             sampling_params_dict["guided_json"] = json.dumps(obj)
     sampling_params = SamplingParams()
-    sampling_params.init(tokenizer=g_objs.httpserver_manager.tokenizer, **sampling_params_dict)
+    sampling_params.init(
+        tokenizer=g_objs.httpserver_manager.tokenizer, **sampling_params_dict
+    )
 
     sampling_params.verify()
     multimodal_params = MultimodalParams(**multimodal_params_dict)
@@ -151,7 +164,12 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
         finish_reason_dict = {}
         prompt_tokens_dict = {}
         completion_tokens = 0
-        async for sub_req_id, request_output, metadata, finish_status in results_generator:
+        async for (
+            sub_req_id,
+            request_output,
+            metadata,
+            finish_status,
+        ) in results_generator:
             from .req_id_generator import convert_sub_id_to_group_id
 
             group_request_id = convert_sub_id_to_group_id(sub_req_id)
@@ -183,13 +201,17 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
                     finish_reason = "function_call"
                 try:
                     # 为 tool_call_parser 提供默认值
-                    tool_parser = getattr(g_objs.args, "tool_call_parser", None) or "llama3"
+                    tool_parser = (
+                        getattr(g_objs.args, "tool_call_parser", None) or "llama3"
+                    )
                     parser = FunctionCallParser(tools, tool_parser)
                     full_normal_text, call_info_list = parser.parse_non_stream(text)
                     tool_calls = [
                         ToolCall(
                             id=str(call_info.tool_index),
-                            function=FunctionResponse(name=call_info.name, arguments=call_info.parameters),
+                            function=FunctionResponse(
+                                name=call_info.name, arguments=call_info.parameters
+                            ),
                         )
                         for call_info in call_info_list
                     ]
@@ -200,7 +222,9 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
                         "Failed to parse fc related info to json format!",
                     )
 
-            chat_message = ChatMessage(role="assistant", content=text, tool_calls=tool_calls)
+            chat_message = ChatMessage(
+                role="assistant", content=text, tool_calls=tool_calls
+            )
             choice = ChatCompletionResponseChoice(
                 index=i,
                 message=chat_message,
@@ -208,12 +232,18 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
             )
             choices.append(choice)
         resp = ChatCompletionResponse(
-            id=group_request_id, created=created_time, model=request.model, choices=choices, usage=usage
+            id=group_request_id,
+            created=created_time,
+            model=request.model,
+            choices=choices,
+            usage=usage,
         )
         return resp
 
     if sampling_params.n != 1:
-        return create_error_response(HTTPStatus.BAD_REQUEST, "stream api only support n = 1")
+        return create_error_response(
+            HTTPStatus.BAD_REQUEST, "stream api only support n = 1"
+        )
 
     parser_dict = {}
 
@@ -222,7 +252,12 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
         finish_reason = None
         from .req_id_generator import convert_sub_id_to_group_id
 
-        async for sub_req_id, request_output, metadata, finish_status in results_generator:
+        async for (
+            sub_req_id,
+            request_output,
+            metadata,
+            finish_status,
+        ) in results_generator:
             if request.tool_choice != "none" and request.tools:
                 delta = request_output
                 group_request_id = convert_sub_id_to_group_id(sub_req_id)
@@ -231,7 +266,9 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
 
                 if index not in parser_dict:
                     # 为 tool_call_parser 提供默认值
-                    tool_parser = getattr(g_objs.args, "tool_call_parser", None) or "llama3"
+                    tool_parser = (
+                        getattr(g_objs.args, "tool_call_parser", None) or "llama3"
+                    )
                     parser_dict[index] = FunctionCallParser(
                         tools=request.tools,
                         tool_call_parser=tool_parser,
@@ -265,10 +302,14 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
                             latest_delta_len = len(call_item.parameters)
 
                         expected_call = json.dumps(
-                            parser.multi_format_parser.detectors[0].prev_tool_call_arr[index].get("arguments", {}),
+                            parser.multi_format_parser.detectors[0]
+                            .prev_tool_call_arr[index]
+                            .get("arguments", {}),
                             ensure_ascii=False,
                         )
-                        actual_call = parser.multi_format_parser.detectors[0].streamed_args_for_tool[index]
+                        actual_call = parser.multi_format_parser.detectors[
+                            0
+                        ].streamed_args_for_tool[index]
                         if latest_delta_len > 0:
                             actual_call = actual_call[:-latest_delta_len]
                         remaining_call = expected_call.replace(actual_call, "", 1)
@@ -308,13 +349,21 @@ async def chat_completions_impl(request: ChatCompletionRequest, raw_request: Req
                     model=request.model,
                     choices=[stream_choice],
                 )
-                yield ("data: " + json.dumps(stream_resp.dict(), ensure_ascii=False) + "\n\n").encode("utf-8")
+                yield (
+                    "data: "
+                    + json.dumps(stream_resp.dict(), ensure_ascii=False)
+                    + "\n\n"
+                ).encode("utf-8")
 
     background_tasks = BackgroundTasks()
-    return StreamingResponse(stream_results(), media_type="text/event-stream", background=background_tasks)
+    return StreamingResponse(
+        stream_results(), media_type="text/event-stream", background=background_tasks
+    )
 
 
-async def completions_impl(request: CompletionRequest, raw_request: Request) -> Response:
+async def completions_impl(
+    request: CompletionRequest, raw_request: Request
+) -> Response:
     from .api_http import g_objs
 
     if request.logit_bias is not None:
@@ -372,14 +421,22 @@ async def completions_impl(request: CompletionRequest, raw_request: Request) -> 
     }
 
     sampling_params = SamplingParams()
-    sampling_params.init(tokenizer=g_objs.httpserver_manager.tokenizer, **sampling_params_dict)
+    sampling_params.init(
+        tokenizer=g_objs.httpserver_manager.tokenizer, **sampling_params_dict
+    )
     sampling_params.verify()
 
     # v1/completions does not support multimodal inputs, so we use an empty MultimodalParams
     multimodal_params = MultimodalParams()
 
     return await _process_prompts_completion(
-        prompts, sampling_params, sampling_params_dict, multimodal_params, raw_request, request, created_time
+        prompts,
+        sampling_params,
+        sampling_params_dict,
+        multimodal_params,
+        raw_request,
+        request,
+        created_time,
     )
 
 
@@ -403,16 +460,25 @@ async def _process_prompts_completion(
             )
 
         if sampling_params.n != 1:
-            return create_error_response(HTTPStatus.BAD_REQUEST, "stream api only support n = 1")
+            return create_error_response(
+                HTTPStatus.BAD_REQUEST, "stream api only support n = 1"
+            )
 
         return await _handle_streaming_completion(
-            prompts[0], sampling_params, multimodal_params, raw_request, request, created_time
+            prompts[0],
+            sampling_params,
+            multimodal_params,
+            raw_request,
+            request,
+            created_time,
         )
 
     async def process_single_prompt(prompt: Union[str, List[int]], prompt_index: int):
         if len(prompts) > 1:
             individual_sampling_params = SamplingParams()
-            individual_sampling_params.init(tokenizer=g_objs.httpserver_manager.tokenizer, **sampling_params_dict)
+            individual_sampling_params.init(
+                tokenizer=g_objs.httpserver_manager.tokenizer, **sampling_params_dict
+            )
             individual_sampling_params.verify()
         else:
             individual_sampling_params = sampling_params
@@ -420,15 +486,22 @@ async def _process_prompts_completion(
         # Convert token array to string for _collect_generation_results
         prompt_str = prompt
         if isinstance(prompt, list):
-            prompt_str = g_objs.httpserver_manager.tokenizer.decode(prompt, skip_special_tokens=False)
+            prompt_str = g_objs.httpserver_manager.tokenizer.decode(
+                prompt, skip_special_tokens=False
+            )
 
         generator = g_objs.httpserver_manager.generate(
             prompt, individual_sampling_params, multimodal_params, request=raw_request
         )
 
-        return await _collect_generation_results(generator, request, prompt_str, prompt_index)
+        return await _collect_generation_results(
+            generator, request, prompt_str, prompt_index
+        )
 
-    tasks = [asyncio.create_task(process_single_prompt(prompt, i)) for i, prompt in enumerate(prompts)]
+    tasks = [
+        asyncio.create_task(process_single_prompt(prompt, i))
+        for i, prompt in enumerate(prompts)
+    ]
 
     results = await asyncio.gather(*tasks)
     return _build_completion_response(results, request, created_time, len(prompts) > 1)
@@ -451,7 +524,12 @@ async def _handle_streaming_completion(
     async def stream_results() -> AsyncGenerator[bytes, None]:
         from .req_id_generator import convert_sub_id_to_group_id
 
-        async for sub_req_id, request_output, metadata, finish_status in results_generator:
+        async for (
+            sub_req_id,
+            request_output,
+            metadata,
+            finish_status,
+        ) in results_generator:
             group_request_id = convert_sub_id_to_group_id(sub_req_id)
 
             current_finish_reason = None
@@ -462,7 +540,9 @@ async def _handle_streaming_completion(
             if request.echo and metadata.get("is_first_token", False):
                 prompt_str = prompt
                 if isinstance(prompt, list):
-                    prompt_str = g_objs.httpserver_manager.tokenizer.decode(prompt, skip_special_tokens=False)
+                    prompt_str = g_objs.httpserver_manager.tokenizer.decode(
+                        prompt, skip_special_tokens=False
+                    )
                 output_text = prompt_str + output_text
 
             stream_choice = CompletionStreamChoice(
@@ -477,15 +557,21 @@ async def _handle_streaming_completion(
                 model=request.model,
                 choices=[stream_choice],
             )
-            yield ("data: " + json.dumps(stream_resp.dict(), ensure_ascii=False) + "\n\n").encode("utf-8")
+            yield (
+                "data: " + json.dumps(stream_resp.dict(), ensure_ascii=False) + "\n\n"
+            ).encode("utf-8")
 
         yield "data: [DONE]\n\n".encode("utf-8")
 
     background_tasks = BackgroundTasks()
-    return StreamingResponse(stream_results(), media_type="text/event-stream", background=background_tasks)
+    return StreamingResponse(
+        stream_results(), media_type="text/event-stream", background=background_tasks
+    )
 
 
-async def _collect_generation_results(generator, request: CompletionRequest, prompt: str, prompt_index: int):
+async def _collect_generation_results(
+    generator, request: CompletionRequest, prompt: str, prompt_index: int
+):
     final_output = []
     count_output_tokens = 0
     finish_reason = None
@@ -529,7 +615,9 @@ async def _collect_generation_results(generator, request: CompletionRequest, pro
     }
 
 
-def _build_completion_response(results: List[Dict], request: CompletionRequest, created_time: int, is_batch: bool):
+def _build_completion_response(
+    results: List[Dict], request: CompletionRequest, created_time: int, is_batch: bool
+):
     from .api_http import g_objs
 
     choices = []
@@ -541,7 +629,9 @@ def _build_completion_response(results: List[Dict], request: CompletionRequest, 
         if request.echo:
             text = result["prompt_text"] + text
 
-        logprobs_data = _build_logprobs_data(result, request, g_objs.httpserver_manager.tokenizer)
+        logprobs_data = _build_logprobs_data(
+            result, request, g_objs.httpserver_manager.tokenizer
+        )
 
         choice = CompletionChoice(
             index=result["index"],
@@ -566,7 +656,11 @@ def _build_completion_response(results: List[Dict], request: CompletionRequest, 
         group_request_id = f"cmpl-{uuid.uuid4().hex[:8]}"
 
     return CompletionResponse(
-        id=group_request_id, created=created_time, model=request.model, choices=choices, usage=usage
+        id=group_request_id,
+        created=created_time,
+        model=request.model,
+        choices=choices,
+        usage=usage,
     )
 
 
@@ -620,7 +714,9 @@ def _build_logprobs_data(result: Dict, request: CompletionRequest, tokenizer) ->
             add_tokens_to_logprobs(token_ids=prompt_token_ids)
         else:
             # 回退：重新 tokenize prompt
-            prompt_tokens = tokenizer.encode(result["prompt_text"], add_special_tokens=False)
+            prompt_tokens = tokenizer.encode(
+                result["prompt_text"], add_special_tokens=False
+            )
             add_tokens_to_logprobs(token_ids=prompt_tokens)
 
     # 添加生成的 tokens 和 logprobs

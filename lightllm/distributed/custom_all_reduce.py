@@ -33,7 +33,9 @@ from lightllm.common.basemodel.layer_infer.cache_tensor_manager import g_cache_m
 
 logger = init_logger(__name__)
 
-use_vllm_custom_allreduce = os.getenv("LIGHTLLM_USE_VLLM_CUSTOM_ALLREDUCE", "0").upper() in ["ON", "TRUE", "1"]
+use_vllm_custom_allreduce = os.getenv(
+    "LIGHTLLM_USE_VLLM_CUSTOM_ALLREDUCE", "0"
+).upper() in ["ON", "TRUE", "1"]
 if use_vllm_custom_allreduce:
     # Use vllm custom allreduce
     ops = vllm_ops
@@ -47,7 +49,8 @@ if ops is not None:
 
 def is_weak_contiguous(inp: torch.Tensor):
     return inp.is_contiguous() or (
-        inp.storage().nbytes() - inp.storage_offset() * inp.element_size() == inp.numel() * inp.element_size()
+        inp.storage().nbytes() - inp.storage_offset() * inp.element_size()
+        == inp.numel() * inp.element_size()
     )
 
 
@@ -56,7 +59,12 @@ class CustomAllreduce:
     _SUPPORTED_WORLD_SIZES = [2, 4, 6, 8]
 
     # max_size: max supported allreduce size
-    def __init__(self, group: ProcessGroup, device: Union[int, str, torch.device], max_size=8192 * 1024) -> None:
+    def __init__(
+        self,
+        group: ProcessGroup,
+        device: Union[int, str, torch.device],
+        max_size=8192 * 1024,
+    ) -> None:
         """
         Args:
             group: the process group to work on. If None, it will use the
@@ -75,7 +83,9 @@ class CustomAllreduce:
             # e.g. in a non-cuda environment
             return
         self.group = group
-        assert dist.get_backend(group) != dist.Backend.NCCL, "CustomAllreduce should be attached to a non-NCCL group."
+        assert (
+            dist.get_backend(group) != dist.Backend.NCCL
+        ), "CustomAllreduce should be attached to a non-NCCL group."
 
         rank = dist.get_rank(group=self.group)
         world_size = dist.get_world_size(group=self.group)
@@ -109,7 +119,9 @@ class CustomAllreduce:
 
         physical_device_id = device_ids[device.index]
         tensor = torch.tensor([physical_device_id], dtype=torch.int, device="cpu")
-        gather_list = [torch.tensor([0], dtype=torch.int, device="cpu") for _ in range(world_size)]
+        gather_list = [
+            torch.tensor([0], dtype=torch.int, device="cpu") for _ in range(world_size)
+        ]
         dist.all_gather(gather_list, tensor, group=self.group)
         # physical_device_ids = [t.item() for t in gather_list]
 
@@ -126,7 +138,9 @@ class CustomAllreduce:
         # Buffers memory are owned by this Python class and passed to C++.
         # Meta data composes of two parts: meta data for synchronization and a
         # temporary buffer for storing intermediate allreduce results.
-        self.meta_ptrs = self.create_shared_buffer(ops.meta_size() + max_size, group=group)
+        self.meta_ptrs = self.create_shared_buffer(
+            ops.meta_size() + max_size, group=group
+        )
         # This is a pre-registered IPC buffer. In eager mode, input tensors
         # are first copied into this buffer before allreduce is performed
         self.buffer_ptrs = self.create_shared_buffer(max_size, group=group)
@@ -135,16 +149,22 @@ class CustomAllreduce:
         # 8*world_size bytes where world_size is at most 8. Allocating 8MB
         # is enough for 131072 such tuples. The largest model I've seen only
         # needs less than 10000 of registered tuples.
-        self.rank_data = torch.empty(8 * 1024 * 1024, dtype=torch.uint8, device=self.device)
+        self.rank_data = torch.empty(
+            8 * 1024 * 1024, dtype=torch.uint8, device=self.device
+        )
         self.max_size = max_size
         self.rank = rank
         self.world_size = world_size
         self.full_nvlink = full_nvlink
-        self._ptr = ops.init_custom_ar(self.meta_ptrs, self.rank_data, rank, self.full_nvlink)
+        self._ptr = ops.init_custom_ar(
+            self.meta_ptrs, self.rank_data, rank, self.full_nvlink
+        )
         ops.register_buffer(self._ptr, self.buffer_ptrs)
 
     @staticmethod
-    def create_shared_buffer(size_in_bytes: int, group: Optional[ProcessGroup] = None) -> List[int]:
+    def create_shared_buffer(
+        size_in_bytes: int, group: Optional[ProcessGroup] = None
+    ) -> List[int]:
         """
         Creates a shared buffer and returns a list of pointers
         representing the buffer on all processes in the group.
@@ -167,7 +187,9 @@ class CustomAllreduce:
         return pointers
 
     @staticmethod
-    def free_shared_buffer(pointers: List[int], group: Optional[ProcessGroup] = None) -> None:
+    def free_shared_buffer(
+        pointers: List[int], group: Optional[ProcessGroup] = None
+    ) -> None:
         rank = dist.get_rank(group=group)
         lib = CudaRTLibrary()
         lib.cudaFree(ctypes.c_void_p(pointers[rank]))
@@ -196,7 +218,9 @@ class CustomAllreduce:
         all_data[self.rank] = [handle, offset]
         ranks = sorted(dist.get_process_group_ranks(group=self.group))
         for i, rank in enumerate(ranks):
-            dist.broadcast_object_list(all_data[i], src=rank, group=self.group, device="cpu")
+            dist.broadcast_object_list(
+                all_data[i], src=rank, group=self.group, device="cpu"
+            )
         # Unpack list of tuples to tuple of lists.
         handles = [d[0] for d in all_data]  # type: ignore
         offsets = [d[1] for d in all_data]  # type: ignore
@@ -217,7 +241,9 @@ class CustomAllreduce:
             return inp_size < self.max_size
         return False
 
-    def all_reduce(self, inp: torch.Tensor, *, out: torch.Tensor = None, registered: bool = False):
+    def all_reduce(
+        self, inp: torch.Tensor, *, out: torch.Tensor = None, registered: bool = False
+    ):
         """Performs an out-of-place all reduce.
 
         If registered is True, this assumes inp's pointer is already
@@ -225,11 +251,15 @@ class CustomAllreduce:
         buffer.
         """
         if out is None:
-            out = g_cache_manager.alloc_tensor(inp.shape, inp.dtype, device=inp.device, is_graph_out=False)
+            out = g_cache_manager.alloc_tensor(
+                inp.shape, inp.dtype, device=inp.device, is_graph_out=False
+            )
         if registered:
             ops.all_reduce(self._ptr, inp, out, 0, 0)
         else:
-            ops.all_reduce(self._ptr, inp, out, self.buffer_ptrs[self.rank], self.max_size)
+            ops.all_reduce(
+                self._ptr, inp, out, self.buffer_ptrs[self.rank], self.max_size
+            )
         return out
 
     def custom_all_reduce(self, input: torch.Tensor) -> Optional[torch.Tensor]:
@@ -243,7 +273,9 @@ class CustomAllreduce:
             else:
                 # If warm up, mimic the allocation pattern since custom
                 # allreduce is out-of-place.
-                out = g_cache_manager.alloc_tensor(input.shape, input.dtype, device=input.device, is_graph_out=False)
+                out = g_cache_manager.alloc_tensor(
+                    input.shape, input.dtype, device=input.device, is_graph_out=False
+                )
                 return out
         else:
             # Note: outside of cuda graph context, custom allreduce incurs a

@@ -3,7 +3,9 @@ import time
 from typing import List
 from queue import Queue
 from lightllm.server.router.model_infer.mode_backend.base_backend import ModeBackend
-from lightllm.server.router.model_infer.mode_backend.overlap_events import OverlapEventPack
+from lightllm.server.router.model_infer.mode_backend.overlap_events import (
+    OverlapEventPack,
+)
 from lightllm.server.router.model_infer.infer_batch import InferReq
 from lightllm.server.router.model_infer.mode_backend.pre import (
     prepare_prefill_inputs,
@@ -18,7 +20,10 @@ from lightllm.server.router.model_infer.pin_mem_manager import g_pin_mem_manager
 from lightllm.common.basemodel.infer_lock import g_infer_state_lock
 from lightllm.common.basemodel.batch_objs import ModelOutput
 from lightllm.common.basemodel.triton_kernel.gather_token_id import scatter_token
-from lightllm.common.basemodel.triton_kernel.mtp_verify import mtp_scatter_next_token_ids, gen_b_req_mtp_start_loc
+from lightllm.common.basemodel.triton_kernel.mtp_verify import (
+    mtp_scatter_next_token_ids,
+    gen_b_req_mtp_start_loc,
+)
 from lightllm.utils.log_utils import init_logger
 from lightllm.utils.dist_utils import get_current_device_id
 from lightllm.utils.envs_utils import get_env_start_args
@@ -62,7 +67,9 @@ class ChunkedPrefillBackend(ModeBackend):
                     recover_paused=self.control_state_machine.try_recover_paused_reqs(),
                 )
 
-                run_way = self.control_state_machine.select_run_way(prefill_reqs=prefill_reqs, decode_reqs=decode_reqs)
+                run_way = self.control_state_machine.select_run_way(
+                    prefill_reqs=prefill_reqs, decode_reqs=decode_reqs
+                )
 
                 if run_way.is_prefill():
                     self.prefill(
@@ -94,7 +101,9 @@ class ChunkedPrefillBackend(ModeBackend):
     ):
         # 第一阶段
         model_input, run_reqs = prepare_prefill_inputs(
-            prefill_reqs, is_chuncked_mode=not self.disable_chunked_prefill, is_multimodal=self.is_multimodal
+            prefill_reqs,
+            is_chuncked_mode=not self.disable_chunked_prefill,
+            is_multimodal=self.is_multimodal,
         )
         with torch.cuda.stream(g_infer_context.get_overlap_stream()):
             model_output = self.model.forward(model_input)
@@ -105,7 +114,9 @@ class ChunkedPrefillBackend(ModeBackend):
 
             next_token_ids, next_token_logprobs = sample(logits, run_reqs, self.eos_id)
             b_has_out = g_pin_mem_manager.gen_from_list(
-                key="b_has_out", data=model_input.b_prefill_has_output_cpu, dtype=torch.bool
+                key="b_has_out",
+                data=model_input.b_prefill_has_output_cpu,
+                dtype=torch.bool,
             ).cuda(non_blocking=True)
 
             scatter_token(
@@ -120,15 +131,19 @@ class ChunkedPrefillBackend(ModeBackend):
                 next_token_ids=next_token_ids,
                 mask=b_has_out,
             )
-            next_token_ids_cpu, next_token_logprobs_cpu = self._async_copy_next_token_infos_to_pin_mem(
-                next_token_ids, next_token_logprobs
+            next_token_ids_cpu, next_token_logprobs_cpu = (
+                self._async_copy_next_token_infos_to_pin_mem(
+                    next_token_ids, next_token_logprobs
+                )
             )
             sync_event = torch.cuda.Event()
             sync_event.record()
 
         # 第二阶段
         event_pack.notify_post_handle_and_wait_pre_post_handle()
-        update_packs = self._pre_post_handle(run_reqs, is_chuncked_mode=not self.disable_chunked_prefill)
+        update_packs = self._pre_post_handle(
+            run_reqs, is_chuncked_mode=not self.disable_chunked_prefill
+        )
 
         # 第三阶段
         event_pack.notify_forward_and_wait_post_handle()
@@ -167,8 +182,10 @@ class ChunkedPrefillBackend(ModeBackend):
                 b_req_idx=model_input.b_req_idx,
                 next_token_ids=next_token_ids,
             )
-            next_token_ids_cpu, next_token_logprobs_cpu = self._async_copy_next_token_infos_to_pin_mem(
-                next_token_ids, next_token_logprobs
+            next_token_ids_cpu, next_token_logprobs_cpu = (
+                self._async_copy_next_token_infos_to_pin_mem(
+                    next_token_ids, next_token_logprobs
+                )
             )
             sync_event = torch.cuda.Event()
             sync_event.record()
@@ -198,13 +215,19 @@ class ChunkedPrefillBackend(ModeBackend):
         prefill_reqs: List[InferReq],
     ):
         model_input, run_reqs = prepare_prefill_inputs(
-            prefill_reqs, is_chuncked_mode=not self.disable_chunked_prefill, is_multimodal=self.is_multimodal
+            prefill_reqs,
+            is_chuncked_mode=not self.disable_chunked_prefill,
+            is_multimodal=self.is_multimodal,
         )
         with torch.cuda.stream(g_infer_context.get_overlap_stream()):
             model_output = self.model.forward(model_input)
-            next_token_ids, next_token_logprobs = sample(model_output.logits, run_reqs, self.eos_id)
+            next_token_ids, next_token_logprobs = sample(
+                model_output.logits, run_reqs, self.eos_id
+            )
             b_has_out = g_pin_mem_manager.gen_from_list(
-                key="b_has_out", data=model_input.b_prefill_has_output_cpu, dtype=torch.bool
+                key="b_has_out",
+                data=model_input.b_prefill_has_output_cpu,
+                dtype=torch.bool,
             ).cuda(non_blocking=True)
 
             scatter_token(
@@ -219,8 +242,10 @@ class ChunkedPrefillBackend(ModeBackend):
                 next_token_ids=next_token_ids,
                 mask=b_has_out,
             )
-            next_token_ids_cpu, next_token_logprobs_cpu = self._async_copy_next_token_infos_to_pin_mem(
-                next_token_ids, next_token_logprobs
+            next_token_ids_cpu, next_token_logprobs_cpu = (
+                self._async_copy_next_token_infos_to_pin_mem(
+                    next_token_ids, next_token_logprobs
+                )
             )
             # mtp kv fill
             draft_next_token_ids_gpu = next_token_ids
@@ -233,15 +258,21 @@ class ChunkedPrefillBackend(ModeBackend):
                     b_next_token_ids=draft_next_token_ids_gpu,
                     deepseekv3_mtp_draft_input_hiddens=draft_model_output.deepseekv3_mtp_main_output_hiddens,
                 )
-                draft_model_output = self.draft_models[draft_model_idx].forward(draft_model_input)
-                draft_next_token_ids_gpu = self._gen_argmax_token_ids(draft_model_output)
+                draft_model_output = self.draft_models[draft_model_idx].forward(
+                    draft_model_input
+                )
+                draft_next_token_ids_gpu = self._gen_argmax_token_ids(
+                    draft_model_output
+                )
 
             sync_event = torch.cuda.Event()
             sync_event.record()
 
         # 第二阶段
         event_pack.notify_post_handle_and_wait_pre_post_handle()
-        update_packs = self._pre_post_handle(run_reqs, is_chuncked_mode=not self.disable_chunked_prefill)
+        update_packs = self._pre_post_handle(
+            run_reqs, is_chuncked_mode=not self.disable_chunked_prefill
+        )
 
         # 第三阶段
         event_pack.notify_forward_and_wait_post_handle()
@@ -269,10 +300,16 @@ class ChunkedPrefillBackend(ModeBackend):
         with torch.cuda.stream(g_infer_context.get_overlap_stream()):
             model_output = self.model.forward(model_input)
             all_next_token_ids = []
-            next_token_ids, next_token_logprobs = sample(model_output.logits, run_reqs, self.eos_id)
+            next_token_ids, next_token_logprobs = sample(
+                model_output.logits, run_reqs, self.eos_id
+            )
             all_next_token_ids.append(next_token_ids)
             # verify the next_token_ids
-            b_req_mtp_start_loc = [index for index, mtp_index in enumerate(b_mtp_index_cpu) if mtp_index == 0]
+            b_req_mtp_start_loc = [
+                index
+                for index, mtp_index in enumerate(b_mtp_index_cpu)
+                if mtp_index == 0
+            ]
             b_req_mtp_start_loc = g_pin_mem_manager.gen_from_list(
                 key="b_req_mtp_start_loc",
                 data=b_req_mtp_start_loc,
@@ -307,11 +344,15 @@ class ChunkedPrefillBackend(ModeBackend):
                     draft_model_output.deepseekv3_mtp_main_output_hiddens
                 )
                 # spec decode: MTP
-                draft_model_output: ModelOutput = self.draft_models[draft_model_idx].forward(draft_model_input)
+                draft_model_output: ModelOutput = self.draft_models[
+                    draft_model_idx
+                ].forward(draft_model_input)
                 draft_next_token_ids = self._gen_argmax_token_ids(draft_model_output)
                 all_next_token_ids.append(draft_next_token_ids)
 
-            all_next_token_ids = torch.stack(all_next_token_ids, dim=1)  # [batch_size, mtp_step + 1]
+            all_next_token_ids = torch.stack(
+                all_next_token_ids, dim=1
+            )  # [batch_size, mtp_step + 1]
             mtp_scatter_next_token_ids(
                 req_to_next_token_ids=self.model.req_manager.req_sampling_params_manager.req_to_next_token_ids,
                 b_req_mtp_start_loc=b_req_mtp_start_loc,
@@ -326,8 +367,10 @@ class ChunkedPrefillBackend(ModeBackend):
                 mask=accepted_index == 1,
             )
 
-            next_token_ids_cpu, next_token_logprobs_cpu = self._async_copy_next_token_infos_to_pin_mem(
-                next_token_ids, next_token_logprobs
+            next_token_ids_cpu, next_token_logprobs_cpu = (
+                self._async_copy_next_token_infos_to_pin_mem(
+                    next_token_ids, next_token_logprobs
+                )
             )
             sync_event = torch.cuda.Event()
             sync_event.record()
@@ -335,7 +378,9 @@ class ChunkedPrefillBackend(ModeBackend):
         # 第二阶段
         event_pack.notify_post_handle_and_wait_pre_post_handle()
         verify_event.synchronize()
-        verify_ok_reqs = [run_reqs[i] for i in range(len(run_reqs)) if accepted_index_cpu[i] == 1]
+        verify_ok_reqs = [
+            run_reqs[i] for i in range(len(run_reqs)) if accepted_index_cpu[i] == 1
+        ]
         update_packs = self._pre_post_handle(verify_ok_reqs, is_chuncked_mode=False)
 
         # 第三阶段
@@ -343,7 +388,9 @@ class ChunkedPrefillBackend(ModeBackend):
         sync_event.synchronize()
         need_free_mem_indexes = model_input.mem_indexes_cpu[accepted_index_cpu == 0]
 
-        self._update_mtp_accept_ratio(decode_reqs=decode_reqs, mtp_accept_len_cpu=mtp_accept_len_cpu)
+        self._update_mtp_accept_ratio(
+            decode_reqs=decode_reqs, mtp_accept_len_cpu=mtp_accept_len_cpu
+        )
         select_mask = torch.tensor(accepted_index_cpu, dtype=torch.bool, device="cpu")
         self._post_handle(
             run_reqs=verify_ok_reqs,

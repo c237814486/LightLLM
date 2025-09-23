@@ -161,7 +161,7 @@ except ImportError:
 try:
     import gunicorn
     gunicorn_path = pathlib.Path(gunicorn.__file__).parent
-    for pattern in ["*.py", "*.json", "*.txt"]:
+    for pattern in ["*.py", "*.json", "*.txt", "*.so", "*.dll", "*.dylib", "*.pyd"]:
         for f in gunicorn_path.rglob(pattern):
             if any(skip in str(f) for skip in ["__pycache__", ".git", "tests"]):
                 continue
@@ -169,6 +169,7 @@ try:
             datas.append((str(f), str(rel_path.parent)))
 except ImportError:
     pass
+
 
 # conformer (TTS)
 try:
@@ -408,7 +409,6 @@ runtime_hooks=[str(lightllm_root / 'pyi_runtime_hook.py')]
 a = Analysis(
     ['light_llm_tts_launcher.py'],  # 使用统一启动器
     pathex=[
-        '/mnt/afs/yangdeyu/dependency/lightllm-dev',
         '/mnt/afs/yangdeyu/dependency/lightllm-cosyvoice-old/lightllm-cosyvoice',
         '/mnt/afs/yangdeyu/dependency/LightKernel', 
     ],

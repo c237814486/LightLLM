@@ -1,6 +1,9 @@
 import pytest
 
-from lightllm.server.core.objs.out_token_circlequeue import CircularQueue, LIGHTLLM_OUT_TOKEN_QUEUE_SIZE
+from lightllm.server.core.objs.out_token_circlequeue import (
+    CircularQueue,
+    LIGHTLLM_OUT_TOKEN_QUEUE_SIZE,
+)
 
 
 def test_queue_initialization():

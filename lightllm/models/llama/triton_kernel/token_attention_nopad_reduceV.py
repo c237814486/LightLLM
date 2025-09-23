@@ -39,21 +39,30 @@ def _fwd_kernel_token_att2(
     cur_batch_in_all_start_index = tl.load(B_Start_Loc + cur_batch)
     cur_batch_req_idx = tl.load(B_req_idx + cur_batch)
 
-    v_loc_off = cur_batch_req_idx * stride_req_to_tokens_b + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
+    v_loc_off = (
+        cur_batch_req_idx * stride_req_to_tokens_b
+        + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
+    )
     p_offs = cur_head * stride_ph + (cur_batch_in_all_start_index + offs_n) * stride_pbs
     v_offs = cur_kv_head * stride_vh + offs_d[None, :] * stride_vd
 
     acc = tl.zeros([BLOCK_DMODEL], dtype=tl.float32)
     for start_n in range(0, cur_batch_seq_len, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
-        p_value = tl.load(Prob + p_offs + start_n, mask=(start_n + offs_n) < cur_batch_seq_len, other=0.0)
+        p_value = tl.load(
+            Prob + p_offs + start_n,
+            mask=(start_n + offs_n) < cur_batch_seq_len,
+            other=0.0,
+        )
         v_loc = tl.load(
             Req_to_tokens + v_loc_off + start_n * stride_req_to_tokens_s,
             mask=(start_n + offs_n) < cur_batch_seq_len,
             other=0.0,
         )
         v_value = tl.load(
-            V + v_offs + v_loc[:, None] * stride_vbs, mask=(start_n + offs_n[:, None]) < cur_batch_seq_len, other=0.0
+            V + v_offs + v_loc[:, None] * stride_vbs,
+            mask=(start_n + offs_n[:, None]) < cur_batch_seq_len,
+            other=0.0,
         )
         acc += tl.sum(p_value[:, None] * v_value, 0)
 
@@ -141,7 +150,10 @@ def _fwd_kernel_token_att2_int8v(
     cur_batch_in_all_start_index = tl.load(B_Start_Loc + cur_batch)
     cur_batch_req_idx = tl.load(B_req_idx + cur_batch)
 
-    v_loc_off = cur_batch_req_idx * stride_req_to_tokens_b + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
+    v_loc_off = (
+        cur_batch_req_idx * stride_req_to_tokens_b
+        + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
+    )
     p_offs = cur_head * stride_ph + (cur_batch_in_all_start_index + offs_n) * stride_pbs
     v_offs = cur_kv_head * stride_vh + offs_d[None, :] * stride_vd
     vs_offs = cur_kv_head * stride_vsh
@@ -149,14 +161,20 @@ def _fwd_kernel_token_att2_int8v(
     acc = tl.zeros([BLOCK_DMODEL], dtype=tl.float32)
     for start_n in range(0, cur_batch_seq_len, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
-        p_value = tl.load(Prob + p_offs + start_n, mask=(start_n + offs_n) < cur_batch_seq_len, other=0.0)
+        p_value = tl.load(
+            Prob + p_offs + start_n,
+            mask=(start_n + offs_n) < cur_batch_seq_len,
+            other=0.0,
+        )
         v_loc = tl.load(
             Req_to_tokens + v_loc_off + start_n * stride_req_to_tokens_s,
             mask=(start_n + offs_n) < cur_batch_seq_len,
             other=0.0,
         )
         v_value = tl.load(
-            V + v_offs + v_loc[:, None] * stride_vbs, mask=(start_n + offs_n[:, None]) < cur_batch_seq_len, other=0.0
+            V + v_offs + v_loc[:, None] * stride_vbs,
+            mask=(start_n + offs_n[:, None]) < cur_batch_seq_len,
+            other=0.0,
         )
         vs_value = tl.load(
             V_scale + vs_offs + v_loc[:, None] * stride_vsbs,
@@ -173,7 +191,17 @@ def _fwd_kernel_token_att2_int8v(
 
 
 @torch.no_grad()
-def token_att_fwd2_int8v(prob, v, v_scale, out, Req_to_tokens, B_req_idx, B_Start_Loc, B_Seqlen, max_len_in_batch):
+def token_att_fwd2_int8v(
+    prob,
+    v,
+    v_scale,
+    out,
+    Req_to_tokens,
+    B_req_idx,
+    B_Start_Loc,
+    B_Seqlen,
+    max_len_in_batch,
+):
     if max_len_in_batch < 512:
         BLOCK = triton.next_power_of_2(max_len_in_batch)
     else:

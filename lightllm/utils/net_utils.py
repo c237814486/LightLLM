@@ -7,9 +7,9 @@ from lightllm.utils.log_utils import init_logger
 logger = init_logger(__name__)
 
 
-def alloc_can_use_network_port(num=3, used_nccl_ports=None, from_port_num=10000):
+def alloc_can_use_network_port(num=3, used_nccl_ports=None, from_port_num=1000):
     port_list = []
-    for port in range(from_port_num, 65536):
+    for port in range(from_port_num, from_port_num + 1000):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             result = s.connect_ex(("localhost", port))
             if result != 0 and port not in used_nccl_ports:
@@ -45,7 +45,9 @@ def find_available_port(start_port, end_port):
 
 def get_hostname_ip():
     try:
-        result = subprocess.run(["hostname", "-i"], capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            ["hostname", "-i"], capture_output=True, text=True, check=True
+        )
         # 兼容 hostname -i 命令输出多个 ip 的情况
         result = result.stdout.strip().split(" ")[0]
         logger.info(f"get hostname ip {result}")
@@ -66,7 +68,10 @@ def is_valid_ipv6_address(address: str) -> bool:
 class PortLocker:
     def __init__(self, ports):
         self.ports = ports
-        self.sockets = [socket.socket(socket.AF_INET, socket.SOCK_STREAM) for _ in range(len(self.ports))]
+        self.sockets = [
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            for _ in range(len(self.ports))
+        ]
         for _socket in self.sockets:
             _socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 

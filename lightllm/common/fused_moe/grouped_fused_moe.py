@@ -1,4 +1,5 @@
 """Fused MoE kernel."""
+
 # Adapted from
 # https://github.com/vllm-project/vllm/blob/v0.6.4.post1/vllm/model_executor/layers/fused_moe/fused_moe.py
 # of the vllm-project/vllm GitHub repository.
@@ -33,7 +34,9 @@ from lightllm.utils.device_utils import (
 from .moe_kernel_configs import MoeGroupedGemmKernelConfig
 from .moe_silu_and_mul import silu_and_mul_fwd
 from .moe_sum_reduce import moe_sum_reduce
-from lightllm.common.quantization.triton_quant.fp8.fp8act_quant_kernel import per_token_group_quant_fp8
+from lightllm.common.quantization.triton_quant.fp8.fp8act_quant_kernel import (
+    per_token_group_quant_fp8,
+)
 
 FFN_MOE_CHUNK_SIZE = 8 * 1024
 
@@ -85,7 +88,9 @@ def moe_align(topk_ids: torch.Tensor, out: torch.Tensor):
     TOPK_BLOCK_M = 256
 
     token_num, topk = topk_ids.shape
-    assert out.shape[1] == token_num * topk, f"out shape {out.shape} topk_ids shape {topk_ids.shape} "
+    assert (
+        out.shape[1] == token_num * topk
+    ), f"out shape {out.shape} topk_ids shape {topk_ids.shape} "
     assert topk_ids.is_contiguous()
     out.fill_(0)
     grid = (triton.cdiv(token_num * topk, TOPK_BLOCK_M),)
@@ -125,21 +130,33 @@ def moe_align1_kernel(
 
     pre_sum = 0
 
-    for start_loc in tl.range(0, experts_info_n, TOKEN_BLOCK_SIZE, num_stages=NUM_STAGE):
+    for start_loc in tl.range(
+        0, experts_info_n, TOKEN_BLOCK_SIZE, num_stages=NUM_STAGE
+    ):
         n_range = start_loc + off_n
-        topk_weights_data = tl.load(topk_weights + n_range, mask=n_range < experts_info_n, other=0)
+        topk_weights_data = tl.load(
+            topk_weights + n_range, mask=n_range < experts_info_n, other=0
+        )
         expert_data = tl.load(
-            experts_info_ptr + expert_id * experts_info_stride0 + n_range, mask=n_range < experts_info_n, other=0
+            experts_info_ptr + expert_id * experts_info_stride0 + n_range,
+            mask=n_range < experts_info_n,
+            other=0,
         )
         cumsum_expert_data = tl.cumsum(expert_data) + pre_sum
         pre_sum = tl.max(cumsum_expert_data)
         tl.store(
-            experts_info_ptr + expert_id * experts_info_stride0 + cumsum_expert_data - 1,
+            experts_info_ptr
+            + expert_id * experts_info_stride0
+            + cumsum_expert_data
+            - 1,
             n_range,
             mask=(expert_data == 1) & (n_range < experts_info_n),
         )
         tl.store(
-            experts_topk_weight + expert_id * experts_topk_weight_stride0 + cumsum_expert_data - 1,
+            experts_topk_weight
+            + expert_id * experts_topk_weight_stride0
+            + cumsum_expert_data
+            - 1,
             topk_weights_data,
             mask=(expert_data == 1) & (n_range < experts_info_n),
         )
@@ -190,7 +207,9 @@ def moe_align1(
     """
     expert_num, token_num_mul_topk = experts_info.shape
     topk_num = topk_weights.shape[1]
-    assert token_num_mul_topk <= FFN_MOE_CHUNK_SIZE * topk_num, "need split to handle seq len too long"
+    assert (
+        token_num_mul_topk <= FFN_MOE_CHUNK_SIZE * topk_num
+    ), "need split to handle seq len too long"
     assert exports_token_num.shape[0] == expert_num
     assert topk_weights.is_contiguous()
     if token_num_mul_topk <= 512:
@@ -230,7 +249,9 @@ def moe_align2_kernel(
 
     expert_id = tl.program_id(axis=0)
     off_expert = tl.arange(0, BLOCK_EXPERT)
-    expert_to_token_num = tl.load(experts_token_num_ptr + off_expert, mask=off_expert < expert_num, other=0)
+    expert_to_token_num = tl.load(
+        experts_token_num_ptr + off_expert, mask=off_expert < expert_num, other=0
+    )
     expert_to_block_num = tl.cdiv(expert_to_token_num, BLOCK_M)
     block_starts = tl.cumsum(expert_to_block_num) - expert_to_block_num
     block_start = tl.sum(tl.where(off_expert == expert_id, block_starts, 0))
@@ -252,7 +273,9 @@ def moe_align2_kernel(
         )
 
     if expert_id == expert_num - 1:
-        for extra_fill_start in range(block_start + cur_block_num, max_num_m_blocks, 128):
+        for extra_fill_start in range(
+            block_start + cur_block_num, max_num_m_blocks, 128
+        ):
             tl.store(
                 mblocks_to_expert_id + extra_fill_start + block_off,
                 -1,
@@ -261,15 +284,23 @@ def moe_align2_kernel(
     return
 
 
-def moe_align2(token_num_mul_topk_num: int, exports_token_num: torch.Tensor, block_m: int):
+def moe_align2(
+    token_num_mul_topk_num: int, exports_token_num: torch.Tensor, block_m: int
+):
     """
     exports_token_num is tensor shape [expert_num] , will get expert need handle token num.
     out tensor is a tensor that contain block schduel infos tensor.
     """
-    max_num_tokens_padded = token_num_mul_topk_num + exports_token_num.shape[0] * (block_m - 1)
+    max_num_tokens_padded = token_num_mul_topk_num + exports_token_num.shape[0] * (
+        block_m - 1
+    )
     max_num_m_blocks = triton.cdiv(max_num_tokens_padded, block_m)
-    mblocks_to_expert_id = torch.empty((max_num_m_blocks,), dtype=torch.int32, device="cuda")
-    mblocks_to_m_index = torch.empty((max_num_m_blocks,), dtype=torch.int32, device="cuda")
+    mblocks_to_expert_id = torch.empty(
+        (max_num_m_blocks,), dtype=torch.int32, device="cuda"
+    )
+    mblocks_to_m_index = torch.empty(
+        (max_num_m_blocks,), dtype=torch.int32, device="cuda"
+    )
     expert_num = exports_token_num.shape[0]
 
     grid = (expert_num,)
@@ -343,7 +374,11 @@ def grouped_matmul_kernel(
     in_group_index = pid % num_pid_in_group
     back_mark = (in_group_index // group_size_m) % 2
     back_mark1 = -1 * (2 * back_mark - 1)
-    pid_m = first_pid_m + back_mark * (group_size_m - 1) + back_mark1 * (in_group_index % group_size_m)
+    pid_m = (
+        first_pid_m
+        + back_mark * (group_size_m - 1)
+        + back_mark1 * (in_group_index % group_size_m)
+    )
     pid_n = (pid % num_pid_in_group) // group_size_m
 
     expert_id = tl.load(mblocks_to_expert_id + pid_m)
@@ -377,21 +412,47 @@ def grouped_matmul_kernel(
 
     if use_fp8_w8a8:
         if block_size_k > 0 and block_size_n > 0:
-            a_scale_ptrs = token_scale_ptr + (a_m_index // topk_num) * (token_stride_0 // block_size_k)
+            a_scale_ptrs = token_scale_ptr + (a_m_index // topk_num) * (
+                token_stride_0 // block_size_k
+            )
             offs_bsn = offs_bn // block_size_n
-            b_scale_ptrs = weight_scale_ptr + expert_id * weight_scale_stride0 + offs_bsn * weight_scale_stride1
+            b_scale_ptrs = (
+                weight_scale_ptr
+                + expert_id * weight_scale_stride0
+                + offs_bsn * weight_scale_stride1
+            )
         else:
             a_scale = tl.load(token_scale_ptr, eviction_policy="evict_last")
-            b_scale = tl.load(weight_scale_ptr + expert_id, eviction_policy="evict_last")
+            b_scale = tl.load(
+                weight_scale_ptr + expert_id, eviction_policy="evict_last"
+            )
             ab_scale = a_scale * b_scale
 
     if use_fp8_w8a8:
-        a_ptrs = token_ptr + (a_m_index // topk_num)[None, :] * token_stride_0 + offs_k[:, None]
-        b_ptrs = weights_ptr + weight_stride_0 * expert_id + offs_k[None, :] + offs_bn[:, None] * weight_stride_1
+        a_ptrs = (
+            token_ptr
+            + (a_m_index // topk_num)[None, :] * token_stride_0
+            + offs_k[:, None]
+        )
+        b_ptrs = (
+            weights_ptr
+            + weight_stride_0 * expert_id
+            + offs_k[None, :]
+            + offs_bn[:, None] * weight_stride_1
+        )
         accumulator = tl.zeros((BLOCK_SIZE_N, BLOCK_SIZE_M), dtype=tl.float32)
     else:
-        a_ptrs = token_ptr + (a_m_index // topk_num)[:, None] * token_stride_0 + offs_k[None, :]
-        b_ptrs = weights_ptr + weight_stride_0 * expert_id + offs_k[:, None] + offs_bn[None, :] * weight_stride_1
+        a_ptrs = (
+            token_ptr
+            + (a_m_index // topk_num)[:, None] * token_stride_0
+            + offs_k[None, :]
+        )
+        b_ptrs = (
+            weights_ptr
+            + weight_stride_0 * expert_id
+            + offs_k[:, None]
+            + offs_bn[None, :] * weight_stride_1
+        )
         accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
 
     for step_k in range(0, tl.cdiv(k, BLOCK_SIZE_K)):
@@ -401,14 +462,22 @@ def grouped_matmul_kernel(
 
         if use_fp8_w8a8:
             if NEED_K_MASK:
-                a = tl.load(a_ptrs, mask=(token_mask[None, :]) & (offs_k[:, None] < k), other=0.0)
+                a = tl.load(
+                    a_ptrs,
+                    mask=(token_mask[None, :]) & (offs_k[:, None] < k),
+                    other=0.0,
+                )
                 b = tl.load(b_ptrs, mask=(offs_k[None, :] < k), other=0.0)
             else:
                 a = tl.load(a_ptrs, mask=(token_mask[None, :]), other=0.0)
                 b = tl.load(b_ptrs)
         else:
             if NEED_K_MASK:
-                a = tl.load(a_ptrs, mask=(token_mask[:, None]) & (offs_k[None, :] < k), other=0.0)
+                a = tl.load(
+                    a_ptrs,
+                    mask=(token_mask[:, None]) & (offs_k[None, :] < k),
+                    other=0.0,
+                )
                 b = tl.load(b_ptrs, mask=(offs_k[:, None] < k), other=0.0)
             else:
                 a = tl.load(a_ptrs, mask=(token_mask[:, None]), other=0.0)
@@ -520,21 +589,35 @@ def grouped_matmul(
     if use_fp8_w8a8:
         # 当权重使用 block wise 量化时，激活也使用 per token， group size 量化
         if block_size_k == 0:
-            token_inputs, token_input_scale = vllm_ops.scaled_fp8_quant(token_inputs, token_input_scale)
+            token_inputs, token_input_scale = vllm_ops.scaled_fp8_quant(
+                token_inputs, token_input_scale
+            )
         else:
             _m, _k = token_inputs.shape
             assert _k % block_size_k == 0
-            input_scale = alloc_tensor_func((_m, _k // block_size_k), dtype=torch.float32, device=token_inputs.device)
-            qinput_tensor = alloc_tensor_func((_m, _k), dtype=expert_weights.dtype, device=token_inputs.device)
-            per_token_group_quant_fp8(token_inputs, block_size_k, qinput_tensor, input_scale)
+            input_scale = alloc_tensor_func(
+                (_m, _k // block_size_k),
+                dtype=torch.float32,
+                device=token_inputs.device,
+            )
+            qinput_tensor = alloc_tensor_func(
+                (_m, _k), dtype=expert_weights.dtype, device=token_inputs.device
+            )
+            per_token_group_quant_fp8(
+                token_inputs, block_size_k, qinput_tensor, input_scale
+            )
             token_inputs, token_input_scale = qinput_tensor, input_scale
 
     if reused_mblock_infos is None:
-        mblocks_to_expert_id, mblocks_to_m_index = moe_align2(token_num_mul_topk_num, expert_to_token_num, BLOCK_SIZE_M)
+        mblocks_to_expert_id, mblocks_to_m_index = moe_align2(
+            token_num_mul_topk_num, expert_to_token_num, BLOCK_SIZE_M
+        )
     else:
         # when up group gemm and down group gemm use same BLOCK_SIZE_M,
         # can reuse (mblocks_to_expert_id, mblocks_to_m_index) created by moe_align2 kernel.
-        mblocks_to_expert_id, mblocks_to_m_index, reused_block_size_m = reused_mblock_infos
+        mblocks_to_expert_id, mblocks_to_m_index, reused_block_size_m = (
+            reused_mblock_infos
+        )
         if reused_block_size_m != BLOCK_SIZE_M:
             mblocks_to_expert_id, mblocks_to_m_index = moe_align2(
                 token_num_mul_topk_num, expert_to_token_num, BLOCK_SIZE_M
@@ -554,15 +637,21 @@ def grouped_matmul(
         topk_num,
         token_input_scale,
         expert_to_weights_scale,
-        expert_to_weights_scale.stride(0)
-        if expert_to_weights_scale is not None and expert_to_weights_scale.ndim >= 1
-        else 0,
-        expert_to_weights_scale.stride(1)
-        if expert_to_weights_scale is not None and expert_to_weights_scale.ndim >= 2
-        else 0,
-        expert_to_weights_scale.stride(2)
-        if expert_to_weights_scale is not None and expert_to_weights_scale.ndim == 3
-        else 0,
+        (
+            expert_to_weights_scale.stride(0)
+            if expert_to_weights_scale is not None and expert_to_weights_scale.ndim >= 1
+            else 0
+        ),
+        (
+            expert_to_weights_scale.stride(1)
+            if expert_to_weights_scale is not None and expert_to_weights_scale.ndim >= 2
+            else 0
+        ),
+        (
+            expert_to_weights_scale.stride(2)
+            if expert_to_weights_scale is not None and expert_to_weights_scale.ndim == 3
+            else 0
+        ),
         token_inputs,
         token_inputs.stride(0),
         token_inputs.stride(1),
@@ -626,12 +715,16 @@ def fused_experts_impl(
     topk_num = topk_ids.shape[1]
     M = min(num_tokens, CHUNK_SIZE)
 
-    intermediate_cache1 = alloc_tensor_func((M, topk_num, N), device=hidden_states.device, dtype=hidden_states.dtype)
+    intermediate_cache1 = alloc_tensor_func(
+        (M, topk_num, N), device=hidden_states.device, dtype=hidden_states.dtype
+    )
     intermediate_cache2 = alloc_tensor_func(
         (M, topk_num, N // 2), device=hidden_states.device, dtype=hidden_states.dtype
     )
     intermediate_cache3 = alloc_tensor_func(
-        (M, topk_num, w2.shape[1]), device=hidden_states.device, dtype=hidden_states.dtype
+        (M, topk_num, w2.shape[1]),
+        device=hidden_states.device,
+        dtype=hidden_states.dtype,
     )
 
     if inplace:
@@ -642,7 +735,10 @@ def fused_experts_impl(
         )
 
     for chunk in range(triton.cdiv(num_tokens, CHUNK_SIZE)):
-        begin_chunk_idx, end_chunk_idx = (chunk * CHUNK_SIZE, min((chunk + 1) * CHUNK_SIZE, num_tokens))
+        begin_chunk_idx, end_chunk_idx = (
+            chunk * CHUNK_SIZE,
+            min((chunk + 1) * CHUNK_SIZE, num_tokens),
+        )
         curr_hidden_states = hidden_states[begin_chunk_idx:end_chunk_idx]
         tokens_in_chunk, _ = curr_hidden_states.shape
 
@@ -653,11 +749,21 @@ def fused_experts_impl(
         curr_topk_ids = topk_ids[begin_chunk_idx:end_chunk_idx]
         curr_topk_weights = topk_weights[begin_chunk_idx:end_chunk_idx]
 
-        expert_to_tokens = torch.empty((E, topk_num * tokens_in_chunk), dtype=torch.int32, device="cuda")
-        expert_to_weights = torch.empty((E, topk_num * tokens_in_chunk), dtype=torch.float32, device="cuda")
+        expert_to_tokens = torch.empty(
+            (E, topk_num * tokens_in_chunk), dtype=torch.int32, device="cuda"
+        )
+        expert_to_weights = torch.empty(
+            (E, topk_num * tokens_in_chunk), dtype=torch.float32, device="cuda"
+        )
         moe_align(topk_ids=curr_topk_ids, out=expert_to_tokens)
         expert_to_token_num = torch.empty((E,), dtype=torch.int32, device="cuda")
-        moe_align1(expert_to_tokens, curr_topk_weights, expert_to_weights, expert_to_token_num, topk=topk_num)
+        moe_align1(
+            expert_to_tokens,
+            curr_topk_weights,
+            expert_to_weights,
+            expert_to_token_num,
+            topk=topk_num,
+        )
 
         reused_mblock_infos = grouped_matmul(
             curr_topk_ids.numel(),
@@ -676,7 +782,9 @@ def fused_experts_impl(
             **run_config,
         )
 
-        silu_and_mul_fwd(intermediate_cache1.view(-1, N), intermediate_cache2.view(-1, N // 2))
+        silu_and_mul_fwd(
+            intermediate_cache1.view(-1, N), intermediate_cache2.view(-1, N // 2)
+        )
 
         grouped_matmul(
             curr_topk_ids.numel(),
@@ -697,6 +805,7 @@ def fused_experts_impl(
         )
 
         moe_sum_reduce(
-            intermediate_cache3.view(*intermediate_cache3.shape), out_hidden_states[begin_chunk_idx:end_chunk_idx]
+            intermediate_cache3.view(*intermediate_cache3.shape),
+            out_hidden_states[begin_chunk_idx:end_chunk_idx],
         )
     return out_hidden_states

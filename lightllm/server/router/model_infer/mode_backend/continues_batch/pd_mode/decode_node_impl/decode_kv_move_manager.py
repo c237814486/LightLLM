@@ -16,7 +16,12 @@ from lightllm.utils.log_utils import init_logger
 from .decode_infer_rpyc import PDDecodeInferRpcServer
 from ..task_queue import TaskQueue
 import torch.multiprocessing as mp
-from lightllm.server.pd_io_struct import KVMoveTask, UpKVStatus, PDTransJoinInfo, PDTransLeaveInfo
+from lightllm.server.pd_io_struct import (
+    KVMoveTask,
+    UpKVStatus,
+    PDTransJoinInfo,
+    PDTransLeaveInfo,
+)
 from lightllm.utils.retry_utils import retry
 import numpy as np
 from rpyc import AsyncResult
@@ -51,10 +56,14 @@ class DecodeKVMoveManager(rpyc.Service):
 
         self.connect_id_to_trans_obj: Dict[str, KVTransConnectObj] = {}
         for port in self.args.pd_node_infer_rpyc_ports:
-            socket_path = f"/tmp/{get_unique_server_name()}_decode_node_infer_rpyc_{port}"
+            socket_path = (
+                f"/tmp/{get_unique_server_name()}_decode_node_infer_rpyc_{port}"
+            )
             from rpyc.utils.factory import unix_connect
 
-            con = retry(max_attempts=20, wait_time=2)(unix_connect)(socket_path, config={"allow_pickle": True})
+            con = retry(max_attempts=20, wait_time=2)(unix_connect)(
+                socket_path, config={"allow_pickle": True}
+            )
             self.infer_rpyc_objs.append(con.root)
             logger.info(f"rpyc connect to port: {port} ok")
 
@@ -62,11 +71,17 @@ class DecodeKVMoveManager(rpyc.Service):
 
         self.up_status_in_queue = mp.Queue()
         self.up_status_out_queue = mp.Queue()
-        start_up_kv_status_process(self.args, self.up_status_in_queue, self.up_status_out_queue)
+        start_up_kv_status_process(
+            self.args, self.up_status_in_queue, self.up_status_out_queue
+        )
 
         # fail release queue
-        self.fail_to_release_queue = TaskQueue(get_func=lambda datas: datas[0:KV_MOVE_MAX_NUM], fail_func=None)
-        self.fail_to_release_thread = threading.Thread(target=self.handle_fail_release_task_loop, daemon=True)
+        self.fail_to_release_queue = TaskQueue(
+            get_func=lambda datas: datas[0:KV_MOVE_MAX_NUM], fail_func=None
+        )
+        self.fail_to_release_thread = threading.Thread(
+            target=self.handle_fail_release_task_loop, daemon=True
+        )
         self.fail_to_release_thread.start()
 
         # 在不使用p2p 复制kv 的方案时，需要全局的传输锁进行控制。这个时候kv传输的效率会下降。
@@ -95,7 +110,9 @@ class DecodeKVMoveManager(rpyc.Service):
         await asyncio.gather(*[asyncio.to_thread(future.wait) for future in futures])
         return
 
-    def _dp_alloc_to_frozen_some_tokens(self, dp_tasks: List[List[KVMoveTask]]) -> List[List[Optional[List[int]]]]:
+    def _dp_alloc_to_frozen_some_tokens(
+        self, dp_tasks: List[List[KVMoveTask]]
+    ) -> List[List[Optional[List[int]]]]:
         with self.infer_rpyc_lock:
             futures = []
             for dp_index in range(self.dp_size_in_node):
@@ -103,11 +120,16 @@ class DecodeKVMoveManager(rpyc.Service):
                 conn_end = (dp_index + 1) * self.dp_world_size
                 conns = self.infer_rpyc_objs[conn_start:conn_end]
                 for conn in conns:
-                    futures.append(rpyc.async_(conn.alloc_to_frozen_some_tokens)(dp_tasks[dp_index]))
+                    futures.append(
+                        rpyc.async_(conn.alloc_to_frozen_some_tokens)(
+                            dp_tasks[dp_index]
+                        )
+                    )
 
             asyncio.run(self.wait_all_future_finish(futures))
             ans_values = [
-                obtain(futures[dp_index * self.dp_world_size].value) for dp_index in range(self.dp_size_in_node)
+                obtain(futures[dp_index * self.dp_world_size].value)
+                for dp_index in range(self.dp_size_in_node)
             ]
             return ans_values
 
@@ -123,7 +145,9 @@ class DecodeKVMoveManager(rpyc.Service):
                 conns = self.infer_rpyc_objs[conn_start:conn_end]
                 for conn in conns:
                     futures.append(
-                        rpyc.async_(conn.put_kv_received_to_radix_cache)([task.group_request_id for task in _tasks])
+                        rpyc.async_(conn.put_kv_received_to_radix_cache)(
+                            [task.group_request_id for task in _tasks]
+                        )
                     )
             asyncio.run(self.wait_all_future_finish(futures))
         return
@@ -140,7 +164,9 @@ class DecodeKVMoveManager(rpyc.Service):
                 conns = self.infer_rpyc_objs[conn_start:conn_end]
                 for conn in conns:
                     futures.append(
-                        rpyc.async_(conn.fail_to_realese_forzen_tokens)([task.group_request_id for task in _tasks])
+                        rpyc.async_(conn.fail_to_realese_forzen_tokens)(
+                            [task.group_request_id for task in _tasks]
+                        )
                     )
             asyncio.run(self.wait_all_future_finish(futures))
         return
@@ -177,7 +203,9 @@ class DecodeKVMoveManager(rpyc.Service):
 
     def handle_fail_release_task_loop(self):
         while True:
-            handle_list: List[KVMoveTask] = self.fail_to_release_queue.get_tasks(log_tag="fail_to_release_queue")
+            handle_list: List[KVMoveTask] = self.fail_to_release_queue.get_tasks(
+                log_tag="fail_to_release_queue"
+            )
             if len(handle_list) == 0:
                 time.sleep(0.01)
             else:
@@ -214,31 +242,57 @@ class DecodeKVMoveManager(rpyc.Service):
         return
 
     def exposed_build_trans_connect(
-        self, prefill_node_id, pd_prefill_nccl_ip, pd_prefill_nccl_port, prefill_node_max_kv_trans_num, connect_id
+        self,
+        prefill_node_id,
+        pd_prefill_nccl_ip,
+        pd_prefill_nccl_port,
+        prefill_node_max_kv_trans_num,
+        connect_id,
     ):
-        prefill_node_id, pd_prefill_nccl_ip, pd_prefill_nccl_port, prefill_node_max_kv_trans_num = list(
-            map(obtain, [prefill_node_id, pd_prefill_nccl_ip, pd_prefill_nccl_port, prefill_node_max_kv_trans_num])
+        (
+            prefill_node_id,
+            pd_prefill_nccl_ip,
+            pd_prefill_nccl_port,
+            prefill_node_max_kv_trans_num,
+        ) = list(
+            map(
+                obtain,
+                [
+                    prefill_node_id,
+                    pd_prefill_nccl_ip,
+                    pd_prefill_nccl_port,
+                    prefill_node_max_kv_trans_num,
+                ],
+            )
         )
         connect_id = obtain(connect_id)
         thread_local_data.connect_id = connect_id
 
-        logger.info(f"build trans infos {prefill_node_id} {pd_prefill_nccl_ip} {pd_prefill_nccl_port} {connect_id}")
+        logger.info(
+            f"build trans infos {prefill_node_id} {pd_prefill_nccl_ip} {pd_prefill_nccl_port} {connect_id}"
+        )
 
         from .decode_trans_obj import KVTransConnectObj
 
         tran_obj = KVTransConnectObj()
-        tran_obj.create(connect_id, prefill_node_id, pd_prefill_nccl_ip, pd_prefill_nccl_port, self)
+        tran_obj.create(
+            connect_id, prefill_node_id, pd_prefill_nccl_ip, pd_prefill_nccl_port, self
+        )
         self.connect_id_to_trans_obj[connect_id] = tran_obj
         return min(prefill_node_max_kv_trans_num, self.args.max_total_token_num)
 
     # 返回 None 代表繁忙， 放弃该任务的 kv 传送
-    def exposed_request_data_transfer(self, tasks: List[KVMoveTask]) -> List[Optional[int]]:
+    def exposed_request_data_transfer(
+        self, tasks: List[KVMoveTask]
+    ) -> List[Optional[int]]:
         tasks: List[KVMoveTask] = obtain(tasks)
         alloc_tokened_tasks = []
         ans_list = []
         try:
             for task in tasks:
-                logger.info(f"exposed_request_data_transfer in {task.to_decode_log_info()}, type {type(task)}")
+                logger.info(
+                    f"exposed_request_data_transfer in {task.to_decode_log_info()}, type {type(task)}"
+                )
 
             trans_obj = self.get_trans_obj(tasks[0])
             assert trans_obj is not None
@@ -254,14 +308,21 @@ class DecodeKVMoveManager(rpyc.Service):
                 dp_tasks = [[] for _ in range(self.dp_size_in_node)]
                 for task in tasks:
                     if task.group_request_id not in id_has_result:
-                        test_dp_index = id_to_test_range[task.group_request_id][test_index]
+                        test_dp_index = id_to_test_range[task.group_request_id][
+                            test_index
+                        ]
                         dp_tasks[test_dp_index].append(task)
                 if not all(len(t) == 0 for t in dp_tasks):
                     dp_tasks_ans = self._dp_alloc_to_frozen_some_tokens(dp_tasks)
                     for dp_index in range(self.dp_size_in_node):
-                        for task, decode_token_indexes in zip(dp_tasks[dp_index], dp_tasks_ans[dp_index]):
+                        for task, decode_token_indexes in zip(
+                            dp_tasks[dp_index], dp_tasks_ans[dp_index]
+                        ):
                             if decode_token_indexes is not None:
-                                id_has_result[task.group_request_id] = (dp_index, decode_token_indexes)
+                                id_has_result[task.group_request_id] = (
+                                    dp_index,
+                                    decode_token_indexes,
+                                )
             for task in tasks:
                 if task.group_request_id in id_has_result:
                     task.decode_dp_index = id_has_result[task.group_request_id][0]
@@ -270,7 +331,9 @@ class DecodeKVMoveManager(rpyc.Service):
                     ans_list.append(task.move_kv_len)
                     alloc_tokened_tasks.append(task)
                 else:
-                    logger.info(f"req id {task.id()} request_data_transfer fail, server is busy")
+                    logger.info(
+                        f"req id {task.id()} request_data_transfer fail, server is busy"
+                    )
                     ans_list.append(None)
 
         except BaseException as e:
@@ -282,7 +345,8 @@ class DecodeKVMoveManager(rpyc.Service):
 
         if alloc_tokened_tasks:
             trans_obj.ready_to_move_queue.put(
-                alloc_tokened_tasks, error_handle_func=self.put_to_fail_release_task_queue
+                alloc_tokened_tasks,
+                error_handle_func=self.put_to_fail_release_task_queue,
             )
 
         return ans_list
@@ -368,10 +432,14 @@ def _init_env(args, info_queue: mp.Queue, mem_queues: List[mp.Queue], event: mp.
     graceful_registry(inspect.currentframe().f_code.co_name)
 
     manager = DecodeKVMoveManager(args, info_queue, mem_queues)
-    t = ThreadedServer(manager, port=args.pd_decode_rpyc_port, protocol_config={"allow_pickle": True})
+    t = ThreadedServer(
+        manager, port=args.pd_decode_rpyc_port, protocol_config={"allow_pickle": True}
+    )
     threading.Thread(target=lambda: t.start(), daemon=True).start()
 
-    kv_trans_process_check = threading.Thread(target=manager.check_trans_process_loop, daemon=True)
+    kv_trans_process_check = threading.Thread(
+        target=manager.check_trans_process_loop, daemon=True
+    )
     kv_trans_process_check.start()
 
     event.set()
@@ -379,7 +447,9 @@ def _init_env(args, info_queue: mp.Queue, mem_queues: List[mp.Queue], event: mp.
     return
 
 
-def start_decode_kv_move_manager_process(args, info_queue: mp.Queue, mem_queues: List[mp.Queue]):
+def start_decode_kv_move_manager_process(
+    args, info_queue: mp.Queue, mem_queues: List[mp.Queue]
+):
     event = mp.Event()
     proc = mp.Process(target=_init_env, args=(args, info_queue, mem_queues, event))
     proc.start()

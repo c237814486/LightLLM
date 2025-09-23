@@ -43,8 +43,12 @@ def gen_cumsum_pad0_tensor(b_q_seq_len: torch.Tensor, b_kv_seq_len: torch.Tensor
     assert len(b_q_seq_len.shape) == 1
     assert b_q_seq_len.shape == b_kv_seq_len.shape
 
-    b1_cu_q_seq_len = torch.empty((b_q_seq_len.shape[0] + 1,), dtype=torch.int32, device="cuda")
-    b1_cu_kv_seq_len = torch.empty((b_kv_seq_len.shape[0] + 1,), dtype=torch.int32, device="cuda")
+    b1_cu_q_seq_len = torch.empty(
+        (b_q_seq_len.shape[0] + 1,), dtype=torch.int32, device="cuda"
+    )
+    b1_cu_kv_seq_len = torch.empty(
+        (b_kv_seq_len.shape[0] + 1,), dtype=torch.int32, device="cuda"
+    )
     _gen_cumsum_pad0_kernel[(1,)](
         b_q_seq_len,
         b1_cu_q_seq_len,
@@ -75,12 +79,18 @@ def _gen_prefill_position(
     for start in range(ready_len, seq_len, RANGE_BLOCK):
         write_loc = start + tl.arange(0, RANGE_BLOCK) - ready_len
         write_value = start + tl.arange(0, RANGE_BLOCK)
-        tl.store(position_ids + dest_start + write_loc, write_value, mask=write_loc < q_seq_len)
+        tl.store(
+            position_ids + dest_start + write_loc,
+            write_value,
+            mask=write_loc < q_seq_len,
+        )
     return
 
 
 @torch.no_grad()
-def gen_prefill_params(input_token_num: int, b_ready_cache_len: torch.Tensor, b_seq_len: torch.Tensor):
+def gen_prefill_params(
+    input_token_num: int, b_ready_cache_len: torch.Tensor, b_seq_len: torch.Tensor
+):
     batch_size = b_ready_cache_len.shape[0]
     position_ids = torch.empty((input_token_num,), dtype=torch.int32, device="cuda")
     assert b_ready_cache_len.shape[0] == b_seq_len.shape[0]
@@ -101,4 +111,12 @@ def gen_prefill_params(input_token_num: int, b_ready_cache_len: torch.Tensor, b_
     b_kv_seq_len = b_seq_len
     max_q_seq_len = b_q_seq_len.max().item()
     max_kv_seq_len = b_kv_seq_len.max().item()
-    return b_q_seq_len, b1_cu_q_seq_len, b_kv_seq_len, b1_cu_kv_seq_len, position_ids, max_q_seq_len, max_kv_seq_len
+    return (
+        b_q_seq_len,
+        b1_cu_q_seq_len,
+        b_kv_seq_len,
+        b1_cu_kv_seq_len,
+        position_ids,
+        max_q_seq_len,
+        max_kv_seq_len,
+    )

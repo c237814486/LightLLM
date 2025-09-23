@@ -22,7 +22,13 @@ from lightllm.utils.log_utils import init_logger
 from lightllm.server.multimodal_params import AudioItem
 from lightllm.models.whisper.modeling_whisper import WhisperModel
 from lightllm.models.whisper.defaults import MIN_AUDIO_LEN, MAX_AUDIO_LEN
-from lightllm.server.embed_cache.utils import tensor2bytes, read_shm, create_shm, get_shm_name_data, get_shm_name_embed
+from lightllm.server.embed_cache.utils import (
+    tensor2bytes,
+    read_shm,
+    create_shm,
+    get_shm_name_data,
+    get_shm_name_embed,
+)
 from lightllm.utils.infer_utils import calculate_cpu_time_sync
 
 logger = init_logger(__name__)
@@ -42,7 +48,11 @@ class AudioConvUpScaleProjector(nn.Module):
             padding=0,
         )  # 50Hz -> 25Hz
         self.compress_ratio = config.audio_downsample_ratio // 2  # conv已经压缩了2倍
-        self.linear1 = nn.Linear(int(self.audio_hidden_size * self.compress_ratio), self.hidden_size, bias=True)
+        self.linear1 = nn.Linear(
+            int(self.audio_hidden_size * self.compress_ratio),
+            self.hidden_size,
+            bias=True,
+        )
         self.gelu = nn.GELU()
         self.linear2 = nn.Linear(self.hidden_size, self.hidden_size, bias=True)
 
@@ -50,14 +60,22 @@ class AudioConvUpScaleProjector(nn.Module):
         # x: [bs, seq_len, audio_hidden_size]
         # feature length: List[int]
 
-        x = self.afeat_1d_conv(x.transpose(1, 2)).transpose(1, 2)  # Process Whisper features with 1D conv: (B x T x D) -> (B x T//2 x D')
+        x = self.afeat_1d_conv(x.transpose(1, 2)).transpose(
+            1, 2
+        )  # Process Whisper features with 1D conv: (B x T x D) -> (B x T//2 x D')
         bs, seq_len, audio_hidden_size = x.size()
 
-        target_seq_len = (seq_len + self.compress_ratio - 1) // self.compress_ratio * self.compress_ratio
+        target_seq_len = (
+            (seq_len + self.compress_ratio - 1)
+            // self.compress_ratio
+            * self.compress_ratio
+        )
         pad_len = target_seq_len - seq_len
 
         if pad_len > 0:
-            pad_tensor = torch.zeros(bs, pad_len, audio_hidden_size, device=x.device, dtype=x.dtype)
+            pad_tensor = torch.zeros(
+                bs, pad_len, audio_hidden_size, device=x.device, dtype=x.dtype
+            )
             x = torch.cat([x, pad_tensor], dim=1)  # 在时间维度 padding
 
         new_seq_len = target_seq_len // self.compress_ratio
@@ -66,7 +84,9 @@ class AudioConvUpScaleProjector(nn.Module):
         x = self.gelu(x)
         x = self.linear2(x)
         compress_ratio = self.config.audio_downsample_ratio
-        num_tokens = [(cur_l + compress_ratio - 1) // compress_ratio for cur_l in feature_length]
+        num_tokens = [
+            (cur_l + compress_ratio - 1) // compress_ratio for cur_l in feature_length
+        ]
         return x, num_tokens
 
 
@@ -77,7 +97,9 @@ class WhisperAudioModel:
         self.sampling_rate = 16000
         self.max_length = self.max_seconds * self.sampling_rate
         self.cache_port = kvargs["cache_port"]
-        self.cache_client = rpyc.connect("localhost", self.cache_port, config={"allow_pickle": True})
+        self.cache_client = rpyc.connect(
+            "localhost", self.cache_port, config={"allow_pickle": True}
+        )
         data_type = kvargs["data_type"]
         if data_type in ["bf16", "bfloat16"]:
             self.data_type = torch.bfloat16
@@ -93,8 +115,12 @@ class WhisperAudioModel:
         return self
 
     def load_model(self, weight_dir, config):
-        self.audio_model = WhisperModel.from_pretrained(config.audio_encoder).encoder.to(self.data_type)
-        self.audio_projector = AudioConvUpScaleProjector(config).to(self.audio_projector_dtype)
+        self.audio_model = WhisperModel.from_pretrained(
+            config.audio_encoder
+        ).encoder.to(self.data_type)
+        self.audio_projector = AudioConvUpScaleProjector(config).to(
+            self.audio_projector_dtype
+        )
 
         self.load_weight(weight_dir)
 
@@ -115,10 +141,14 @@ class WhisperAudioModel:
                 tensor_data = load_file(os.path.join(weight_dir, filename))
                 params_map[filename] = tensor_data
             if "audio_projector" in k:
-                audio_projector_weight[k.replace("model.audio_projector.", "")] = params_map[filename][k].to(self.data_type)
+                audio_projector_weight[k.replace("model.audio_projector.", "")] = (
+                    params_map[filename][k].to(self.data_type)
+                )
 
             elif "audio_encoder" in k:
-                audio_weight[k.replace("model.audio_encoder.model.", "")] = params_map[filename][k].to(self.data_type)
+                audio_weight[k.replace("model.audio_encoder.model.", "")] = params_map[
+                    filename
+                ][k].to(self.data_type)
 
         self.audio_model.load_state_dict(audio_weight)
         self.audio_projector.load_state_dict(audio_projector_weight)
@@ -128,7 +158,10 @@ class WhisperAudioModel:
         # batch audios : List[np.ndarray]
         # audio length: List[int]
 
-        batch_audios = [torch.tensor(a) if not isinstance(a, torch.Tensor) else a for a in batch_audios]
+        batch_audios = [
+            torch.tensor(a) if not isinstance(a, torch.Tensor) else a
+            for a in batch_audios
+        ]
         padded_audio = pad_sequence(batch_audios, batch_first=True, padding_value=0)
         audio = pad_or_trim(padded_audio)
         mel = log_mel_spectrogram(audio, n_mels=self.mel_bins)
@@ -156,7 +189,12 @@ class WhisperAudioModel:
 
             # padding to min audio len
             if audio.shape[0] < MIN_AUDIO_LEN:
-                audio = np.pad(audio, (0, MIN_AUDIO_LEN - len(audio)), mode="constant", constant_values=0.0)
+                audio = np.pad(
+                    audio,
+                    (0, MIN_AUDIO_LEN - len(audio)),
+                    mode="constant",
+                    constant_values=0.0,
+                )
             elif audio.shape[0] > MAX_AUDIO_LEN:
                 audio = audio[:MAX_AUDIO_LEN]
 
@@ -170,7 +208,9 @@ class WhisperAudioModel:
         audios = audios.to(torch.device("cpu"))
         torch.cuda.synchronize()
         end = time.time()
-        logger.debug(f"whisper encode time: {end - start:.4f}s, audio num: {len(audio_len)}")
+        logger.debug(
+            f"whisper encode time: {end - start:.4f}s, audio num: {len(audio_len)}"
+        )
 
         # self.alloc_audio_resources(uuids, audios, audio_token_num)
         self.alloc_audio_resources_batch(uuids, audios, audio_token_num)
@@ -196,12 +236,19 @@ class WhisperAudioModel:
         embed_status = self.cache_client.root.get_items_embed_v2(uuids_blob)
         embed_status = pickle.loads(embed_status)
 
-        tasks = [(uuids[i], audio_features[i], audio_token_num[i]) for i in range(len(uuids)) if not embed_status[i]]
+        tasks = [
+            (uuids[i], audio_features[i], audio_token_num[i])
+            for i in range(len(uuids))
+            if not embed_status[i]
+        ]
 
         if not tasks:
             return  # 所有items都已经embed了
 
-        futures = [self.thread_pool.submit(self.create_shm_for_item, uuid, audio, token_num) for uuid, audio, token_num in tasks]
+        futures = [
+            self.thread_pool.submit(self.create_shm_for_item, uuid, audio, token_num)
+            for uuid, audio, token_num in tasks
+        ]
 
         created_uuids = []
         for future in concurrent.futures.as_completed(futures):
@@ -245,7 +292,9 @@ class WhisperAudioBenchmarkRunner:
             self.console.print(f"\n[yellow]正在测试 Batch Size: {bs}...[/yellow]")
 
             for model_name, model in self.models_to_test.items():
-                self.console.print(f"  -> 评估模型: [bold magenta]{model_name}[/bold magenta]")
+                self.console.print(
+                    f"  -> 评估模型: [bold magenta]{model_name}[/bold magenta]"
+                )
                 try:
                     # 预热
                     for _ in range(self.config["warmup_runs"]):
@@ -269,8 +318,12 @@ class WhisperAudioBenchmarkRunner:
                     avg_latency_ms = (total_time / self.config["test_runs"]) * 1000
 
                     # 计算吞吐量 (音频秒数/秒)
-                    total_audio_length = sum(len(audio) for audio in test_audios) / 16000  # 转换为秒
-                    throughput = (bs * total_audio_length * self.config["test_runs"]) / total_time
+                    total_audio_length = (
+                        sum(len(audio) for audio in test_audios) / 16000
+                    )  # 转换为秒
+                    throughput = (
+                        bs * total_audio_length * self.config["test_runs"]
+                    ) / total_time
 
                     if model_name not in self.results:
                         self.results[model_name] = {}
@@ -281,7 +334,9 @@ class WhisperAudioBenchmarkRunner:
                     }
 
                 except Exception as e:
-                    self.console.print(f"[bold red]  -> 错误: 模型 {model_name} 在 BS={bs} 时运行失败: {e}[/bold red]")
+                    self.console.print(
+                        f"[bold red]  -> 错误: 模型 {model_name} 在 BS={bs} 时运行失败: {e}[/bold red]"
+                    )
                     if model_name not in self.results:
                         self.results[model_name] = {}
                     self.results[model_name][bs] = {
@@ -304,7 +359,9 @@ class WhisperAudioBenchmarkRunner:
             return
 
         if baseline_name and baseline_name not in model_names:
-            self.console.print(f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]")
+            self.console.print(
+                f"[bold red]警告: 基准模型 '{baseline_name}' 不在测试结果中。将使用第一个模型 '{model_names[0]}' 作为替代。[/bold red]"
+            )
             baseline_name = None
 
         if baseline_name is None:
@@ -314,23 +371,44 @@ class WhisperAudioBenchmarkRunner:
         table.add_column("Batch Size", justify="center", style="cyan")
         for name in model_names:
             table.add_column(f"{name}\nLatency (ms)", justify="center", style="magenta")
-            table.add_column(f"{name}\nThroughput\n(audio sec/s)", justify="center", style="green")
+            table.add_column(
+                f"{name}\nThroughput\n(audio sec/s)", justify="center", style="green"
+            )
 
         if len(model_names) > 1:
             table.add_column("Speedup 🚀", justify="center", style="yellow")
 
         for bs in self.config["batch_sizes"]:
             row_data = [str(bs)]
-            baseline_latency = self.results[baseline_name][bs].get("latency", float("inf"))
+            baseline_latency = self.results[baseline_name][bs].get(
+                "latency", float("inf")
+            )
 
             for name in model_names:
-                res = self.results[name].get(bs, {"latency": float("inf"), "throughput": 0, "audio_seconds_per_sec": 0})
-                row_data.extend([f"{res['latency']:.2f}", f"{res['audio_seconds_per_sec']:.2f}"])
+                res = self.results[name].get(
+                    bs,
+                    {
+                        "latency": float("inf"),
+                        "throughput": 0,
+                        "audio_seconds_per_sec": 0,
+                    },
+                )
+                row_data.extend(
+                    [f"{res['latency']:.2f}", f"{res['audio_seconds_per_sec']:.2f}"]
+                )
 
             if len(model_names) > 1:
-                optimized_model_name = next(n for n in model_names if n != baseline_name)
-                optimized_latency = self.results[optimized_model_name][bs].get("latency", float("inf"))
-                speedup = baseline_latency / optimized_latency if optimized_latency > 0 else float("inf")
+                optimized_model_name = next(
+                    n for n in model_names if n != baseline_name
+                )
+                optimized_latency = self.results[optimized_model_name][bs].get(
+                    "latency", float("inf")
+                )
+                speedup = (
+                    baseline_latency / optimized_latency
+                    if optimized_latency > 0
+                    else float("inf")
+                )
                 row_data.append(f"{speedup:.2f}x")
 
             table.add_row(*row_data)
@@ -355,7 +433,10 @@ if __name__ == "__main__":
     root_path = "/mnt/afs/yangdeyu/GameMLLM/LLaVA_hub/checkpoints/omni_models"
     # --- 1. 配置中心 ---
     BENCHMARK_CONFIG = {
-        "model_path": os.path.join(root_path, "0803_llava_omni_qwen25vl_14B_16x_4k_st2_kimiwhisper_10x_unfreezeaudio_omnidata_text500w_8k"),
+        "model_path": os.path.join(
+            root_path,
+            "0803_llava_omni_qwen25vl_14B_16x_4k_st2_kimiwhisper_10x_unfreezeaudio_omnidata_text500w_8k",
+        ),
         "batch_sizes": [1, 2, 4, 8, 16, 32],
         "warmup_runs": 5,
         "test_runs": 20,

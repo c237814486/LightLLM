@@ -1,6 +1,8 @@
 import torch
 import numpy as np
-from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import LlamaPreAndPostLayerWeight
+from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import (
+    LlamaPreAndPostLayerWeight,
+)
 
 
 # add key: language_model.xxx -> xxx
@@ -10,7 +12,7 @@ def rename_weight_keys(weights):
     keys = list(weights.keys())
     for k in keys:
         if prefix in k:
-            weights[k[len(prefix):]] = weights[k]
+            weights[k[len(prefix) :]] = weights[k]
 
 
 class LlavaPreAndPostLayerWeight(LlamaPreAndPostLayerWeight):
@@ -22,5 +24,3 @@ class LlavaPreAndPostLayerWeight(LlamaPreAndPostLayerWeight):
         rename_weight_keys(weights)
         super().load_hf_weights(weights)
         return
-
-

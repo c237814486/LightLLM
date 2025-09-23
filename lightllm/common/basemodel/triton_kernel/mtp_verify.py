@@ -19,7 +19,11 @@ def _fwd_kernel_mtp_verify(
     req_nums = tl.num_programs(axis=0)
 
     req_start_loc = tl.load(b_req_mtp_start_loc + cur_index)
-    req_start_end = tl.load(b_req_mtp_start_loc + cur_index + 1, mask=cur_index + 1 < req_nums, other=req_mtp_all_num)
+    req_start_end = tl.load(
+        b_req_mtp_start_loc + cur_index + 1,
+        mask=cur_index + 1 < req_nums,
+        other=req_mtp_all_num,
+    )
     req_mtp_num = req_start_end - req_start_loc
     cur_req_idx = tl.load(b_req_idx + req_start_loc)
 
@@ -31,7 +35,9 @@ def _fwd_kernel_mtp_verify(
         mask=offset + 1 < req_mtp_num,
         other=-1,
     )
-    cur_new_next_token_id = tl.load(new_next_token_ids + req_offset, mask=offset + 1 < req_mtp_num, other=-2)
+    cur_new_next_token_id = tl.load(
+        new_next_token_ids + req_offset, mask=offset + 1 < req_mtp_num, other=-2
+    )
 
     match_mask = cur_next_token_id == cur_new_next_token_id
     accept_len = tl.sum(tl.where(match_mask, 1, 0)) + 1
@@ -64,8 +70,12 @@ def mtp_verify(
     assert max_mtp_step <= BLOCK_SIZE, f"max_mtp_step must be less than {BLOCK_SIZE}"
     num_reqs = b_req_mtp_start_loc.shape[0]
     req_mtp_all_num = b_req_idx.shape[0]
-    mtp_accept_len = torch.empty((num_reqs,), dtype=torch.int32, device=req_to_next_token_ids.device)
-    accepted_index = torch.empty((req_mtp_all_num,), dtype=torch.int32, device=req_to_next_token_ids.device)
+    mtp_accept_len = torch.empty(
+        (num_reqs,), dtype=torch.int32, device=req_to_next_token_ids.device
+    )
+    accepted_index = torch.empty(
+        (req_mtp_all_num,), dtype=torch.int32, device=req_to_next_token_ids.device
+    )
 
     grid = (num_reqs,)
     num_warps = 1
@@ -105,7 +115,9 @@ def _fwd_kernel_mtp_scatter_next_token_ids(
     offset = tl.arange(0, BLOCK_SIZE)
 
     scatter_next_token_ids = tl.load(
-        all_next_token_ids + (req_start_loc + accept_len - 1) * all_next_token_ids_stride + offset,
+        all_next_token_ids
+        + (req_start_loc + accept_len - 1) * all_next_token_ids_stride
+        + offset,
         mask=offset < mtp_step,
         other=0,
     )
@@ -163,7 +175,9 @@ def _fwd_kernel_gen_b_req_mtp_start_loc(
 
 
 def gen_b_req_mtp_start_loc(b_mtp_index: torch.Tensor, num_reqs: int):
-    b_req_mtp_start_loc = torch.empty((num_reqs,), dtype=torch.int32, device=b_mtp_index.device)
+    b_req_mtp_start_loc = torch.empty(
+        (num_reqs,), dtype=torch.int32, device=b_mtp_index.device
+    )
     BLOCK_SIZE = triton.next_power_of_2(b_mtp_index.shape[0])
     batch_size = b_mtp_index.shape[0]
     grid = (1,)
@@ -180,20 +194,35 @@ def gen_b_req_mtp_start_loc(b_mtp_index: torch.Tensor, num_reqs: int):
 
 def test_mtp_verify():
     req_to_next_token_ids = torch.tensor(
-        [[1, 2, -2, -1, -1], [1, 2, 0, -1, -1], [1, 3, 4, 4, 5]], dtype=torch.int32, device="cuda"
+        [[1, 2, -2, -1, -1], [1, 2, 0, -1, -1], [1, 3, 4, 4, 5]],
+        dtype=torch.int32,
+        device="cuda",
     )
     b_req_idx = torch.tensor([0, 0, 2, 2, 2], dtype=torch.int32, device="cuda")
     b_mtp_index = torch.tensor([0, 1, 0, 1, 2], dtype=torch.int32, device="cuda")
     b_req_mtp_start_loc = torch.tensor([0, 2], dtype=torch.int32, device="cuda")
-    new_next_token_ids = torch.tensor([1, 4, 3, 4, 13], dtype=torch.int32, device="cuda")
+    new_next_token_ids = torch.tensor(
+        [1, 4, 3, 4, 13], dtype=torch.int32, device="cuda"
+    )
     all_next_token_ids = torch.tensor(
-        [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [13, 14, 15]], dtype=torch.int32, device="cuda"
+        [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [13, 14, 15]],
+        dtype=torch.int32,
+        device="cuda",
     )
     mtp_accept_len, accepted_index = mtp_verify(
-        req_to_next_token_ids, b_req_mtp_start_loc, new_next_token_ids, b_req_idx, b_mtp_index
+        req_to_next_token_ids,
+        b_req_mtp_start_loc,
+        new_next_token_ids,
+        b_req_idx,
+        b_mtp_index,
     )
     mtp_scatter_next_token_ids(
-        req_to_next_token_ids, b_req_mtp_start_loc, all_next_token_ids, b_req_idx, b_mtp_index, mtp_accept_len
+        req_to_next_token_ids,
+        b_req_mtp_start_loc,
+        all_next_token_ids,
+        b_req_idx,
+        b_mtp_index,
+        mtp_accept_len,
     )
     print(mtp_accept_len)
     print(req_to_next_token_ids)

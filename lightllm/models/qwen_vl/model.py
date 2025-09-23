@@ -23,12 +23,18 @@ class QWenVLTokenizer(BaseMultiModalTokenizer):
         self.image_length = model_cfg["visual"].get("n_queries", 256)
 
     def init_imageitem_extral_params(
-        self, img: ImageItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        img: ImageItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         return
 
     def init_audioitem_extral_params(
-        self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        audio: AudioItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         raise NotImplementedError
 
@@ -60,7 +66,9 @@ class QWenVLTokenizer(BaseMultiModalTokenizer):
     def encode(self, prompt, multimodal_params: MultimodalParams = None):
         prompt = unicodedata.normalize("NFC", prompt)
         prompt = self._format_prompt(prompt)
-        origin_ids = self.tokenizer.tokenizer.encode(prompt, allowed_special="all", disallowed_special=())
+        origin_ids = self.tokenizer.tokenizer.encode(
+            prompt, allowed_special="all", disallowed_special=()
+        )
 
         input_ids = []
         image_id = 0
@@ -77,7 +85,9 @@ class QWenVLTokenizer(BaseMultiModalTokenizer):
 
             token_id = multimodal_params.images[image_id].token_id
             token_num = multimodal_params.images[image_id].token_num
-            assert token_num == self.image_length, "invalid token num: {} vs {}!".format(token_num, self.image_length)
+            assert (
+                token_num == self.image_length
+            ), "invalid token num: {} vs {}!".format(token_num, self.image_length)
 
             input_ids.append(self.image_start_id)
             input_ids.extend(range(token_id, token_id + token_num))
@@ -88,7 +98,9 @@ class QWenVLTokenizer(BaseMultiModalTokenizer):
         input_ids.extend(origin_ids[end:])
         if multimodal_params:
             image_cnt = len(multimodal_params.images)
-            assert image_cnt == image_id, "invalid image tag num: {} vs {}!".format(image_cnt, image_id)
+            assert image_cnt == image_id, "invalid image tag num: {} vs {}!".format(
+                image_cnt, image_id
+            )
         return input_ids
 
 

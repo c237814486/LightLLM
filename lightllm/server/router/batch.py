@@ -22,7 +22,9 @@ class Batch:
         return batch_input_tokens
 
     def get_batch_decode_need_tokens(self):
-        new_batch_decode_need_tokens = [0 for _ in range(self.dp_size_in_node)]  # for chunked prefill
+        new_batch_decode_need_tokens = [
+            0 for _ in range(self.dp_size_in_node)
+        ]  # for chunked prefill
 
         for req in self.reqs:
             req_dp_index = req.sample_params.suggested_dp_index

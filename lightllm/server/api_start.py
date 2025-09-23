@@ -9,8 +9,15 @@ from lightllm.utils.start_utils import process_manager, kill_recursive
 from lightllm.server.metrics.manager import start_metric_manager
 from lightllm.server.embed_cache.manager import start_cache_manager
 from lightllm.utils.log_utils import init_logger
-from lightllm.utils.envs_utils import set_env_start_args, set_unique_server_name, get_unique_server_name
-from lightllm.utils.envs_utils import get_lightllm_gunicorn_time_out_seconds, get_lightllm_gunicorn_keep_alive
+from lightllm.utils.envs_utils import (
+    set_env_start_args,
+    set_unique_server_name,
+    get_unique_server_name,
+)
+from lightllm.utils.envs_utils import (
+    get_lightllm_gunicorn_time_out_seconds,
+    get_lightllm_gunicorn_keep_alive,
+)
 from lightllm.server.detokenization.manager import start_detokenization_process
 from lightllm.server.router.manager import start_router_process
 from lightllm.utils.process_check import is_process_active
@@ -88,7 +95,9 @@ def normal_or_p_d_start(args):
     if args.use_config_server_to_init_nccl:
         assert args.config_server_host == args.nccl_host
 
-    assert args.mem_fraction > 0 and args.mem_fraction < 1, f"Invalid mem_fraction {args.mem_fraction}, The expected value is between 0 and 1."
+    assert (
+        args.mem_fraction > 0 and args.mem_fraction < 1
+    ), f"Invalid mem_fraction {args.mem_fraction}, The expected value is between 0 and 1."
 
     if args.graph_max_len_in_batch == 0:
         args.graph_max_len_in_batch = args.max_req_total_len
@@ -107,20 +116,38 @@ def normal_or_p_d_start(args):
         assert args.disable_dynamic_prompt_cache is False
         assert args.disable_chunked_prefill is False
     if args.use_reward_model:
-        assert args.disable_dynamic_prompt_cache is True, "need add --disable_dynamic_prompt_cache"
-        assert args.disable_chunked_prefill is True, "need add --disable_chunked_prefill"
+        assert (
+            args.disable_dynamic_prompt_cache is True
+        ), "need add --disable_dynamic_prompt_cache"
+        assert (
+            args.disable_chunked_prefill is True
+        ), "need add --disable_chunked_prefill"
     if args.return_all_prompt_logprobs:
-        assert args.disable_dynamic_prompt_cache is True, "need add --disable_dynamic_prompt_cache"
-        assert args.disable_chunked_prefill is True, "need add --disable_chunked_prefill"
+        assert (
+            args.disable_dynamic_prompt_cache is True
+        ), "need add --disable_dynamic_prompt_cache"
+        assert (
+            args.disable_chunked_prefill is True
+        ), "need add --disable_chunked_prefill"
     if "offline_calibration_fp8kv" in args.mode:
-        assert args.enable_fa3 is True or (args.enable_flashinfer_prefill is True and args.enable_flashinfer_decode is True), (
-            "offline_calibration_fp8kv mode need enable fa3 or flashinfer, add --enable_fa3 or " "--enable_flashinfer_prefill and --enable_flashinfer_decode"
+        assert args.enable_fa3 is True or (
+            args.enable_flashinfer_prefill is True
+            and args.enable_flashinfer_decode is True
+        ), (
+            "offline_calibration_fp8kv mode need enable fa3 or flashinfer, add --enable_fa3 or "
+            "--enable_flashinfer_prefill and --enable_flashinfer_decode"
         )
     if "export_fp8kv_calibration" in args.mode:
-        assert args.enable_fa3 is True or (args.enable_flashinfer_prefill is True and args.enable_flashinfer_decode is True), (
-            "export_fp8kv_calibration mode need enable fa3 or flashinfer, add --enable_fa3 or " "--enable_flashinfer_prefill and --enable_flashinfer_decode"
+        assert args.enable_fa3 is True or (
+            args.enable_flashinfer_prefill is True
+            and args.enable_flashinfer_decode is True
+        ), (
+            "export_fp8kv_calibration mode need enable fa3 or flashinfer, add --enable_fa3 or "
+            "--enable_flashinfer_prefill and --enable_flashinfer_decode"
         )
-        assert args.disable_cudagraph is True, "export_fp8kv_calibration mode need disable cudagraph"
+        assert (
+            args.disable_cudagraph is True
+        ), "export_fp8kv_calibration mode need disable cudagraph"
 
     # 部分模式还不能支持与高级动态调度算法协同，to do.
     if args.diverse_mode:
@@ -139,13 +166,18 @@ def normal_or_p_d_start(args):
         args.visual_gpu_ids = list(range(args.visual_dp * args.visual_tp))
     total_required_gpus = args.visual_dp * args.visual_tp
     if len(args.visual_gpu_ids) < total_required_gpus:
-        raise ValueError(f"Not enough GPUs specified. You need at least {total_required_gpus}, but got {len(args.visual_gpu_ids)}.")
+        raise ValueError(
+            f"Not enough GPUs specified. You need at least {total_required_gpus}, but got {len(args.visual_gpu_ids)}."
+        )
     else:
         args.visual_gpu_ids = args.visual_gpu_ids[:total_required_gpus]
 
     # 检查visual_nccl_port数量是否足够
     if len(args.visual_nccl_ports) < args.visual_dp:
-        raise ValueError(f"Not enough visual_nccl_ports specified. You need at least {args.visual_dp}, " f"but got ({len(args.visual_nccl_ports)}).")
+        raise ValueError(
+            f"Not enough visual_nccl_ports specified. You need at least {args.visual_dp}, "
+            f"but got ({len(args.visual_nccl_ports)})."
+        )
     else:
         args.visual_nccl_ports = args.visual_nccl_ports[: args.visual_dp]
 
@@ -153,8 +185,14 @@ def normal_or_p_d_start(args):
         raise ValueError("visual_dp must be a positive integer.")
 
     # 检查visual_infer_batch_size是否合理
-    if args.visual_infer_batch_size // args.visual_dp < 1 or args.visual_infer_batch_size % args.visual_dp != 0:
-        raise ValueError(f"visual_infer_batch_size ({args.visual_infer_batch_size}) must be " f"a positive integer multiple of visual_dp ({args.visual_dp})")
+    if (
+        args.visual_infer_batch_size // args.visual_dp < 1
+        or args.visual_infer_batch_size % args.visual_dp != 0
+    ):
+        raise ValueError(
+            f"visual_infer_batch_size ({args.visual_infer_batch_size}) must be "
+            f"a positive integer multiple of visual_dp ({args.visual_dp})"
+        )
 
     if args.disable_chunked_prefill:
         args.chunked_prefill_size = args.max_req_total_len
@@ -162,13 +200,19 @@ def normal_or_p_d_start(args):
         if args.batch_max_tokens is None:
             args.batch_max_tokens = args.max_req_total_len
         else:
-            assert args.batch_max_tokens >= args.max_req_total_len, "batch_max_tokens must >= max_req_total_len"
+            assert (
+                args.batch_max_tokens >= args.max_req_total_len
+            ), "batch_max_tokens must >= max_req_total_len"
     else:
         # chunked 模式下
         if args.batch_max_tokens is None:
-            args.batch_max_tokens = min(args.max_req_total_len, 2 * args.chunked_prefill_size + 256)
+            args.batch_max_tokens = min(
+                args.max_req_total_len, 2 * args.chunked_prefill_size + 256
+            )
 
-        assert args.batch_max_tokens >= args.chunked_prefill_size, "chunked prefill mode, batch_max_tokens must >= chunked_prefill_size"
+        assert (
+            args.batch_max_tokens >= args.chunked_prefill_size
+        ), "chunked prefill mode, batch_max_tokens must >= chunked_prefill_size"
 
     # help to manage data stored on Ceph
     if "s3://" in args.model_dir:
@@ -186,11 +230,22 @@ def normal_or_p_d_start(args):
         from lightllm.utils.config_utils import get_dtype
 
         args.data_type = get_dtype(args.model_dir)
-        assert args.data_type in ["fp16", "float16", "bf16", "bfloat16", "fp32", "float32"]
+        assert args.data_type in [
+            "fp16",
+            "float16",
+            "bf16",
+            "bfloat16",
+            "fp32",
+            "float32",
+        ]
 
     already_uesd_ports = args.visual_nccl_ports + [args.nccl_port, args.port]
     if args.run_mode == "decode":
-        already_uesd_ports = args.visual_nccl_ports + [args.nccl_port, args.port, args.pd_decode_rpyc_port]
+        already_uesd_ports = args.visual_nccl_ports + [
+            args.nccl_port,
+            args.port,
+            args.pd_decode_rpyc_port,
+        ]
 
     # 提前锁定端口，防止在单个机器上启动多个实列的时候，要到模型启动的时候才能
     # 捕获到端口设置冲突的问题
@@ -198,7 +253,11 @@ def normal_or_p_d_start(args):
     ports_locker.lock_port()
 
     node_world_size = args.tp // args.nnodes
-    can_use_ports = alloc_can_use_network_port(num=7 + node_world_size + args.visual_dp * args.visual_tp, used_nccl_ports=already_uesd_ports)
+    can_use_ports = alloc_can_use_network_port(
+        num=7 + node_world_size + args.visual_dp * args.visual_tp,
+        used_nccl_ports=already_uesd_ports,
+        from_port_num=args.from_port_num,
+    )
     logger.info(f"alloced ports: {can_use_ports}")
     (
         router_port,
@@ -331,7 +390,9 @@ def normal_or_p_d_start(args):
     if args.health_monitor:
         from lightllm.server.health_monitor.manager import start_health_check_process
 
-        process_manager.start_submodule_processes(start_funcs=[start_health_check_process], start_args=[(args,)])
+        process_manager.start_submodule_processes(
+            start_funcs=[start_health_check_process], start_args=[(args,)]
+        )
     setup_signal_handlers(http_server_process, process_manager)
     http_server_process.wait()
     return
@@ -353,7 +414,9 @@ def pd_master_start(args):
     logger.info(f"use tgi api: {args.use_tgi_api}")
     logger.info(f"all start args:{args}")
 
-    can_use_ports = alloc_can_use_network_port(num=1, used_nccl_ports=[args.nccl_port, args.port])
+    can_use_ports = alloc_can_use_network_port(
+        num=1, used_nccl_ports=[args.nccl_port, args.port]
+    )
     metric_port = can_use_ports[0]
 
     args.metric_port = metric_port
@@ -394,7 +457,9 @@ def pd_master_start(args):
     if args.health_monitor:
         from lightllm.server.health_monitor.manager import start_health_check_process
 
-        process_manager.start_submodule_processes(start_funcs=[start_health_check_process], start_args=[(args,)])
+        process_manager.start_submodule_processes(
+            start_funcs=[start_health_check_process], start_args=[(args,)]
+        )
 
     setup_signal_handlers(http_server_process, process_manager)
     http_server_process.wait()

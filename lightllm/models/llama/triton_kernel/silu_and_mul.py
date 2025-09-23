@@ -28,9 +28,18 @@ def _silu_and_mul_kernel(
     input_n_offsets = pid * BLOCK_N + tl.arange(0, BLOCK_N)
     output_n_offsets = pid * BLOCK_N + tl.arange(0, BLOCK_N)
 
-    up_offsets = input_m_offsets[:, None] * stride_input_m + (input_n_offsets[None, :] + size_n) * stride_input_n
-    gate_offsets = input_m_offsets[:, None] * stride_input_m + input_n_offsets[None, :] * stride_input_n
-    res_offsets = output_m_offsets[:, None] * stride_output_m + output_n_offsets[None, :] * stride_output_n
+    up_offsets = (
+        input_m_offsets[:, None] * stride_input_m
+        + (input_n_offsets[None, :] + size_n) * stride_input_n
+    )
+    gate_offsets = (
+        input_m_offsets[:, None] * stride_input_m
+        + input_n_offsets[None, :] * stride_input_n
+    )
+    res_offsets = (
+        output_m_offsets[:, None] * stride_output_m
+        + output_n_offsets[None, :] * stride_output_n
+    )
 
     up = tl.load(
         input_ptr + up_offsets,
@@ -49,7 +58,8 @@ def _silu_and_mul_kernel(
     tl.store(
         output_ptr + res_offsets,
         up * gate,
-        mask=(output_n_offsets < size_n)[None, :] * (output_m_offsets < size_m)[:, None],
+        mask=(output_n_offsets < size_n)[None, :]
+        * (output_m_offsets < size_m)[:, None],
     )
 
 
@@ -82,7 +92,10 @@ def silu_and_mul_fwd(input: torch.Tensor, output):
 
 
 def torch_silu_and_mul(input: torch.Tensor):
-    return torch.nn.functional.silu(input[:, 0 : (input.shape[-1] // 2)]) * input[:, (input.shape[-1] // 2) :]
+    return (
+        torch.nn.functional.silu(input[:, 0 : (input.shape[-1] // 2)])
+        * input[:, (input.shape[-1] // 2) :]
+    )
 
 
 def test_silu_and_mul(M, N, dtype, device="cuda"):

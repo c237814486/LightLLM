@@ -49,11 +49,17 @@ def _fwd_kernel(
 
     cur_q_head_range = cur_kv_head * kv_group_num + cur_q_head_offs
 
-    off_q = cur_batch * stride_qbs + cur_q_head_range[:, None] * stride_qh + offs_d[None, :]
+    off_q = (
+        cur_batch * stride_qbs + cur_q_head_range[:, None] * stride_qh + offs_d[None, :]
+    )
     off_k = cur_kv_head * stride_kh + offs_d[:, None]
     off_v = cur_kv_head * stride_vh + offs_d[None, :]
 
-    q = tl.load(Q + off_q, mask=cur_q_head_range[:, None] < (cur_kv_head + 1) * kv_group_num, other=0.0)
+    q = tl.load(
+        Q + off_q,
+        mask=cur_q_head_range[:, None] < (cur_kv_head + 1) * kv_group_num,
+        other=0.0,
+    )
 
     k_ptrs = K + off_k
     v_ptrs = V + off_v
@@ -67,18 +73,25 @@ def _fwd_kernel(
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         kv_loc = tl.load(
-            Req_to_tokens + cur_batch_req_idx * stride_req_to_tokens_b + start_n + offs_n,
+            Req_to_tokens
+            + cur_batch_req_idx * stride_req_to_tokens_b
+            + start_n
+            + offs_n,
             mask=(start_n + offs_n) < cur_batch_seq_len,
             other=0,
         ).to(tl.int64)
         k = tl.load(
-            k_ptrs + kv_loc[None, :] * stride_kbs, mask=(start_n + offs_n[None, :]) < cur_batch_seq_len, other=0.0
+            k_ptrs + kv_loc[None, :] * stride_kbs,
+            mask=(start_n + offs_n[None, :]) < cur_batch_seq_len,
+            other=0.0,
         )
 
         qk = tl.zeros([Q_HEAD_NUM, BLOCK_N], dtype=tl.float32)
         qk += tl.dot(q, k)
         qk *= sm_scale
-        qk = tl.where(cur_batch_seq_len - 1 >= (start_n + offs_n[None, :]), qk, float("-inf"))
+        qk = tl.where(
+            cur_batch_seq_len - 1 >= (start_n + offs_n[None, :]), qk, float("-inf")
+        )
 
         # -- compute m_ij, p, l_ij
         m_ij = tl.max(qk, 1)
@@ -98,7 +111,9 @@ def _fwd_kernel(
         acc = acc * acc_scale[:, None]
         # update acc
         v = tl.load(
-            v_ptrs + kv_loc[:, None] * stride_vbs, mask=(start_n + offs_n[:, None]) < cur_batch_seq_len, other=0.0
+            v_ptrs + kv_loc[:, None] * stride_vbs,
+            mask=(start_n + offs_n[:, None]) < cur_batch_seq_len,
+            other=0.0,
         )
 
         p = p.to(v.dtype)
@@ -107,9 +122,13 @@ def _fwd_kernel(
         l_i = l_i_new
         m_i = m_i_new
     # initialize pointers to output
-    off_o = cur_batch * stride_obs + cur_q_head_range[:, None] * stride_oh + offs_d[None, :]
+    off_o = (
+        cur_batch * stride_obs + cur_q_head_range[:, None] * stride_oh + offs_d[None, :]
+    )
     out_ptrs = Out + off_o
-    tl.store(out_ptrs, acc, mask=cur_q_head_range[:, None] < (cur_kv_head + 1) * kv_group_num)
+    tl.store(
+        out_ptrs, acc, mask=cur_q_head_range[:, None] < (cur_kv_head + 1) * kv_group_num
+    )
     return
 
 
@@ -122,7 +141,7 @@ def gqa_decode_attention_fwd(q, k, v, o, req_to_tokens, b_req_idx, b_seq_len):
     assert Lq == Lk and Lk == Lv
     assert Lk in {16, 32, 64, 128}
 
-    sm_scale = 1.0 / (Lq ** 0.5)  # 计算scale系数
+    sm_scale = 1.0 / (Lq**0.5)  # 计算scale系数
     batch = b_req_idx.shape[0]
     kv_group_num = q.shape[1] // k.shape[1]
     kv_head_num = k.shape[1]

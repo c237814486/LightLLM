@@ -27,7 +27,14 @@ if torch.cuda.is_available():
     ],
 )
 def test_destindex_copy_kv(batch, seqlen, heads, nope_head, rope_head, copy_len):
-    B, N_CTX, H, NOPE_HEAD, ROPE_HEAD, COPY_LEN = batch, seqlen, heads, nope_head, rope_head, copy_len
+    B, N_CTX, H, NOPE_HEAD, ROPE_HEAD, COPY_LEN = (
+        batch,
+        seqlen,
+        heads,
+        nope_head,
+        rope_head,
+        copy_len,
+    )
     dtype = torch.bfloat16
     dest_loc = torch.randperm(COPY_LEN).cuda()
     kv = torch.randn((len(dest_loc), H, NOPE_HEAD + ROPE_HEAD), dtype=dtype).cuda()

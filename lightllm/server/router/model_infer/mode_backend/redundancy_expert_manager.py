@@ -11,8 +11,13 @@ from lightllm.common.basemodel.basemodel import TpPartBaseModel
 from lightllm.common.basemodel.layer_weights.meta_weights.fused_moe_weight_ep_redundancy import (
     FusedMoeWeightEPAutoRedundancy,
 )
-from lightllm.common.basemodel.layer_weights.meta_weights.fused_moe_weight_ep import FusedMoeWeightEP
-from lightllm.utils.envs_utils import get_env_start_args, get_redundancy_expert_update_interval
+from lightllm.common.basemodel.layer_weights.meta_weights.fused_moe_weight_ep import (
+    FusedMoeWeightEP,
+)
+from lightllm.utils.envs_utils import (
+    get_env_start_args,
+    get_redundancy_expert_update_interval,
+)
 from lightllm.utils.envs_utils import get_redundancy_expert_update_max_load_count
 from lightllm.utils.envs_utils import get_redundancy_expert_num
 from lightllm.utils.dist_utils import get_global_rank
@@ -30,7 +35,9 @@ class RedundancyExpertManager:
         for layer in self.model.trans_layers_weight:
             ep_weights = self._find_members_of_class(layer, FusedMoeWeightEP)
             assert len(ep_weights) <= 1
-            self.ep_fused_moeweights.extend([FusedMoeWeightEPAutoRedundancy(e) for e in ep_weights])
+            self.ep_fused_moeweights.extend(
+                [FusedMoeWeightEPAutoRedundancy(e) for e in ep_weights]
+            )
 
         # save load params
         self.use_safetensors = True
@@ -39,7 +46,9 @@ class RedundancyExpertManager:
         if len(candidate_files) == 0:
             self.use_safetensors = False
             candidate_files = list(filter(lambda x: x.endswith(".bin"), files))
-        assert len(candidate_files) != 0, "can only support pytorch tensor and safetensors format for weights."
+        assert (
+            len(candidate_files) != 0
+        ), "can only support pytorch tensor and safetensors format for weights."
         self.candidate_files = candidate_files
 
         # state 1. check_to_update 2. prepare_update 3. start_load_hf_weights 4. wait_load_ready, 5. commit
@@ -73,10 +82,14 @@ class RedundancyExpertManager:
         elif self.state == _STATE.PREPARE_UPDATE:
             self._prepare_load_new_redundancy_expert()
             self.state = _STATE.START_LOAD_HF_WEIGHTS
-            logger.info(f"global_rank {self.global_rank} state to start load hf weights")
+            logger.info(
+                f"global_rank {self.global_rank} state to start load hf weights"
+            )
 
         elif self.state == _STATE.START_LOAD_HF_WEIGHTS:
-            self.load_thread = threading.Thread(target=self._load_hf_weights, daemon=True)
+            self.load_thread = threading.Thread(
+                target=self._load_hf_weights, daemon=True
+            )
             self.load_thread.start()
             self.state = _STATE.WAIT_LOAD_READY
             logger.info(f"global_rank {self.global_rank} state to wait load ready")
@@ -98,7 +111,9 @@ class RedundancyExpertManager:
         for w in self.ep_fused_moeweights:
             topk_redundancy_expert_ids = w.prepare_redundancy_experts()
             if self.global_rank == 0:
-                self.rank0_redundancy_expert_config[str(w._ep_w.layer_num)] = topk_redundancy_expert_ids
+                self.rank0_redundancy_expert_config[str(w._ep_w.layer_num)] = (
+                    topk_redundancy_expert_ids
+                )
 
         if self.global_rank == 0:
             try:
@@ -109,7 +124,9 @@ class RedundancyExpertManager:
                 )
             except BaseException as e:
                 logger.exception(str(e))
-                logger.error(f"global rank {self.global_rank} save redundancy_expert_config.json failed")
+                logger.error(
+                    f"global rank {self.global_rank} save redundancy_expert_config.json failed"
+                )
 
         return
 
@@ -128,7 +145,9 @@ class RedundancyExpertManager:
             logger.exception(str(e))
             raise e
         cost_time = time.time() - start
-        logger.info(f"global rank {self.global_rank} load redundancy_expert cost time: {cost_time} s")
+        logger.info(
+            f"global rank {self.global_rank} load redundancy_expert cost time: {cost_time} s"
+        )
         return
 
     def _commit(self):

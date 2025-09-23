@@ -1,7 +1,9 @@
 import torch
 import torch.distributed as dist
 
-from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import LlamaPreAndPostLayerWeight
+from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import (
+    LlamaPreAndPostLayerWeight,
+)
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 
 from lightllm.models.llama.layer_infer.pre_layer_infer import LlamaPreLayerInfer
@@ -31,7 +33,12 @@ class LlamaMultimodalPreLayerInfer(LlamaPreLayerInfer):
         super().__init__(network_config, mode)
         return
 
-    def context_forward(self, input_ids, infer_state: LlamaInferStateInfo, layer_weight: LlamaPreAndPostLayerWeight):
+    def context_forward(
+        self,
+        input_ids,
+        infer_state: LlamaInferStateInfo,
+        layer_weight: LlamaPreAndPostLayerWeight,
+    ):
 
         img_weight = []
         img_start_token_ids = []
@@ -52,7 +59,9 @@ class LlamaMultimodalPreLayerInfer(LlamaPreLayerInfer):
                     continue
                 # pull the img_embeds by uid from shm
                 data = read_shm(get_shm_name_embed(img["uuid"]))
-                img_weight.append(bytes2tensor(data).cuda().reshape(img["token_num"], -1))
+                img_weight.append(
+                    bytes2tensor(data).cuda().reshape(img["token_num"], -1)
+                )
                 img_start_token_ids.append(img["token_id"])
                 img_token_lens.append(img["token_num"])
                 img_start_locs.append(img_start_loc)
@@ -68,9 +77,15 @@ class LlamaMultimodalPreLayerInfer(LlamaPreLayerInfer):
         )
         # each tp will fill the img embeds, should divide by world_size
         img_weight = img_weight / self.tp_world_size_
-        img_start_token_ids = torch.Tensor(img_start_token_ids).to(device=device, dtype=torch.long)
-        img_token_lens = torch.Tensor(img_token_lens).to(device=device, dtype=torch.long)
-        img_start_locs = torch.Tensor(img_start_locs).to(device=device, dtype=torch.long)
+        img_start_token_ids = torch.Tensor(img_start_token_ids).to(
+            device=device, dtype=torch.long
+        )
+        img_token_lens = torch.Tensor(img_token_lens).to(
+            device=device, dtype=torch.long
+        )
+        img_start_locs = torch.Tensor(img_start_locs).to(
+            device=device, dtype=torch.long
+        )
 
         multimodal_emb(
             out,
@@ -84,5 +99,7 @@ class LlamaMultimodalPreLayerInfer(LlamaPreLayerInfer):
             self.vob_end_id_,
         )
         if self.tp_world_size_ > 1:
-            all_reduce(out, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False)
+            all_reduce(
+                out, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False
+            )
         return out

@@ -1,7 +1,11 @@
 import torch
 import pytest
-from lightllm.common.basemodel.triton_kernel.redundancy_topk_ids_repair import redundancy_topk_ids_repair
-from lightllm.common.basemodel.triton_kernel.redundancy_topk_ids_repair import expert_id_counter
+from lightllm.common.basemodel.triton_kernel.redundancy_topk_ids_repair import (
+    redundancy_topk_ids_repair,
+)
+from lightllm.common.basemodel.triton_kernel.redundancy_topk_ids_repair import (
+    expert_id_counter,
+)
 from lightllm.utils.log_utils import init_logger
 
 logger = init_logger(__name__)
@@ -49,15 +53,22 @@ def test_redundancy_topk_ids_repair():
         dtype=torch.int64,
         device="cuda",
     )
-    ans_topk_ids = (ans_topk_ids // ep_expert_num) * redundancy_expert_num + ans_topk_ids
-    new_redundancy_expert_ids = (redundancy_expert_ids // ep_expert_num) * redundancy_expert_num + redundancy_expert_ids
+    ans_topk_ids = (
+        ans_topk_ids // ep_expert_num
+    ) * redundancy_expert_num + ans_topk_ids
+    new_redundancy_expert_ids = (
+        redundancy_expert_ids // ep_expert_num
+    ) * redundancy_expert_num + redundancy_expert_ids
     ans_topk_ids[ans_topk_ids == new_redundancy_expert_ids[0]] = (
         (ep_expert_num + redundancy_expert_num) * global_rank + ep_expert_num + 0
     )
 
     assert torch.equal(topk_ids, ans_topk_ids)
     assert torch.equal(
-        expert_id_counter, torch.tensor([1, 2, 1, 2, 0, 1, 0, 2, 0, 1, 1, 1], dtype=torch.int64, device="cuda")
+        expert_id_counter,
+        torch.tensor(
+            [1, 2, 1, 2, 0, 1, 0, 2, 0, 1, 1, 1], dtype=torch.int64, device="cuda"
+        ),
     )
 
     ep_expert_num = 4
@@ -96,8 +107,12 @@ def test_redundancy_topk_ids_repair():
         dtype=torch.int64,
         device="cuda",
     )
-    ans_topk_ids = (ans_topk_ids // ep_expert_num) * redundancy_expert_num + ans_topk_ids
-    new_redundancy_expert_ids = (redundancy_expert_ids // ep_expert_num) * redundancy_expert_num + redundancy_expert_ids
+    ans_topk_ids = (
+        ans_topk_ids // ep_expert_num
+    ) * redundancy_expert_num + ans_topk_ids
+    new_redundancy_expert_ids = (
+        redundancy_expert_ids // ep_expert_num
+    ) * redundancy_expert_num + redundancy_expert_ids
     ans_topk_ids[ans_topk_ids == new_redundancy_expert_ids[0]] = (
         (ep_expert_num + redundancy_expert_num) * global_rank + ep_expert_num + 0
     )
@@ -144,7 +159,9 @@ def test_expert_id_counter():
     end_event = torch.cuda.Event(enable_timing=True)
     end_event.record()
     torch.cuda.synchronize()
-    logger.info(f"expert_id_counter time cost: {start_event.elapsed_time(end_event)} ms")
+    logger.info(
+        f"expert_id_counter time cost: {start_event.elapsed_time(end_event)} ms"
+    )
 
 
 if __name__ == "__main__":

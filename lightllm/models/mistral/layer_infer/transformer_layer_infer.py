@@ -1,4 +1,6 @@
-from lightllm.models.llama.layer_infer.transformer_layer_infer import LlamaTransformerLayerInfer
+from lightllm.models.llama.layer_infer.transformer_layer_infer import (
+    LlamaTransformerLayerInfer,
+)
 
 
 class MistralTransformerLayerInfer(LlamaTransformerLayerInfer):

@@ -21,22 +21,31 @@ class TokenHealingBackend(ChunkedPrefillBackend):
         初始化tokenizer 词表相关的的操作
         """
         self.tokenizer = get_tokenizer(
-            self.args.model_dir, self.args.tokenizer_mode, trust_remote_code=self.args.trust_remote_code
+            self.args.model_dir,
+            self.args.tokenizer_mode,
+            trust_remote_code=self.args.trust_remote_code,
         )
         vob_dict = self.tokenizer.get_vocab()
         self.token_to_token_id = vob_dict
         if len(vob_dict) == self.model.vocab_size:
-            logger.warning(f"tokenizer error: {len(vob_dict)} != {self.model.vocab_size}")
+            logger.warning(
+                f"tokenizer error: {len(vob_dict)} != {self.model.vocab_size}"
+            )
         self.max_token_str_len = max([len(key) for key in vob_dict.keys()])
         self.logger.info(f"max vob token str len: {self.max_token_str_len}")
         self.pad_token_str = "\U0010FFFF" * self.max_token_str_len
         from sortedcontainers import SortedList
 
-        self.token_id_to_token = {token_id: token for token, token_id in vob_dict.items()}
+        self.token_id_to_token = {
+            token_id: token for token, token_id in vob_dict.items()
+        }
         self.sorted_tokens = SortedList(
-            [(token_str, token_id) for token_str, token_id in vob_dict.items()], key=lambda x: x[0]
+            [(token_str, token_id) for token_str, token_id in vob_dict.items()],
+            key=lambda x: x[0],
         )
-        self.token_indexes = torch.tensor([e[1] for e in self.sorted_tokens], dtype=torch.int64, device="cuda")
+        self.token_indexes = torch.tensor(
+            [e[1] for e in self.sorted_tokens], dtype=torch.int64, device="cuda"
+        )
         return
 
     def _decode_mask_callback(self, run_reqs: List[InferReq], logits: torch.Tensor):
@@ -60,7 +69,9 @@ class TokenHealingBackend(ChunkedPrefillBackend):
         logits[mask] = -1000000.0
         return
 
-    def _update_tokenhealing_req_prefix_str(self, req_obj: InferReq, next_token_id, next_token_logprob):
+    def _update_tokenhealing_req_prefix_str(
+        self, req_obj: InferReq, next_token_id, next_token_logprob
+    ):
         next_token = self.token_id_to_token[int(next_token_id)]
 
         if len(req_obj.prefix_str) != 0:
@@ -115,6 +126,8 @@ class TokenHealingBackend(ChunkedPrefillBackend):
         for i, run_obj in enumerate(run_reqs):
             if not hasattr(run_obj, "prefix_str"):
                 run_obj: InferReq = run_obj
-                prefix_token_str = "".join([self.token_id_to_token[e] for e in run_obj.prefix_token_ids])
+                prefix_token_str = "".join(
+                    [self.token_id_to_token[e] for e in run_obj.prefix_token_ids]
+                )
                 run_obj.prefix_str = prefix_token_str
         return

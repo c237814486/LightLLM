@@ -35,26 +35,44 @@ def _fwd_kernel_apply_penalty(
     cur_batch_end_index = tl.load(p_cumsum_seq_len + cur_batch + 1)
     for block_start_index in range(cur_batch_start_index, cur_batch_end_index, BLOCK_P):
         cur_batch_id_offset = block_start_index + tl.arange(0, BLOCK_P)
-        token_ids = tl.load(p_token_ids + cur_batch_id_offset, mask=cur_batch_id_offset < cur_batch_end_index, other=0)
+        token_ids = tl.load(
+            p_token_ids + cur_batch_id_offset,
+            mask=cur_batch_id_offset < cur_batch_end_index,
+            other=0,
+        )
         token_ids_count = tl.load(
-            p_token_counts + cur_batch_id_offset, mask=cur_batch_id_offset < cur_batch_end_index, other=0
+            p_token_counts + cur_batch_id_offset,
+            mask=cur_batch_id_offset < cur_batch_end_index,
+            other=0,
         )
 
         row_start_ptr = Logits + cur_batch * stride_logit_b
         cur_offset = row_start_ptr + token_ids
         cur_logits = tl.load(
-            cur_offset, mask=(cur_batch_id_offset < cur_batch_end_index) & (token_ids < vocab_size), other=0.0
+            cur_offset,
+            mask=(cur_batch_id_offset < cur_batch_end_index) & (token_ids < vocab_size),
+            other=0.0,
         )
-        rep_logits = tl.where(cur_logits > 0, cur_logits / cur_repetition, cur_logits * cur_repetition)
+        rep_logits = tl.where(
+            cur_logits > 0, cur_logits / cur_repetition, cur_logits * cur_repetition
+        )
         freq_logits = rep_logits - token_ids_count * cur_freqency
         pre_logits = freq_logits - cur_presence
         output_ptr = Logits + cur_batch * stride_logit_b + token_ids
-        tl.store(output_ptr, pre_logits, mask=(cur_batch_id_offset < cur_batch_end_index) & (token_ids < vocab_size))
+        tl.store(
+            output_ptr,
+            pre_logits,
+            mask=(cur_batch_id_offset < cur_batch_end_index) & (token_ids < vocab_size),
+        )
 
     mask_eos = tl.load(b_mask_eos_reqs + cur_batch)
-    exponential_decay_length_penalty = tl.load(req_to_exponential_decay_length_penalty + cur_req_idx)
+    exponential_decay_length_penalty = tl.load(
+        req_to_exponential_decay_length_penalty + cur_req_idx
+    )
     length_penalty = tl.load(b_length_penalty_param + cur_batch)
-    penalty_scale = tl.exp2(tl.log2(exponential_decay_length_penalty) * length_penalty) - 1
+    penalty_scale = (
+        tl.exp2(tl.log2(exponential_decay_length_penalty) * length_penalty) - 1
+    )
 
     for eos_index in range(EOS_ID_NUM):
         eos_id = tl.load(eos_ids + eos_index)

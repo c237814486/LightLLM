@@ -67,18 +67,28 @@ def _fwd_kernel(
     alibi_m = tl.load(Alibi + cur_head)
 
     block_mask = tl.where(block_start_loc < cur_batch_seq_len, 1, 0)
-    block_end_loc = tl.minimum((start_m + 1) * BLOCK_M + ready_cache_len, cur_batch_seq_len + ready_cache_len)
+    block_end_loc = tl.minimum(
+        (start_m + 1) * BLOCK_M + ready_cache_len, cur_batch_seq_len + ready_cache_len
+    )
 
     for start_n in range(0, block_mask * block_end_loc, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         kv_loc = tl.load(
-            Req_to_tokens + stride_req_to_tokens_b * cur_batch_req_idx + stride_req_to_tokens_s * (start_n + offs_n),
+            Req_to_tokens
+            + stride_req_to_tokens_b * cur_batch_req_idx
+            + stride_req_to_tokens_s * (start_n + offs_n),
             mask=(start_n + offs_n) < block_end_loc,
             other=0,
         ).to(tl.int64)
-        off_k = kv_loc[None, :] * stride_kbs + cur_head * stride_kh + offs_d[:, None] * stride_kd
-        k = tl.load(K + off_k, mask=(start_n + offs_n[None, :]) < block_end_loc, other=0.0)
+        off_k = (
+            kv_loc[None, :] * stride_kbs
+            + cur_head * stride_kh
+            + offs_d[:, None] * stride_kd
+        )
+        k = tl.load(
+            K + off_k, mask=(start_n + offs_n[None, :]) < block_end_loc, other=0.0
+        )
 
         qk = tl.zeros([BLOCK_M, BLOCK_N], dtype=tl.float32)
         qk += tl.dot(q, k)
@@ -87,7 +97,11 @@ def _fwd_kernel(
         alibi_loc = ready_cache_len + offs_m[:, None] - (start_n + offs_n[None, :])
         qk -= alibi_loc * alibi_m
 
-        qk = tl.where((offs_m[:, None] + ready_cache_len) >= (start_n + offs_n[None, :]), qk, -10000000.0)
+        qk = tl.where(
+            (offs_m[:, None] + ready_cache_len) >= (start_n + offs_n[None, :]),
+            qk,
+            -10000000.0,
+        )
 
         m_ij = tl.max(qk, 1)
         p = tl.exp(qk - m_ij[:, None])
@@ -105,8 +119,14 @@ def _fwd_kernel(
         acc_scale = l_i / l_i_new * alpha
         acc = acc * acc_scale[:, None]
         # update acc
-        off_v = kv_loc[:, None] * stride_vbs + cur_head * stride_vh + offs_d[None, :] * stride_vd
-        v = tl.load(V + off_v, mask=(start_n + offs_n[:, None]) < block_end_loc, other=0.0)
+        off_v = (
+            kv_loc[:, None] * stride_vbs
+            + cur_head * stride_vh
+            + offs_d[None, :] * stride_vd
+        )
+        v = tl.load(
+            V + off_v, mask=(start_n + offs_n[:, None]) < block_end_loc, other=0.0
+        )
 
         p = p.to(v.dtype)
         acc += tl.dot(p, v)
@@ -126,7 +146,17 @@ def _fwd_kernel(
 
 @torch.no_grad()
 def context_attention_fwd(
-    q, k, v, o, b_req_idx, alibi, b_start_loc, b_seq_len, b_ready_cache_len, max_input_len, req_to_token_indexs
+    q,
+    k,
+    v,
+    o,
+    b_req_idx,
+    alibi,
+    b_start_loc,
+    b_seq_len,
+    b_ready_cache_len,
+    max_input_len,
+    req_to_token_indexs,
 ):
     BLOCK = 128
     # shape constraints
@@ -134,7 +164,7 @@ def context_attention_fwd(
     assert Lq == Lk and Lk == Lv
     assert Lk in {16, 32, 64, 128}
 
-    sm_scale = 1.0 / (Lq ** 0.5)
+    sm_scale = 1.0 / (Lq**0.5)
     batch, head = b_seq_len.shape[0], q.shape[1]
 
     grid = (batch, head, triton.cdiv(max_input_len, BLOCK))
@@ -180,7 +210,12 @@ def torch_att(xq, xk, xv, bs, seqlen, num_head, head_dim):
     xq = xq.view(bs, seqlen, num_head, head_dim)
     xk = xk.view(bs, seqlen, num_head, head_dim)
     xv = xv.view(bs, seqlen, num_head, head_dim)
-    mask = torch.tril(torch.ones(seqlen, seqlen), diagonal=0).unsqueeze(0).unsqueeze(0).cuda()
+    mask = (
+        torch.tril(torch.ones(seqlen, seqlen), diagonal=0)
+        .unsqueeze(0)
+        .unsqueeze(0)
+        .cuda()
+    )
     mask[mask == 0.0] = -100000000.0
     mask = mask.repeat(bs, num_head, 1, 1)
     keys = xk
@@ -191,7 +226,10 @@ def torch_att(xq, xk, xv, bs, seqlen, num_head, head_dim):
     scores = torch.matmul(xq, keys.transpose(2, 3)) / math.sqrt(head_dim)
     scores = F.softmax(scores.float() + mask, dim=-1).type_as(xq)
     output = (
-        torch.matmul(scores, values).transpose(1, 2).contiguous().reshape(-1, num_head, head_dim)
+        torch.matmul(scores, values)
+        .transpose(1, 2)
+        .contiguous()
+        .reshape(-1, num_head, head_dim)
     )  # (bs, n_local_heads, slen, head_dim)
     return output
 
@@ -202,10 +240,18 @@ def test():
     Z, H, N_CTX, D_HEAD = 4, 10, 1024, 128
     dtype = torch.float16
     Z = 3
-    q = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.1, std=0.2)
-    k = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.4, std=0.2)
-    v = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
-    o = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
+    q = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.1, std=0.2
+    )
+    k = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.4, std=0.2
+    )
+    v = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.3, std=0.2
+    )
+    o = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
+        mean=0.3, std=0.2
+    )
     alibi = torch.zeros((H,), dtype=torch.float32, device="cuda")
 
     max_input_len = N_CTX
@@ -225,7 +271,9 @@ def test():
     start = 0
     for i in range(Z):
         end = start + b_seq_len[i]
-        torch_o = torch_att(q[start:end], k[start:end], v[start:end], 1, b_seq_len[i], H, D_HEAD)
+        torch_o = torch_att(
+            q[start:end], k[start:end], v[start:end], 1, b_seq_len[i], H, D_HEAD
+        )
         start = end
         torch_out.append(torch_o)
     torch_out = torch.cat(torch_out, dim=0)

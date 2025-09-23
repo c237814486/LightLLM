@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from lightllm.utils.log_utils import init_logger
 from ..task_queue import TaskQueue
 import torch.multiprocessing as mp
-from lightllm.server.pd_io_struct import KVMoveTask, UpKVStatus, PDTransJoinInfo, PDTransLeaveInfo, KVMoveTaskGroup
+from lightllm.server.pd_io_struct import (
+    KVMoveTask,
+    UpKVStatus,
+    PDTransJoinInfo,
+    PDTransLeaveInfo,
+    KVMoveTaskGroup,
+)
 from lightllm.utils.device_utils import kv_trans_use_p2p
 from .decode_kv_move_manager import DecodeKVMoveManager
 from lightllm.utils.time_utils import TimeChecker
@@ -68,12 +74,20 @@ class KVTransConnectObj:
             )
             assert self.kv_trans_process.task_out_queue.get(timeout=60) == "nccl_ok"
 
-        self.ready_to_move_queue = TaskQueue(get_func=lambda datas: datas[0:1], fail_func=self.manager.put_to_fail_release_task_queue)
+        self.ready_to_move_queue = TaskQueue(
+            get_func=lambda datas: datas[0:1],
+            fail_func=self.manager.put_to_fail_release_task_queue,
+        )
         self.kv_move_thread = threading.Thread(target=self.kv_move_loop, daemon=True)
         self.kv_move_thread.start()
 
-        self.move_finished_queue = TaskQueue(get_func=lambda datas: datas[0:KV_MOVE_MAX_NUM], fail_func=self.manager.put_to_fail_release_task_queue)
-        self.put_to_radix_thread = threading.Thread(target=self.put_to_radix_loop, daemon=True)
+        self.move_finished_queue = TaskQueue(
+            get_func=lambda datas: datas[0:KV_MOVE_MAX_NUM],
+            fail_func=self.manager.put_to_fail_release_task_queue,
+        )
+        self.put_to_radix_thread = threading.Thread(
+            target=self.put_to_radix_loop, daemon=True
+        )
         self.put_to_radix_thread.start()
         return
 
@@ -84,7 +98,9 @@ class KVTransConnectObj:
     def _transfer_kv(self, move_tasks: List[KVMoveTask]):
         with self.kv_trans_process.device_lock:
             clear_queue(self.kv_trans_process.task_out_queue)
-            kv_move_group = KVMoveTaskGroup(tasks=move_tasks.copy(), connect_id=self.connect_id)
+            kv_move_group = KVMoveTaskGroup(
+                tasks=move_tasks.copy(), connect_id=self.connect_id
+            )
             kv_move_group.connect_id = self.connect_id
             self.kv_trans_process.task_in_queue.put(kv_move_group, timeout=10)
             assert self.kv_trans_process.task_out_queue.get(timeout=60) == "ok"
@@ -100,7 +116,9 @@ class KVTransConnectObj:
     def kv_move_loop(self):
         func_name = self.kv_move_loop.__name__
         while not self.has_error:
-            move_tasks: List[List[KVMoveTask]] = self.ready_to_move_queue.get_tasks(log_tag="ready_to_move_queue")
+            move_tasks: List[List[KVMoveTask]] = self.ready_to_move_queue.get_tasks(
+                log_tag="ready_to_move_queue"
+            )
             if len(move_tasks) == 0:
                 time.sleep(0.01)
                 continue
@@ -139,20 +157,26 @@ class KVTransConnectObj:
     def put_to_radix_loop(self):
         func_name = self.put_to_radix_loop.__name__
         while not self.has_error:
-            move_tasks: List[KVMoveTask] = self.move_finished_queue.get_tasks(log_tag="move_finished_queue")
+            move_tasks: List[KVMoveTask] = self.move_finished_queue.get_tasks(
+                log_tag="move_finished_queue"
+            )
             if len(move_tasks) == 0:
                 time.sleep(0.01)
                 continue
 
             for task in move_tasks:
-                logger.info(f"{func_name} get put radix task {task.to_decode_log_info()}")
+                logger.info(
+                    f"{func_name} get put radix task {task.to_decode_log_info()}"
+                )
 
             try:
                 self.timer_to_check_status(raise_exception=True)
                 # random to check stats
                 self.manager._put_kv_received_to_radix_cache(move_tasks.copy())
                 for task in move_tasks.copy():
-                    logger.info(f"{func_name} put kv to radix cache ok, req_id: {task.id()} cost_time {task.get_cost_time()} s")
+                    logger.info(
+                        f"{func_name} put kv to radix cache ok, req_id: {task.id()} cost_time {task.get_cost_time()} s"
+                    )
                     self.manager.up_status_in_queue.put(
                         UpKVStatus(
                             group_request_id=task.group_request_id,
@@ -160,7 +184,9 @@ class KVTransConnectObj:
                             pd_master_node_id=task.decode_node.pd_master_node_id,
                         )
                     )
-                    logger.info(f"{func_name} up kv status req_id: {task.id()} finished")
+                    logger.info(
+                        f"{func_name} up kv status req_id: {task.id()} finished"
+                    )
                 move_tasks.clear()
 
             except BaseException as e:
@@ -226,7 +252,13 @@ class KVTransConnectObj:
             join_if_alive(self.put_to_radix_thread)
 
             if self.connect_id is not None and self.kv_trans_process is not None:
-                self.kv_trans_process.task_in_queue.put(PDTransLeaveInfo(decode_id=self.decode_node_id, prefill_id=self.prefill_node_id, connect_id=self.connect_id))
+                self.kv_trans_process.task_in_queue.put(
+                    PDTransLeaveInfo(
+                        decode_id=self.decode_node_id,
+                        prefill_id=self.prefill_node_id,
+                        connect_id=self.connect_id,
+                    )
+                )
 
             if self.ready_to_move_queue is not None:
                 self.ready_to_move_queue.clear_tasks()

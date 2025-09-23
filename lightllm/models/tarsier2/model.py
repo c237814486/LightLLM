@@ -7,7 +7,9 @@ from lightllm.models.llama.model import LlamaTpPartModel
 from lightllm.models.qwen2.model import Qwen2TpPartModel
 from lightllm.models.qwen2_vl.model import Qwen2VLTpPartModel
 from lightllm.models.qwen2_vl.vision_process import smart_resize
-from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import LlamaMultimodalPreLayerInfer
+from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import (
+    LlamaMultimodalPreLayerInfer,
+)
 from lightllm.models.tarsier2.layer_weights.pre_and_post_layer_weight import (
     Tarsier2Qwen2PreAndPostLayerWeight,
     Tarsier2LlamaPreAndPostLayerWeight,
@@ -20,17 +22,25 @@ class Tarsier2Tokenizer(BaseMultiModalTokenizer):
     def __init__(self, tokenizer=None, image_processor=None, **kwargs):
         super().__init__(tokenizer)
         self.image_processor = image_processor
-        self.image_start_id = kwargs["model_cfg"]["text_config"]["vision_start_token_id"]
+        self.image_start_id = kwargs["model_cfg"]["text_config"][
+            "vision_start_token_id"
+        ]
         self.image_end_id = kwargs["model_cfg"]["text_config"]["vision_end_token_id"]
         self.image_token_id = kwargs["model_cfg"]["text_config"]["image_token_id"]
 
     def init_imageitem_extral_params(
-        self, img: ImageItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        img: ImageItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         return
 
     def init_audioitem_extral_params(
-        self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        audio: AudioItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         raise NotImplementedError
 
@@ -41,8 +51,11 @@ class Tarsier2Tokenizer(BaseMultiModalTokenizer):
         self.patch_size = self.image_processor.patch_size
         self.merge_size = self.image_processor.merge_size
         grid_t = 1
-        grid_h, grid_w = resized_height // self.patch_size, resized_width // self.patch_size
-        merge_length = self.merge_size ** 2
+        grid_h, grid_w = (
+            resized_height // self.patch_size,
+            resized_width // self.patch_size,
+        )
+        merge_length = self.merge_size**2
         self.token_num = (grid_t * grid_h * grid_w) // merge_length
         self.image_length = self.token_num
         return self.image_length

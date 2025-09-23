@@ -3,7 +3,10 @@ import torch
 import time
 import torch.multiprocessing as mp
 import itertools
-from lightllm.common.fused_moe.moe_silu_and_mul import MoeSiluAndMulKernelConfig, silu_and_mul_fwd
+from lightllm.common.fused_moe.moe_silu_and_mul import (
+    MoeSiluAndMulKernelConfig,
+    silu_and_mul_fwd,
+)
 from lightllm.utils.watchdog_utils import Watchdog
 from typing import List
 from lightllm.utils.log_utils import init_logger
@@ -100,7 +103,9 @@ def worker(
 
 def get_test_configs(split_id, split_count):
     index = 0
-    result = itertools.product([1, 2, 4, 8, 16, 32], [64, 128, 256, 512, 1024], [1, 2, 4, 8, 16])
+    result = itertools.product(
+        [1, 2, 4, 8, 16, 32], [64, 128, 256, 512, 1024], [1, 2, 4, 8, 16]
+    )
     for BLOCK_M, BLOCK_N, num_warps in result:
         t_config = {
             "BLOCK_M": BLOCK_M,

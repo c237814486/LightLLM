@@ -1,7 +1,10 @@
 import pytest
 import time
 from multiprocessing import Process
-from lightllm.server.core.objs.atomic_array_lock import AtomicShmArrayLock, AtomicLockItem
+from lightllm.server.core.objs.atomic_array_lock import (
+    AtomicShmArrayLock,
+    AtomicLockItem,
+)
 
 
 @pytest.fixture

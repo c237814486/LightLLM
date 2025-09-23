@@ -12,12 +12,16 @@ from lightllm.models.qwen2.model import Qwen2TpPartModel
 from lightllm.models.qwen3.model import Qwen3TpPartModel
 from lightllm.models.qwen3_moe.model import Qwen3MOEModel
 from lightllm.models.deepseek2.model import Deepseek2TpPartModel
-from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import LlamaMultimodalPreLayerInfer
+from lightllm.models.qwen_vl.layer_infer.pre_layer_infer import (
+    LlamaMultimodalPreLayerInfer,
+)
 from lightllm.models.internvl.layer_weights.pre_and_post_layer_weight import (
     InternVLLlamaPreAndPostLayerWeight,
     InternVLPhi3PreAndPostLayerWeight,
 )
-from lightllm.models.internvl.layer_weights.pre_and_post_layer_weight import InternVLInternlm2PreAndPostLayerWeight
+from lightllm.models.internvl.layer_weights.pre_and_post_layer_weight import (
+    InternVLInternlm2PreAndPostLayerWeight,
+)
 from lightllm.models.vit import get_image_patch_func
 
 IMG_START_TOKEN = "<img>"
@@ -48,10 +52,15 @@ class InternvlTokenizer(BaseMultiModalTokenizer):
         self.get_image_patch_func = get_image_patch_func(kwargs["weight_dir"])
 
     def init_imageitem_extral_params(
-        self, img: ImageItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        img: ImageItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         if sampling_params.image_max_patch_num > 0:
-            img.extra_params["image_patch_max_num"] = sampling_params.image_max_patch_num
+            img.extra_params["image_patch_max_num"] = (
+                sampling_params.image_max_patch_num
+            )
             return
         elif os.getenv("MAX_PATCH_NUM"):
             img.extra_params["image_patch_max_num"] = int(os.getenv("MAX_PATCH_NUM"))
@@ -67,14 +76,20 @@ class InternvlTokenizer(BaseMultiModalTokenizer):
         return
 
     def init_audioitem_extral_params(
-        self, audio: AudioItem, multi_params: MultimodalParams, sampling_params: SamplingParams
+        self,
+        audio: AudioItem,
+        multi_params: MultimodalParams,
+        sampling_params: SamplingParams,
     ):
         return
 
     def get_image_token_length(self, img: ImageItem):
         return (
             self.get_image_patch_func(
-                img.image_w, img.image_h, max_num=img.extra_params["image_patch_max_num"], use_thumbnail=True
+                img.image_w,
+                img.image_h,
+                max_num=img.extra_params["image_patch_max_num"],
+                use_thumbnail=True,
             )
             * self.image_length
         )
@@ -85,7 +100,7 @@ class InternvlTokenizer(BaseMultiModalTokenizer):
         mel_len = L // 160
         dilation = 1
         L_in = mel_len
-        for (padding, kernel_size, stride) in eval("[(1,3,1)] + [(1,3,2)] "):
+        for padding, kernel_size, stride in eval("[(1,3,1)] + [(1,3,2)] "):
             L_out = L_in + 2 * padding - dilation * (kernel_size - 1) - 1
             L_out = 1 + L_out // stride
             L_in = L_out
@@ -103,7 +118,9 @@ class InternvlTokenizer(BaseMultiModalTokenizer):
         image_count = len(multimodal_params.images)
         prompt = prompt.replace(IMG_TOKEN, image_tokens, image_count)
 
-        origin_ids = self.tokenizer.encode(prompt, add_special_tokens=kwargs["add_special_tokens"])
+        origin_ids = self.tokenizer.encode(
+            prompt, add_special_tokens=kwargs["add_special_tokens"]
+        )
         # <img></img> --> <img>id,id+1...id+num</img>
         input_ids = []
         image_id = 0
@@ -155,7 +172,9 @@ class InternvlTokenizer(BaseMultiModalTokenizer):
         return input_ids
 
 
-@ModelRegistry(["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("phi3"))
+@ModelRegistry(
+    ["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("phi3")
+)
 class InternVLPhi3TpPartModel(Phi3TpPartModel):
     # weight class
     pre_and_post_weight_class = InternVLPhi3PreAndPostLayerWeight
@@ -179,7 +198,9 @@ class InternVLPhi3TpPartModel(Phi3TpPartModel):
         return
 
 
-@ModelRegistry(["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("internlm2"))
+@ModelRegistry(
+    ["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("internlm2")
+)
 class InternVLInternlm2TpPartModel(Internlm2TpPartModel):
     # weight class
     pre_and_post_weight_class = InternVLInternlm2PreAndPostLayerWeight
@@ -203,7 +224,9 @@ class InternVLInternlm2TpPartModel(Internlm2TpPartModel):
         return
 
 
-@ModelRegistry(["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("llama"))
+@ModelRegistry(
+    ["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("llama")
+)
 class InternVLLlamaTpPartModel(LlamaTpPartModel):
     # weight class
     pre_and_post_weight_class = InternVLLlamaPreAndPostLayerWeight
@@ -227,7 +250,9 @@ class InternVLLlamaTpPartModel(LlamaTpPartModel):
         return
 
 
-@ModelRegistry(["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("qwen2"))
+@ModelRegistry(
+    ["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("qwen2")
+)
 class InternVLQwen2TpPartModel(Qwen2TpPartModel):
     # weight class
     pre_and_post_weight_class = InternVLLlamaPreAndPostLayerWeight
@@ -251,7 +276,11 @@ class InternVLQwen2TpPartModel(Qwen2TpPartModel):
         return
 
 
-@ModelRegistry(["internvl_chat"], is_multimodal=True, condition=llm_model_type_is(["deepseek_v2", "deepseek_v3"]))
+@ModelRegistry(
+    ["internvl_chat"],
+    is_multimodal=True,
+    condition=llm_model_type_is(["deepseek_v2", "deepseek_v3"]),
+)
 class InternVLDeepSeek2TpPartModel(Deepseek2TpPartModel):
     # support Deepseek2,3,R1
     # weight class
@@ -276,7 +305,9 @@ class InternVLDeepSeek2TpPartModel(Deepseek2TpPartModel):
         return
 
 
-@ModelRegistry(["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("qwen3"))
+@ModelRegistry(
+    ["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("qwen3")
+)
 class InternVLQwen3TpPartModel(Qwen3TpPartModel):
     # weight class
     pre_and_post_weight_class = InternVLLlamaPreAndPostLayerWeight
@@ -300,7 +331,9 @@ class InternVLQwen3TpPartModel(Qwen3TpPartModel):
         return
 
 
-@ModelRegistry(["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("qwen3_moe"))
+@ModelRegistry(
+    ["internvl_chat"], is_multimodal=True, condition=llm_model_type_is("qwen3_moe")
+)
 class InternVLQwen3MOETpPartModel(Qwen3MOEModel):
     # weight class
     pre_and_post_weight_class = InternVLLlamaPreAndPostLayerWeight

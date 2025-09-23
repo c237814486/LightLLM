@@ -61,27 +61,49 @@ class Monitor:
     def init_metrics(self, args):
 
         self.create_histogram("lightllm_request_duration", self.duration_buckets)
-        self.create_histogram("lightllm_request_validation_duration", self.duration_buckets)
+        self.create_histogram(
+            "lightllm_request_validation_duration", self.duration_buckets
+        )
         self.create_counter("lightllm_request_count")
         self.create_counter("lightllm_request_success")
         self.create_counter("lightllm_request_failure")
         self.create_counter("lightllm_batch_inference_count", labelnames=["method"])
 
         max_req_input_len = args.max_req_total_len
-        input_len_buckets = [max_req_input_len / 100.0 * (i + 1) for i in range(-1, 100)]
+        input_len_buckets = [
+            max_req_input_len / 100.0 * (i + 1) for i in range(-1, 100)
+        ]
         self.create_histogram("lightllm_request_input_length", input_len_buckets)
         self.create_histogram("lightllm_cache_length", input_len_buckets)
 
         max_req_total_len = args.max_req_total_len
-        generate_tokens_buckets = [max_req_total_len / 100.0 * (i + 1) for i in range(-1, 100)]
-        self.create_histogram("lightllm_request_max_new_tokens", generate_tokens_buckets)
-        self.create_histogram("lightllm_request_generated_tokens", generate_tokens_buckets)
+        generate_tokens_buckets = [
+            max_req_total_len / 100.0 * (i + 1) for i in range(-1, 100)
+        ]
+        self.create_histogram(
+            "lightllm_request_max_new_tokens", generate_tokens_buckets
+        )
+        self.create_histogram(
+            "lightllm_request_generated_tokens", generate_tokens_buckets
+        )
 
-        self.create_histogram("lightllm_request_inference_duration", self.duration_buckets)
-        self.create_histogram("lightllm_request_mean_time_per_token_duration", self.duration_buckets)
-        self.create_histogram("lightllm_request_first_token_duration", self.duration_buckets)
-        self.create_histogram("lightllm_request_queue_duration_bucket", self.duration_buckets)
-        self.create_histogram("lightllm_batch_inference_duration_bucket", self.duration_buckets, labelnames=["method"])
+        self.create_histogram(
+            "lightllm_request_inference_duration", self.duration_buckets
+        )
+        self.create_histogram(
+            "lightllm_request_mean_time_per_token_duration", self.duration_buckets
+        )
+        self.create_histogram(
+            "lightllm_request_first_token_duration", self.duration_buckets
+        )
+        self.create_histogram(
+            "lightllm_request_queue_duration_bucket", self.duration_buckets
+        )
+        self.create_histogram(
+            "lightllm_batch_inference_duration_bucket",
+            self.duration_buckets,
+            labelnames=["method"],
+        )
         self.gateway_url = args.metric_gateway
 
         self.create_gauge("lightllm_queue_size")
@@ -96,10 +118,16 @@ class Monitor:
 
     def create_histogram(self, name, buckets, labelnames=None):
         if labelnames is None:
-            histogram = Histogram(name, MONITOR_INFO[name], buckets=buckets, registry=self.registry)
+            histogram = Histogram(
+                name, MONITOR_INFO[name], buckets=buckets, registry=self.registry
+            )
         else:
             histogram = Histogram(
-                name, MONITOR_INFO[name], labelnames=labelnames, buckets=buckets, registry=self.registry
+                name,
+                MONITOR_INFO[name],
+                labelnames=labelnames,
+                buckets=buckets,
+                registry=self.registry,
             )
         self.monitor_registry[name] = histogram
 
@@ -107,7 +135,9 @@ class Monitor:
         if labelnames is None:
             histogram = Counter(name, MONITOR_INFO[name], registry=self.registry)
         else:
-            histogram = Counter(name, MONITOR_INFO[name], labelnames=labelnames, registry=self.registry)
+            histogram = Counter(
+                name, MONITOR_INFO[name], labelnames=labelnames, registry=self.registry
+            )
         self.monitor_registry[name] = histogram
 
     def create_gauge(self, name):
@@ -141,5 +171,8 @@ class Monitor:
                 )
             else:
                 push_to_gateway(
-                    self.gateway_url, job=self.job_name, grouping_key=self.grouping_key, registry=self.registry
+                    self.gateway_url,
+                    job=self.job_name,
+                    grouping_key=self.grouping_key,
+                    registry=self.registry,
                 )

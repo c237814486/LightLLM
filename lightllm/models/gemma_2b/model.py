@@ -1,8 +1,14 @@
 from lightllm.models.registry import ModelRegistry
-from lightllm.models.gemma_2b.layer_weights.transformer_layer_weight import Gemma_2bTransformerLayerWeight
-from lightllm.models.gemma_2b.layer_weights.pre_and_post_layer_weight import Gemma_2bPreAndPostLayerWeight
+from lightllm.models.gemma_2b.layer_weights.transformer_layer_weight import (
+    Gemma_2bTransformerLayerWeight,
+)
+from lightllm.models.gemma_2b.layer_weights.pre_and_post_layer_weight import (
+    Gemma_2bPreAndPostLayerWeight,
+)
 from lightllm.models.gemma_2b.layer_infer.pre_layer_infer import Gemma_2bPreLayerInfer
-from lightllm.models.gemma_2b.layer_infer.transformer_layer_infer import Gemma_2bTransformerLayerInfer
+from lightllm.models.gemma_2b.layer_infer.transformer_layer_infer import (
+    Gemma_2bTransformerLayerInfer,
+)
 from lightllm.models.llama.layer_infer.post_layer_infer import LlamaPostLayerInfer
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 from lightllm.models.llama.model import LlamaTpPartModel

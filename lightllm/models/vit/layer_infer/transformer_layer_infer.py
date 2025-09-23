@@ -2,7 +2,9 @@ import torch
 import torch.distributed as dist
 
 
-from lightllm.models.vit.layer_weights.transformer_layer_weight import ViTTransformerLayerWeight
+from lightllm.models.vit.layer_weights.transformer_layer_weight import (
+    ViTTransformerLayerWeight,
+)
 from lightllm.models.vit.triton_kernel.flashattention_nopad import flash_attention_fwd
 from lightllm.utils.dist_utils import get_current_rank_in_dp, get_dp_world_size
 from lightllm.models.vit.triton_kernel.gelu_vit import gelu_fwd
@@ -18,8 +20,12 @@ class ViTTransformerLayerInfer:
         self.tp_world_size_ = get_dp_world_size()
         self.eps_ = network_config["layer_norm_eps"]
         self.head_num = network_config["num_attention_heads"]
-        self.tp_padding_head_num = network_config["padding_head_num"] // self.tp_world_size_
-        self.head_dim_ = network_config["hidden_size"] // network_config["num_attention_heads"]
+        self.tp_padding_head_num = (
+            network_config["padding_head_num"] // self.tp_world_size_
+        )
+        self.head_dim_ = (
+            network_config["hidden_size"] // network_config["num_attention_heads"]
+        )
         self.embed_dim_ = network_config["hidden_size"]
         self.qk_norm = network_config["qk_normalization"]
         self.tp_padding_embed_dim_ = self.tp_padding_head_num * self.head_dim_
@@ -57,7 +63,10 @@ class ViTTransformerLayerInfer:
     def _att_norm(self, input, layer_weight: ViTTransformerLayerWeight) -> torch.Tensor:
         if layer_weight.norm_type == "rms_norm":
             b = rms_norm(
-                input, weight=layer_weight.att_norm_weight_.weight, eps=self.eps_, use_custom_tensor_mananger=True
+                input,
+                weight=layer_weight.att_norm_weight_.weight,
+                eps=self.eps_,
+                use_custom_tensor_mananger=True,
             )
         else:
             b = torch.nn.functional.layer_norm(
@@ -72,7 +81,10 @@ class ViTTransformerLayerInfer:
     def _ffn_norm(self, input, layer_weight: ViTTransformerLayerWeight) -> torch.Tensor:
         if layer_weight.norm_type == "rms_norm":
             return rms_norm(
-                input, weight=layer_weight.ffn_norm_weight_.weight, eps=self.eps_, use_custom_tensor_mananger=True
+                input,
+                weight=layer_weight.ffn_norm_weight_.weight,
+                eps=self.eps_,
+                use_custom_tensor_mananger=True,
             )
         else:
             return torch.nn.functional.layer_norm(
@@ -91,7 +103,9 @@ class ViTTransformerLayerInfer:
     def _get_qkv(self, input, layer_weight: ViTTransformerLayerWeight) -> torch.Tensor:
         batch_size = input.shape[0]
         seq_len = input.shape[1]
-        qkv = layer_weight.qkv_proj.mm(input.view(-1, self.embed_dim_), use_custom_tensor_mananger=True)
+        qkv = layer_weight.qkv_proj.mm(
+            input.view(-1, self.embed_dim_), use_custom_tensor_mananger=True
+        )
         qkv = qkv.view(batch_size, seq_len, 3, -1, self.head_dim_)
         q, k, v = qkv.unbind(2)
         return q, k, v
@@ -102,7 +116,9 @@ class ViTTransformerLayerInfer:
         total_len = batch_size * seq_len
         reshape = lambda t: t.view(total_len, head_num, head_dim)
         q, k, v, out = map(reshape, (q, k, v, out))
-        cu_seqlens = torch.arange(batch_size + 1, dtype=torch.int32, device=q.device) * seq_len
+        cu_seqlens = (
+            torch.arange(batch_size + 1, dtype=torch.int32, device=q.device) * seq_len
+        )
         max_seqlen = seq_len
         flash_attention_fwd(q, k, v, out, cu_seqlens, max_seqlen)
         return out.reshape(batch_size, seq_len, -1)
@@ -111,18 +127,23 @@ class ViTTransformerLayerInfer:
         batch_size = input.shape[0]
         seq_len = input.shape[1]
         o_tensor = layer_weight.o_proj.mm(
-            input.view(-1, self.tp_padding_head_num * self.head_dim_), use_custom_tensor_mananger=True
+            input.view(-1, self.tp_padding_head_num * self.head_dim_),
+            use_custom_tensor_mananger=True,
         )
         if layer_weight.use_ls:
             o_tensor.mul_(layer_weight.ls1)
         return o_tensor.reshape((batch_size, seq_len, -1))
 
     def _ffn(self, input, layer_weight: ViTTransformerLayerWeight) -> torch.Tensor:
-        fc1 = layer_weight.ffn_1_proj_.mm(input.view(-1, self.embed_dim_), use_custom_tensor_mananger=True)
+        fc1 = layer_weight.ffn_1_proj_.mm(
+            input.view(-1, self.embed_dim_), use_custom_tensor_mananger=True
+        )
         input_shape = input.shape
         input = None
         ffn1_out = gelu_fwd(fc1, use_custom_tensor_mananger=True)
-        ffn2_out = layer_weight.ffn_2_proj_.mm(ffn1_out, use_custom_tensor_mananger=True)
+        ffn2_out = layer_weight.ffn_2_proj_.mm(
+            ffn1_out, use_custom_tensor_mananger=True
+        )
         ffn1_out = None
         if layer_weight.use_ls:
             ffn2_out.mul_(layer_weight.ls2)

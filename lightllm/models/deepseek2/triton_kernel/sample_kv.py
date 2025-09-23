@@ -46,17 +46,29 @@ def _sample_kv_kernel(
         other=0,
     ).to(tl.int64)
     off_kv_nope = kv_loc[:, None] * stride_input_dim + offs_nope_d[None, :]
-    off_kv_rope = kv_loc[:, None] * stride_input_dim + (offs_rope_d + BLOCK_DMODEL)[None, :]
-    kv_nope = tl.load(KV_input + off_kv_nope, mask=offs_m[:, None] < block_end_loc, other=0.0)
-    kv_rope = tl.load(KV_input + off_kv_rope, mask=offs_m[:, None] < block_end_loc, other=0.0)
-    off_nope = (offs_m + cur_batch_start_loc)[:, None] * stride_nope_dim + offs_nope_d[None, :]
-    off_rope = (offs_m + cur_batch_start_loc)[:, None] * stride_rope_dim + offs_rope_d[None, :]
+    off_kv_rope = (
+        kv_loc[:, None] * stride_input_dim + (offs_rope_d + BLOCK_DMODEL)[None, :]
+    )
+    kv_nope = tl.load(
+        KV_input + off_kv_nope, mask=offs_m[:, None] < block_end_loc, other=0.0
+    )
+    kv_rope = tl.load(
+        KV_input + off_kv_rope, mask=offs_m[:, None] < block_end_loc, other=0.0
+    )
+    off_nope = (offs_m + cur_batch_start_loc)[:, None] * stride_nope_dim + offs_nope_d[
+        None, :
+    ]
+    off_rope = (offs_m + cur_batch_start_loc)[:, None] * stride_rope_dim + offs_rope_d[
+        None, :
+    ]
     nope_ptrs = KV_nope + off_nope
     rope_ptrs = KV_rope + off_rope
     tl.store(nope_ptrs, kv_nope, mask=offs_m[:, None] < block_end_loc)
     tl.store(rope_ptrs, kv_rope, mask=offs_m[:, None] < block_end_loc)
     if HAS_SCALE:
-        kv_scale = tl.load(KV_scale + kv_loc * stride_scale_dim, mask=offs_m < block_end_loc)
+        kv_scale = tl.load(
+            KV_scale + kv_loc * stride_scale_dim, mask=offs_m < block_end_loc
+        )
         off_k_scale = cur_batch_start_loc + offs_m
         k_scale_ptrs = K_scale + off_k_scale
         tl.store(k_scale_ptrs, kv_scale, mask=offs_m < block_end_loc)

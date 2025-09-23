@@ -3,9 +3,15 @@ import torch
 import torch.multiprocessing as mp
 import torch.distributed as dist
 import threading
-from lightllm.server.router.model_infer.mode_backend.chunked_prefill.impl import ChunkedPrefillBackend
+from lightllm.server.router.model_infer.mode_backend.chunked_prefill.impl import (
+    ChunkedPrefillBackend,
+)
 from typing import List, Tuple
-from lightllm.server.router.model_infer.infer_batch import g_infer_context, InferReq, g_infer_state_lock
+from lightllm.server.router.model_infer.infer_batch import (
+    g_infer_context,
+    InferReq,
+    g_infer_state_lock,
+)
 from lightllm.server.core.objs import FinishStatus
 from lightllm.utils.log_utils import init_logger
 from rpyc.utils.server import ThreadedServer
@@ -37,7 +43,9 @@ class DecodeNode(ChunkedPrefillBackend):
             os.remove(socket_path)
 
         t = ThreadedServer(
-            PDDecodeInferRpcServer(self), socket_path=socket_path, protocol_config={"allow_pickle": True}
+            PDDecodeInferRpcServer(self),
+            socket_path=socket_path,
+            protocol_config={"allow_pickle": True},
         )
         threading.Thread(target=lambda: t.start(), daemon=True).start()
 
@@ -100,10 +108,16 @@ class DecodeNode(ChunkedPrefillBackend):
                     req_obj.shm_req.candetoken_out_len = req_obj.cur_output_len
 
                     req_id = req_obj.shm_req.request_id
-                    logger.error(f"req_id: {req_id} forced to finished, it not in g_success_kv_move_task_cache")
+                    logger.error(
+                        f"req_id: {req_id} forced to finished, it not in g_success_kv_move_task_cache"
+                    )
 
         if self.is_master_in_dp:
             with g_router_lock.obj:
-                self.shared_token_load.add_frozened_token_count(-remove_count, self.dp_rank_in_node)
-                self.shared_token_load.add_estimated_peak_token_count(estimated_peak_token_count, self.dp_rank_in_node)
+                self.shared_token_load.add_frozened_token_count(
+                    -remove_count, self.dp_rank_in_node
+                )
+                self.shared_token_load.add_estimated_peak_token_count(
+                    estimated_peak_token_count, self.dp_rank_in_node
+                )
         return

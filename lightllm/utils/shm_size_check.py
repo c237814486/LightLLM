@@ -30,7 +30,9 @@ def _check_shm_size(args):
     shm_size = _get_system_shm_size_gb()
     required_size = _get_recommended_shm_size_gb(args)
     if shm_size < required_size:
-        logger.warning(f"{RED}Available shm size {shm_size:.2f}G is less than required_size {required_size:.2f}G{ENDC}")
+        logger.warning(
+            f"{RED}Available shm size {shm_size:.2f}G is less than required_size {required_size:.2f}G{ENDC}"
+        )
         return shm_size, required_size, False
     else:  # shm_size >= required_size
         return shm_size, required_size, True
@@ -67,12 +69,14 @@ def _get_system_shm_size_gb():
     try:
         shm_path = "/dev/shm"
         if not os.path.exists(shm_path):
-            logger.error(f"{shm_path} not exist, this may indicate a system or Docker configuration anomaly.")
+            logger.error(
+                f"{shm_path} not exist, this may indicate a system or Docker configuration anomaly."
+            )
             return 0
 
         # shutil.disk_usage 返回 (total, used, free)
         total_bytes = shutil.disk_usage(shm_path).total
-        total_gb = total_bytes / (1024 ** 3)
+        total_gb = total_bytes / (1024**3)
         return total_gb
     except Exception as e:
         logger.error(f"Error getting /dev/shm size: {e}")
@@ -86,7 +90,9 @@ def _get_recommended_shm_size_gb(args, max_image_resolution=(1288, 728), dtype_s
     tokenizer = get_tokenizer(args.model_dir, trust_remote_code=True)
 
     # 估算input_token和logprob占用shm大小，由于是double和int64，所以固定占用8个字节
-    input_token_logprob_size_bytes = args.running_max_req_size * 8 * 2 * args.max_req_total_len
+    input_token_logprob_size_bytes = (
+        args.running_max_req_size * 8 * 2 * args.max_req_total_len
+    )
 
     # 估算Req所需的shm大小
     if args.token_healing_mode:
@@ -96,7 +102,9 @@ def _get_recommended_shm_size_gb(args, max_image_resolution=(1288, 728), dtype_s
     req_shm_size_bytes = req_class_size * args.running_max_req_size
 
     if not args.enable_multimodal:
-        total_recommended_shm_size_gb = (req_shm_size_bytes + input_token_logprob_size_bytes) / (1024 ** 3) + 2
+        total_recommended_shm_size_gb = (
+            req_shm_size_bytes + input_token_logprob_size_bytes
+        ) / (1024**3) + 2
     else:
         # 存储图片数据所需的shm大小
         num_channels = 3
@@ -105,7 +113,9 @@ def _get_recommended_shm_size_gb(args, max_image_resolution=(1288, 728), dtype_s
 
         # 假设加载最大分辨率图片时，通过 tokenizer 得到最多的 image_tokens
         if not hasattr(tokenizer, "get_image_token_length"):
-            logger.error("Tokenizer must have a 'get_image_token_length' method for multimodal models.")
+            logger.error(
+                "Tokenizer must have a 'get_image_token_length' method for multimodal models."
+            )
             return float("inf")
 
         fake_image_item = ImageItem(
@@ -120,7 +130,8 @@ def _get_recommended_shm_size_gb(args, max_image_resolution=(1288, 728), dtype_s
         hidden_size = get_hidden_size(args.model_dir)
         if hidden_size is None:
             logger.warning(
-                "Model config not contain 'hidden_size', " "using 4096 by default to calculate recommended shm size."
+                "Model config not contain 'hidden_size', "
+                "using 4096 by default to calculate recommended shm size."
             )
             image_token_size_bytes = max_image_tokens * 4096 * dtype_size
         else:
@@ -132,6 +143,6 @@ def _get_recommended_shm_size_gb(args, max_image_resolution=(1288, 728), dtype_s
             + input_token_logprob_size_bytes
         )
 
-        total_recommended_shm_size_gb = total_recommended_shm_size_gb / (1024 ** 3) + 2
+        total_recommended_shm_size_gb = total_recommended_shm_size_gb / (1024**3) + 2
 
     return total_recommended_shm_size_gb

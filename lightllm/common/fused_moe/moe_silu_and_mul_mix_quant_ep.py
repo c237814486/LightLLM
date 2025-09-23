@@ -43,18 +43,32 @@ def _silu_and_mul_post_quant_kernel(
     input_ptr_offs = input_ptr + expert_id * stride_input_0 + offs_in_d
     output_ptr_offs = output_ptr + expert_id * stride_output_0 + offs_in_d
     output_scale_offs = (
-        output_scale_ptr + expert_id * stride_output_scale_0 + hidden_dim_block_index * stride_output_scale_2
+        output_scale_ptr
+        + expert_id * stride_output_scale_0
+        + hidden_dim_block_index * stride_output_scale_2
     )
 
-    for token_index in tl.range(token_id, token_num_cur_expert, block_num_per_expert, num_stages=NUM_STAGE):
-        gate = tl.load(input_ptr_offs + token_index * stride_input_1, mask=offs_in_d < size_n, other=0.0).to(tl.float32)
-        up = tl.load(input_ptr_offs + token_index * stride_input_1 + size_n, mask=offs_in_d < size_n, other=0.0)
+    for token_index in tl.range(
+        token_id, token_num_cur_expert, block_num_per_expert, num_stages=NUM_STAGE
+    ):
+        gate = tl.load(
+            input_ptr_offs + token_index * stride_input_1,
+            mask=offs_in_d < size_n,
+            other=0.0,
+        ).to(tl.float32)
+        up = tl.load(
+            input_ptr_offs + token_index * stride_input_1 + size_n,
+            mask=offs_in_d < size_n,
+            other=0.0,
+        )
         gate = gate / (1 + tl.exp(-gate))
         gate = gate.to(input_ptr.dtype.element_ty)
         gate_up = up * gate
         _absmax = tl.maximum(tl.max(tl.abs(gate_up)), 1e-10)
         output_s = _absmax / fp8_max
-        output_q = tl.clamp(gate_up / output_s, fp8_min, fp8_max).to(output_ptr.dtype.element_ty)
+        output_q = tl.clamp(gate_up / output_s, fp8_min, fp8_max).to(
+            output_ptr.dtype.element_ty
+        )
         tl.store(
             output_ptr_offs + token_index * stride_output_1,
             output_q,
@@ -67,7 +81,11 @@ def _silu_and_mul_post_quant_kernel(
 
 
 def silu_and_mul_masked_post_quant_fwd(
-    input: torch.Tensor, output: torch.Tensor, output_scale: torch.Tensor, quant_group_size: int, masked_m: torch.Tensor
+    input: torch.Tensor,
+    output: torch.Tensor,
+    output_scale: torch.Tensor,
+    quant_group_size: int,
+    masked_m: torch.Tensor,
 ):
     """
     input shape [expert_num, token_num_padded, hidden_dim]

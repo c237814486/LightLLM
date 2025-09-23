@@ -21,7 +21,9 @@ class RequestThread(threading.Thread):
         self.data = data
 
     def run(self):
-        response = requests.post(self.url, headers=self.headers, data=json.dumps(self.data))
+        response = requests.post(
+            self.url, headers=self.headers, data=json.dumps(self.data)
+        )
         if response.status_code == 200:
             print(response.json())
         else:
@@ -60,7 +62,12 @@ time.sleep(10)
 for i in range(20):
     data = {
         "inputs": "Are dog a man? ",
-        "parameters": {"do_sample": False, "ignore_eos": True, "max_new_tokens": 200, "allowed_token_ids": [2, 3]},
+        "parameters": {
+            "do_sample": False,
+            "ignore_eos": True,
+            "max_new_tokens": 200,
+            "allowed_token_ids": [2, 3],
+        },
     }
     thread = RequestThread(url, headers, data)
     thread.start()

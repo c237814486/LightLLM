@@ -16,7 +16,12 @@ class KernelConfigs(ABC):
     @classmethod
     def get_config_file_name(cls, params: Dict[str, Any]) -> str:
         json_str = json.dumps(params, sort_keys=True)
-        json_str = json_str.replace(" ", "").replace("\n", "").replace('"', "").replace(":", "=")
+        json_str = (
+            json_str.replace(" ", "")
+            .replace("\n", "")
+            .replace('"', "")
+            .replace(":", "=")
+        )
         filename = json_str
         device_name = get_current_device_name().replace(" ", "_")
         return f"{filename}_{device_name}.json"
@@ -28,7 +33,9 @@ class KernelConfigs(ABC):
 
         json_file_name = KernelConfigs.get_config_file_name(params)
         config_dir_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "all_kernel_configs", cls.kernel_name
+            os.path.dirname(os.path.abspath(__file__)),
+            "all_kernel_configs",
+            cls.kernel_name,
         )
 
         config_file_path = os.path.join(config_dir_path, json_file_name)
@@ -48,7 +55,9 @@ class KernelConfigs(ABC):
 
         json_file_name = KernelConfigs.get_config_file_name(params)
         config_dir_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "all_kernel_configs", cls.kernel_name
+            os.path.dirname(os.path.abspath(__file__)),
+            "all_kernel_configs",
+            cls.kernel_name,
         )
         os.makedirs(config_dir_path, exist_ok=True)
         config_file_path = os.path.join(config_dir_path, json_file_name)

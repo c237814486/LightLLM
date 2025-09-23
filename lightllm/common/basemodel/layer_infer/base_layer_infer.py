@@ -11,10 +11,20 @@ class BaseLayerInfer:
         self.tp_rank_ = get_current_rank_in_dp()
         self.tp_world_size_ = get_dp_world_size()
 
-    def context_forward(self, input: torch.Tensor, infer_state: InferStateInfo, layer_weight: BaseLayerWeight):
+    def context_forward(
+        self,
+        input: torch.Tensor,
+        infer_state: InferStateInfo,
+        layer_weight: BaseLayerWeight,
+    ):
         raise Exception("need to impl")
 
-    def token_forward(self, input: torch.Tensor, infer_state: InferStateInfo, layer_weight: BaseLayerWeight):
+    def token_forward(
+        self,
+        input: torch.Tensor,
+        infer_state: InferStateInfo,
+        layer_weight: BaseLayerWeight,
+    ):
         raise Exception("need to impl")
 
     def alloc_tensor(
@@ -33,13 +43,27 @@ class BaseLayerInfer:
         具体的意义，其他情况没有实际意义。
         """
         return g_cache_manager.alloc_tensor(
-            shape, dtype, device=device, is_graph_out=is_graph_out, microbatch_index=microbatch_index
+            shape,
+            dtype,
+            device=device,
+            is_graph_out=is_graph_out,
+            microbatch_index=microbatch_index,
         )
 
-    def tpsp_context_forward(self, input: torch.Tensor, infer_state: InferStateInfo, layer_weight: BaseLayerWeight):
+    def tpsp_context_forward(
+        self,
+        input: torch.Tensor,
+        infer_state: InferStateInfo,
+        layer_weight: BaseLayerWeight,
+    ):
         raise Exception("need to impl")
 
-    def tpsp_token_forward(self, input: torch.Tensor, infer_state: InferStateInfo, layer_weight: BaseLayerWeight):
+    def tpsp_token_forward(
+        self,
+        input: torch.Tensor,
+        infer_state: InferStateInfo,
+        layer_weight: BaseLayerWeight,
+    ):
         raise Exception("need to impl")
 
     def overlap_tpsp_token_forward(

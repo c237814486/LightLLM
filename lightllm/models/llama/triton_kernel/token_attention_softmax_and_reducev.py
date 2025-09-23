@@ -50,13 +50,17 @@ def _fwd_kernel(
     for start_n in range(0, cur_batch_seq_len, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         v_index = tl.load(
-            Req_to_tokens + cur_batch_req_idx * stride_req_to_token_b + (start_n + offs_n) * stride_req_to_token_s,
+            Req_to_tokens
+            + cur_batch_req_idx * stride_req_to_token_b
+            + (start_n + offs_n) * stride_req_to_token_s,
             mask=(start_n + offs_n) < cur_batch_seq_len,
             other=other_kv_index,
         )
 
         qk = tl.load(
-            Logics + cur_head * stride_logic_h + (cur_batch_start_loc + start_n + offs_n) * stride_logic_bs,
+            Logics
+            + cur_head * stride_logic_h
+            + (cur_batch_start_loc + start_n + offs_n) * stride_logic_bs,
             mask=start_n + offs_n < cur_batch_seq_len,
             other=float("-inf"),
         )
@@ -77,7 +81,9 @@ def _fwd_kernel(
 
 
 @torch.no_grad()
-def token_softmax_reducev_fwd(logics, v, o, req_to_tokens, b_req_idx, b_start_loc, b_seq_len):
+def token_softmax_reducev_fwd(
+    logics, v, o, req_to_tokens, b_req_idx, b_start_loc, b_seq_len
+):
     BLOCK = 64
     batch, head = b_seq_len.shape[0], logics.shape[0]
     grid = (batch, head)

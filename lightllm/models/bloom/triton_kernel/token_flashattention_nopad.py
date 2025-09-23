@@ -48,7 +48,10 @@ def _fwd_kernel(
     off_q = cur_batch * stride_qbs + cur_head * stride_qh + offs_d * stride_qd
     off_k = cur_head * stride_kh + offs_d[None, :] * stride_kd
     off_v = cur_head * stride_vh + offs_d[None, :] * stride_vd
-    off_b_loc = cur_batch * stride_b_loc_b + (max_input_len - cur_batch_seq_len) * stride_b_loc_s
+    off_b_loc = (
+        cur_batch * stride_b_loc_b
+        + (max_input_len - cur_batch_seq_len) * stride_b_loc_s
+    )
 
     q = tl.load(Q + off_q)
 
@@ -70,7 +73,9 @@ def _fwd_kernel(
             other=0,
         )
         k = tl.load(
-            k_ptrs + k_index[:, None] * stride_kbs, mask=(start_n + offs_n[:, None]) < cur_batch_seq_len, other=0.0
+            k_ptrs + k_index[:, None] * stride_kbs,
+            mask=(start_n + offs_n[:, None]) < cur_batch_seq_len,
+            other=0.0,
         )
 
         qk = tl.zeros(
@@ -105,7 +110,9 @@ def _fwd_kernel(
         # update acc
         v_index = k_index
         v = tl.load(
-            v_ptrs + v_index[:, None] * stride_vbs, mask=(start_n + offs_n[:, None]) < cur_batch_seq_len, other=0.0
+            v_ptrs + v_index[:, None] * stride_vbs,
+            mask=(start_n + offs_n[:, None]) < cur_batch_seq_len,
+            other=0.0,
         )
         # print(p)
         acc += tl.sum(p[:, None] * v, 0)
@@ -171,15 +178,29 @@ def token_attention_fwd(
     batch_size = b_seq_len.shape[0]
     calcu_shape1 = (batch_size, head_num, k.shape[2])
 
-    att_m_tensor = alloc_tensor_func((head_num, total_token_num), dtype=q.dtype, device="cuda")
+    att_m_tensor = alloc_tensor_func(
+        (head_num, total_token_num), dtype=q.dtype, device="cuda"
+    )
 
     token_att_fwd(
-        q.view(calcu_shape1), k, att_m_tensor, alibi, req_to_tokens, b_req_idx, b_start_loc, b_seq_len, max_len_in_batch
+        q.view(calcu_shape1),
+        k,
+        att_m_tensor,
+        alibi,
+        req_to_tokens,
+        b_req_idx,
+        b_start_loc,
+        b_seq_len,
+        max_len_in_batch,
     )
-    prob = alloc_tensor_func(att_m_tensor.shape, dtype=att_m_tensor.dtype, device=att_m_tensor.device)
+    prob = alloc_tensor_func(
+        att_m_tensor.shape, dtype=att_m_tensor.dtype, device=att_m_tensor.device
+    )
     token_softmax_fwd(att_m_tensor, b_start_loc, b_seq_len, prob, max_len_in_batch)
     att_m_tensor = None
-    token_att_fwd2(prob, v, o.view(calcu_shape1), req_to_tokens, b_req_idx, b_start_loc, b_seq_len)
+    token_att_fwd2(
+        prob, v, o.view(calcu_shape1), req_to_tokens, b_req_idx, b_start_loc, b_seq_len
+    )
     prob = None
     return
 
@@ -189,7 +210,7 @@ def torch_att(xq, xk, xv, bs, seqlen, num_head, head_dim):
     xk = xk.view(bs, seqlen, num_head, head_dim)
     xv = xv.view(bs, seqlen, num_head, head_dim)
 
-    logics = torch.sum(xq * xk, dim=3, keepdim=False) * 1 / (head_dim ** 0.5)
+    logics = torch.sum(xq * xk, dim=3, keepdim=False) * 1 / (head_dim**0.5)
     prob = torch.softmax(logics, dim=1)
     prob = prob.view(bs, seqlen, num_head, 1)
 

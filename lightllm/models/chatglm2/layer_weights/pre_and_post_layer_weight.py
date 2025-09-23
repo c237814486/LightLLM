@@ -1,6 +1,8 @@
 import torch
 import numpy as np
-from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import LlamaPreAndPostLayerWeight
+from lightllm.models.llama.layer_weights.pre_and_post_layer_weight import (
+    LlamaPreAndPostLayerWeight,
+)
 
 
 class ChatGLM2PreAndPostLayerWeight(LlamaPreAndPostLayerWeight):
@@ -25,7 +27,9 @@ class ChatGLM2PreAndPostLayerWeight(LlamaPreAndPostLayerWeight):
             ]
             self.lm_head_weight_ = self._cuda(self.lm_head_weight_)
         if "transformer.encoder.final_layernorm.weight" in weights:
-            self.final_norm_weight_ = weights["transformer.encoder.final_layernorm.weight"]
+            self.final_norm_weight_ = weights[
+                "transformer.encoder.final_layernorm.weight"
+            ]
             self.final_norm_weight_ = self._cuda(self.final_norm_weight_)
 
         return

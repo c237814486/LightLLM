@@ -1,6 +1,10 @@
 from lightllm.models.registry import ModelRegistry, is_reward_model
-from lightllm.models.qwen2_reward.layer_infer.post_layer_infer import Qwen2RewardPostLayerInfer
-from lightllm.models.qwen2_reward.layer_weights.pre_and_post_layer_weight import Qwen2RewardPreAndPostLayerWeight
+from lightllm.models.qwen2_reward.layer_infer.post_layer_infer import (
+    Qwen2RewardPostLayerInfer,
+)
+from lightllm.models.qwen2_reward.layer_weights.pre_and_post_layer_weight import (
+    Qwen2RewardPreAndPostLayerWeight,
+)
 from lightllm.models.qwen2.model import Qwen2TpPartModel
 
 

@@ -3,7 +3,12 @@ import argparse
 import torch
 import time
 import torch.multiprocessing as mp
-from lightllm.common.fused_moe.grouped_fused_moe import fused_experts_impl, moe_align, moe_align1, grouped_matmul
+from lightllm.common.fused_moe.grouped_fused_moe import (
+    fused_experts_impl,
+    moe_align,
+    moe_align1,
+    grouped_matmul,
+)
 from typing import List
 from lightllm.utils.log_utils import init_logger
 from transformers import AutoConfig
@@ -85,8 +90,12 @@ def test_kernel(
             n_tiles_w2 = (k + block_n - 1) // block_n
             k_tiles_w1 = (k + block_k - 1) // block_k
             k_tiles_w2 = (2 * n // 2 + block_k - 1) // block_k
-            w1_scale = torch.rand((expert_num, n_tiles_w1, k_tiles_w1), dtype=torch.float32).cuda()
-            w2_scale = torch.rand((expert_num, n_tiles_w2, k_tiles_w2), dtype=torch.float32).cuda()
+            w1_scale = torch.rand(
+                (expert_num, n_tiles_w1, k_tiles_w1), dtype=torch.float32
+            ).cuda()
+            w2_scale = torch.rand(
+                (expert_num, n_tiles_w2, k_tiles_w2), dtype=torch.float32
+            ).cuda()
     else:
         w1 = torch.randn(expert_num, 2 * n, k, dtype=dtype).cuda()
         w2 = torch.randn(expert_num, k, 2 * n // 2, dtype=dtype).cuda()
@@ -95,11 +104,21 @@ def test_kernel(
     topk_values, topk_ids = torch.topk(rnd_logics, topk, dim=1)
     topk_weights = torch.randn((m, topk), device="cuda", dtype=dtype) / 10
 
-    expert_to_tokens = torch.empty((expert_num, topk * m), dtype=torch.int32, device="cuda")
-    expert_to_weights = torch.empty((expert_num, topk * m), dtype=torch.float32, device="cuda")
+    expert_to_tokens = torch.empty(
+        (expert_num, topk * m), dtype=torch.int32, device="cuda"
+    )
+    expert_to_weights = torch.empty(
+        (expert_num, topk * m), dtype=torch.float32, device="cuda"
+    )
     moe_align(topk_ids=topk_ids, out=expert_to_tokens)
     expert_to_token_num = torch.empty((expert_num,), dtype=torch.int32, device="cuda")
-    moe_align1(expert_to_tokens, topk_weights, expert_to_weights, expert_to_token_num, topk=topk)
+    moe_align1(
+        expert_to_tokens,
+        topk_weights,
+        expert_to_weights,
+        expert_to_token_num,
+        topk=topk,
+    )
 
     out1 = torch.zeros((m * topk, 2 * n), dtype=torch.bfloat16, device="cuda")
     down_in = torch.zeros((m * topk, n), dtype=torch.bfloat16, device="cuda")
@@ -158,7 +177,18 @@ def test_kernel(
 
     with torch.cuda.graph(graph):
         for index in range(test_count):
-            a, w1, w2, w1_scale, w2_scale, topk_ids, topk_weights, out1, out2, down_in = input_tuples[index]
+            (
+                a,
+                w1,
+                w2,
+                w1_scale,
+                w2_scale,
+                topk_ids,
+                topk_weights,
+                out1,
+                out2,
+                down_in,
+            ) = input_tuples[index]
             if is_up:
                 grouped_matmul(
                     topk_ids.numel(),
@@ -171,7 +201,7 @@ def test_kernel(
                     expert_to_weights_scale=w1_scale,
                     topk_num=topk,
                     out=out1,
-                    expert_token_limit=2 ** 31 - 1,
+                    expert_token_limit=2**31 - 1,
                     mul_routed_weight=False,
                     use_fp8_w8a8=use_fp8_w8a8,
                     **config,
@@ -188,7 +218,7 @@ def test_kernel(
                     expert_to_weights_scale=w2_scale,
                     topk_num=1,
                     out=out2,
-                    expert_token_limit=2 ** 31 - 1,
+                    expert_token_limit=2**31 - 1,
                     mul_routed_weight=True,
                     use_fp8_w8a8=use_fp8_w8a8,
                     **config,
@@ -404,7 +434,10 @@ def main(args):
     hidden_dim = getattr(config, "hidden_size", None) or config.text_config.hidden_size
     use_fp8_w8a8 = args.use_fp8_w8a8
     block_shape = None
-    if hasattr(config, "quantization_config") and "weight_block_size" in config.quantization_config:
+    if (
+        hasattr(config, "quantization_config")
+        and "weight_block_size" in config.quantization_config
+    ):
         block_shape = config.quantization_config["weight_block_size"]
         assert len(block_shape) == 2
         use_fp8_w8a8 = True

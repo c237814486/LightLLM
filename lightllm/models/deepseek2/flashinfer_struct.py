@@ -22,11 +22,13 @@ class Deepseek2FlashInferStateInfo(Deepseek2InferStateInfo):
 
         if not self.is_prefill:
             if get_env_start_args().enable_flashinfer_decode:
-                self.q_indptr = torch.arange(self.batch_size + 1, dtype=torch.int32).to(input_ids.device)
+                self.q_indptr = torch.arange(self.batch_size + 1, dtype=torch.int32).to(
+                    input_ids.device
+                )
                 if self.batch_size <= model.graph_max_batch_size:
-                    self.kv_indices = self.flashinfer_extra_state.kv_indices_buffer[self.microbatch_index][
-                        : self.batch_size * self.flashinfer_extra_state.max_seq_length
-                    ]
+                    self.kv_indices = self.flashinfer_extra_state.kv_indices_buffer[
+                        self.microbatch_index
+                    ][: self.batch_size * self.flashinfer_extra_state.max_seq_length]
                 else:
                     self.kv_indices = torch.empty(
                         self.batch_size * self.flashinfer_extra_state.max_seq_length,
@@ -69,8 +71,10 @@ class Deepseek2FlashInferStateInfo(Deepseek2InferStateInfo):
                 q_starts = self.b1_cu_q_seq_len.int()
                 kv_starts = self.b1_kv_start_loc.int()
                 if self.prefill_wrapper is None:
-                    self.prefill_wrapper = flashinfer.prefill.BatchPrefillWithRaggedKVCacheWrapper(
-                        self.flashinfer_extra_state.workspace_buffer, "NHD"
+                    self.prefill_wrapper = (
+                        flashinfer.prefill.BatchPrefillWithRaggedKVCacheWrapper(
+                            self.flashinfer_extra_state.workspace_buffer, "NHD"
+                        )
                     )
                 self.prefill_wrapper.plan(
                     qo_indptr=q_starts,

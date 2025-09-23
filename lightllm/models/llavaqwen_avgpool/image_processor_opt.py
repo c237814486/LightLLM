@@ -40,7 +40,9 @@ def batch_center_crop(
         raise TypeError(f"Input images must be of type np.ndarray, got {type(image)}")
 
     if not isinstance(size, Iterable) or len(size) != 2:
-        raise ValueError("size must have 2 elements representing the height and width of the output image")
+        raise ValueError(
+            "size must have 2 elements representing the height and width of the output image"
+        )
 
     # Determine if input has batch dimension (4D tensor)
     is_batched = len(image.shape) == 4
@@ -50,7 +52,9 @@ def batch_center_crop(
 
     batch_size = image.shape[0]
 
-    input_data_format = ChannelDimension.FIRST if image.shape[1] in [1, 3, 4] else ChannelDimension.LAST
+    input_data_format = (
+        ChannelDimension.FIRST if image.shape[1] in [1, 3, 4] else ChannelDimension.LAST
+    )
 
     if input_data_format == ChannelDimension.LAST:
         # Convert from NHWC to NCHW
@@ -74,7 +78,9 @@ def batch_center_crop(
         # Need to pad
         new_height = max(crop_height, orig_height)
         new_width = max(crop_width, orig_width)
-        new_images = np.zeros((batch_size, image.shape[1], new_height, new_width), dtype=image.dtype)
+        new_images = np.zeros(
+            (batch_size, image.shape[1], new_height, new_width), dtype=image.dtype
+        )
 
         # If the image is too small, pad it with zeros
         top_pad = ceil((new_height - orig_height) / 2)
@@ -91,7 +97,12 @@ def batch_center_crop(
         left += left_pad
         right += left_pad
 
-        cropped_images = new_images[:, :, max(0, top) : min(new_height, bottom), max(0, left) : min(new_width, right)]
+        cropped_images = new_images[
+            :,
+            :,
+            max(0, top) : min(new_height, bottom),
+            max(0, left) : min(new_width, right),
+        ]
 
     return cropped_images
 
@@ -116,7 +127,9 @@ def batch_normalize_numexpr(
         std = std.reshape(1, 1, 1, -1)
 
     # 使用 numexpr 进行优化计算
-    result = ne.evaluate("(image - mean) / std", local_dict={"image": image, "mean": mean, "std": std})
+    result = ne.evaluate(
+        "(image - mean) / std", local_dict={"image": image, "mean": mean, "std": std}
+    )
 
     return result
 
@@ -132,7 +145,9 @@ def batch_rescale_numexpr(
     if not isinstance(image, np.ndarray):
         raise TypeError(f"Input image must be of type np.ndarray, got {type(image)}")
     # image = image.astype(np.float64)
-    rescaled_image = ne.evaluate("image * scale", local_dict={"image": image, "scale": scale})
+    rescaled_image = ne.evaluate(
+        "image * scale", local_dict={"image": image, "scale": scale}
+    )
     return rescaled_image  # float64精度
 
 
@@ -216,22 +231,36 @@ class OpimizedCLIPImageProcessor(CLIPImageProcessor):
         size = size if size is not None else self.size
         size = get_size_dict(size, param_name="size", default_to_square=False)
         resample = resample if resample is not None else self.resample
-        do_center_crop = do_center_crop if do_center_crop is not None else self.do_center_crop
+        do_center_crop = (
+            do_center_crop if do_center_crop is not None else self.do_center_crop
+        )
         crop_size = crop_size if crop_size is not None else self.crop_size
-        crop_size = get_size_dict(crop_size, param_name="crop_size", default_to_square=True)
+        crop_size = get_size_dict(
+            crop_size, param_name="crop_size", default_to_square=True
+        )
         do_rescale = do_rescale if do_rescale is not None else self.do_rescale
-        rescale_factor = rescale_factor if rescale_factor is not None else self.rescale_factor
+        rescale_factor = (
+            rescale_factor if rescale_factor is not None else self.rescale_factor
+        )
         do_normalize = do_normalize if do_normalize is not None else self.do_normalize
         image_mean = image_mean if image_mean is not None else self.image_mean
         image_std = image_std if image_std is not None else self.image_std
-        do_convert_rgb = do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        do_convert_rgb = (
+            do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        )
 
-        validate_kwargs(captured_kwargs=kwargs.keys(), valid_processor_keys=self._valid_processor_keys)
+        validate_kwargs(
+            captured_kwargs=kwargs.keys(),
+            valid_processor_keys=self._valid_processor_keys,
+        )
 
         images = make_list_of_images(images)
 
         if not valid_images(images):
-            raise ValueError("Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, " "torch.Tensor, tf.Tensor or jax.ndarray.")
+            raise ValueError(
+                "Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, "
+                "torch.Tensor, tf.Tensor or jax.ndarray."
+            )
         validate_preprocess_arguments(
             do_rescale=do_rescale,
             rescale_factor=rescale_factor,
@@ -262,7 +291,11 @@ class OpimizedCLIPImageProcessor(CLIPImageProcessor):
         image_mean = tuple(image_mean)
         image_std = tuple(image_std)
 
-        input_data_format = ChannelDimension.FIRST if images.shape[1] in [1, 3, 4] else ChannelDimension.LAST
+        input_data_format = (
+            ChannelDimension.FIRST
+            if images.shape[1] in [1, 3, 4]
+            else ChannelDimension.LAST
+        )
 
         if input_data_format == ChannelDimension.LAST:
             images = np.transpose(images, (0, 3, 1, 2))
@@ -278,20 +311,31 @@ class OpimizedCLIPImageProcessor(CLIPImageProcessor):
         )
 
         if do_center_crop:
-            image = batch_center_crop(image=images, size=crop_size, input_data_format=input_data_format)
+            image = batch_center_crop(
+                image=images, size=crop_size, input_data_format=input_data_format
+            )
 
         if do_rescale:  # will skip because of fused rescale
-            image = batch_rescale_numexpr(image=image, scale=rescale_factor, input_data_format=input_data_format)
+            image = batch_rescale_numexpr(
+                image=image, scale=rescale_factor, input_data_format=input_data_format
+            )
 
         if do_normalize:
-            image = batch_normalize_numexpr(image=image, mean=image_mean, std=image_std, input_data_format=input_data_format)
+            image = batch_normalize_numexpr(
+                image=image,
+                mean=image_mean,
+                std=image_std,
+                input_data_format=input_data_format,
+            )
 
         data = {"pixel_values": image}
 
         return BatchFeature(data=data, tensor_type=return_tensors)
 
 
-def get_image_size(image: np.ndarray, channel_dim: ChannelDimension = None) -> tuple[int, int]:
+def get_image_size(
+    image: np.ndarray, channel_dim: ChannelDimension = None
+) -> tuple[int, int]:
     """
     Returns the (height, width) dimensions of the image.
 
@@ -338,7 +382,9 @@ def fast_patch_extraction_torch(patches, temporal_patch_size, patch_size, merge_
         patch_size,
     )
     patches_transposed = patches_reshaped.permute(0, 3, 6, 4, 7, 2, 1, 5, 8)
-    flatten_patches = patches_transposed.contiguous().view(grid_t * grid_h * grid_w, final_features)
+    flatten_patches = patches_transposed.contiguous().view(
+        grid_t * grid_h * grid_w, final_features
+    )
     return flatten_patches
     # return flatten_patches.numpy() if is_numpy else flatten_patches
 
@@ -431,22 +477,36 @@ class Qwen25VLImageProcessorOptimized(OpimizedCLIPImageProcessor):
         do_resize = do_resize if do_resize is not None else self.do_resize
         size = size if size is not None else self.size
         resample = resample if resample is not None else self.resample
-        do_center_crop = do_center_crop if do_center_crop is not None else self.do_center_crop
+        do_center_crop = (
+            do_center_crop if do_center_crop is not None else self.do_center_crop
+        )
         crop_size = crop_size if crop_size is not None else self.crop_size
-        crop_size = get_size_dict(crop_size, param_name="crop_size", default_to_square=True)
+        crop_size = get_size_dict(
+            crop_size, param_name="crop_size", default_to_square=True
+        )
         do_rescale = do_rescale if do_rescale is not None else self.do_rescale
-        rescale_factor = rescale_factor if rescale_factor is not None else self.rescale_factor
+        rescale_factor = (
+            rescale_factor if rescale_factor is not None else self.rescale_factor
+        )
         do_normalize = do_normalize if do_normalize is not None else self.do_normalize
         image_mean = image_mean if image_mean is not None else self.image_mean
         image_std = image_std if image_std is not None else self.image_std
-        do_convert_rgb = do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        do_convert_rgb = (
+            do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        )
 
-        validate_kwargs(captured_kwargs=kwargs.keys(), valid_processor_keys=self._valid_processor_keys)
+        validate_kwargs(
+            captured_kwargs=kwargs.keys(),
+            valid_processor_keys=self._valid_processor_keys,
+        )
 
         images = make_list_of_images(images)
 
         if not valid_images(images):
-            raise ValueError("Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, " "torch.Tensor, tf.Tensor or jax.ndarray.")
+            raise ValueError(
+                "Invalid image type. Must be of type PIL.Image.Image, numpy.ndarray, "
+                "torch.Tensor, tf.Tensor or jax.ndarray."
+            )
         validate_preprocess_arguments(
             do_rescale=do_rescale,
             rescale_factor=rescale_factor,
@@ -477,7 +537,11 @@ class Qwen25VLImageProcessorOptimized(OpimizedCLIPImageProcessor):
         image_mean = tuple(image_mean)
         image_std = tuple(image_std)
 
-        input_data_format = ChannelDimension.FIRST if images.shape[1] in [1, 3, 4] else ChannelDimension.LAST
+        input_data_format = (
+            ChannelDimension.FIRST
+            if images.shape[1] in [1, 3, 4]
+            else ChannelDimension.LAST
+        )
 
         if input_data_format == ChannelDimension.LAST:
             images = np.transpose(images, (0, 3, 1, 2))
@@ -493,10 +557,17 @@ class Qwen25VLImageProcessorOptimized(OpimizedCLIPImageProcessor):
         )
 
         if do_rescale:  # will skip because of fused rescale
-            images = batch_rescale_numexpr(image=images, scale=rescale_factor, input_data_format=input_data_format)
+            images = batch_rescale_numexpr(
+                image=images, scale=rescale_factor, input_data_format=input_data_format
+            )
 
         if do_normalize:
-            images = batch_normalize_numexpr(image=images, mean=image_mean, std=image_std, input_data_format=input_data_format)
+            images = batch_normalize_numexpr(
+                image=images,
+                mean=image_mean,
+                std=image_std,
+                input_data_format=input_data_format,
+            )
 
         height, width = get_image_size(images[0], channel_dim=input_data_format)
         resized_height, resized_width = height, width
@@ -509,11 +580,18 @@ class Qwen25VLImageProcessorOptimized(OpimizedCLIPImageProcessor):
             patches = np.concatenate([patches, last_frame], axis=0)
 
         grid_t = patches.shape[0] // self.temporal_patch_size
-        grid_h, grid_w = resized_height // self.patch_size, resized_width // self.patch_size
+        grid_h, grid_w = (
+            resized_height // self.patch_size,
+            resized_width // self.patch_size,
+        )
         if patch_reshape_method == "torch":
-            flatten_patches = fast_patch_extraction_torch(patches, self.temporal_patch_size, self.patch_size, self.merge_size)
+            flatten_patches = fast_patch_extraction_torch(
+                patches, self.temporal_patch_size, self.patch_size, self.merge_size
+            )
         else:
-            flatten_patches = patch_extraction_numpy(patches, self.temporal_patch_size, self.patch_size, self.merge_size)
+            flatten_patches = patch_extraction_numpy(
+                patches, self.temporal_patch_size, self.patch_size, self.merge_size
+            )
         # patches = patches.reshape(
         #     grid_t,
         #     self.temporal_patch_size,
@@ -545,7 +623,9 @@ class Qwen25VLImageProcessorOptimized(OpimizedCLIPImageProcessor):
         return BatchFeature(data=data, tensor_type=return_tensors)
 
 
-def create_random_images(batch_size: int, height: int, width: int) -> List[PIL.Image.Image]:
+def create_random_images(
+    batch_size: int, height: int, width: int
+) -> List[PIL.Image.Image]:
     images = []
     for _ in range(batch_size):
         # 创建随机 RGB 图片
@@ -555,7 +635,9 @@ def create_random_images(batch_size: int, height: int, width: int) -> List[PIL.I
     return images
 
 
-def run_performance_test(processor, batch_size, height, width, num_runs: int = 5, **kwargs) -> float:
+def run_performance_test(
+    processor, batch_size, height, width, num_runs: int = 5, **kwargs
+) -> float:
     import time
 
     total_time = 0
@@ -572,7 +654,9 @@ def run_performance_test(processor, batch_size, height, width, num_runs: int = 5
 
 def compare_outputs(original_output, optimized_output, tolerance=1e-6) -> bool:
     if not isinstance(original_output, type(optimized_output)):
-        print(f"输出类型不匹配: 原始输出 {type(original_output)} vs 优化输出 {type(optimized_output)}")
+        print(
+            f"输出类型不匹配: 原始输出 {type(original_output)} vs 优化输出 {type(optimized_output)}"
+        )
         return False
 
     # 获取像素值数组
@@ -580,7 +664,9 @@ def compare_outputs(original_output, optimized_output, tolerance=1e-6) -> bool:
     optimized_pixels = optimized_output["pixel_values"].numpy()
 
     if original_pixels.shape != optimized_pixels.shape:
-        print(f"输出形状不匹配: 原始输出 {original_pixels.shape} vs 优化输出 {optimized_pixels.shape}")
+        print(
+            f"输出形状不匹配: 原始输出 {original_pixels.shape} vs 优化输出 {optimized_pixels.shape}"
+        )
         return False
 
     # 计算最大误差
@@ -610,7 +696,9 @@ def compare_processors():
 
     print("\n性能测试报告:")
     print("=" * 80)
-    print(f"{'批次大小':^10} | {'图片尺寸':^12} | {'CLIP 原始(ms)':^12} | {'CLIP 优化后(ms)':^12} | {'Qwen25 Processor numpy(ms)':^12} | {'Qwen25 Processor torch(ms)':^12} | {'性能提升':^12} | {'最大误差':^10}")
+    print(
+        f"{'批次大小':^10} | {'图片尺寸':^12} | {'CLIP 原始(ms)':^12} | {'CLIP 优化后(ms)':^12} | {'Qwen25 Processor numpy(ms)':^12} | {'Qwen25 Processor torch(ms)':^12} | {'性能提升':^12} | {'最大误差':^10}"
+    )
     print("-" * 80)
 
     for batch_size in batch_sizes:
@@ -618,17 +706,43 @@ def compare_processors():
 
             test_images = create_random_images(batch_size, height, width)
 
-            original_output = original_processor.preprocess(test_images, return_tensors="pt")
-            optimized_output = optimized_processor.preprocess(test_images, return_tensors="pt")
-            _ = qwen25_processor.preprocess(test_images, return_tensors="pt", patch_reshape_method="torch")
-            _ = qwen25_processor.preprocess(test_images, return_tensors="pt", patch_reshape_method="numpy")
+            original_output = original_processor.preprocess(
+                test_images, return_tensors="pt"
+            )
+            optimized_output = optimized_processor.preprocess(
+                test_images, return_tensors="pt"
+            )
+            _ = qwen25_processor.preprocess(
+                test_images, return_tensors="pt", patch_reshape_method="torch"
+            )
+            _ = qwen25_processor.preprocess(
+                test_images, return_tensors="pt", patch_reshape_method="numpy"
+            )
 
             max_diff = compare_outputs(original_output, optimized_output)
 
-            optimized_time = run_performance_test(optimized_processor, batch_size, height, width, num_runs=10)
-            original_time = run_performance_test(original_processor, batch_size, height, width, num_runs=10)
-            qwen25_time_torch = run_performance_test(qwen25_processor, batch_size, height, width, num_runs=10, patch_reshape_method="torch")
-            qwen25_time_numpy = run_performance_test(qwen25_processor, batch_size, height, width, num_runs=10, patch_reshape_method="numpy")
+            optimized_time = run_performance_test(
+                optimized_processor, batch_size, height, width, num_runs=10
+            )
+            original_time = run_performance_test(
+                original_processor, batch_size, height, width, num_runs=10
+            )
+            qwen25_time_torch = run_performance_test(
+                qwen25_processor,
+                batch_size,
+                height,
+                width,
+                num_runs=10,
+                patch_reshape_method="torch",
+            )
+            qwen25_time_numpy = run_performance_test(
+                qwen25_processor,
+                batch_size,
+                height,
+                width,
+                num_runs=10,
+                patch_reshape_method="numpy",
+            )
 
             # optimized_time = run_performance_test(optimized_processor, test_images, num_runs=10)
 

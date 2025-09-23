@@ -1,7 +1,11 @@
 import torch
 from lightllm.models.bloom.triton_kernel.layernorm import layernorm_forward
-from lightllm.models.starcoder2.layer_weights.transformer_layer_weight import Starcoder2TransformerLayerWeight
-from lightllm.models.llama.layer_infer.transformer_layer_infer import LlamaTransformerLayerInfer
+from lightllm.models.starcoder2.layer_weights.transformer_layer_weight import (
+    Starcoder2TransformerLayerWeight,
+)
+from lightllm.models.llama.layer_infer.transformer_layer_infer import (
+    LlamaTransformerLayerInfer,
+)
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 
 
@@ -10,7 +14,10 @@ class Starcoder2TransformerLayerInfer(LlamaTransformerLayerInfer):
         super().__init__(layer_num, network_config, mode)
 
     def _att_norm(
-        self, input, infer_state: LlamaInferStateInfo, layer_weight: Starcoder2TransformerLayerWeight
+        self,
+        input,
+        infer_state: LlamaInferStateInfo,
+        layer_weight: Starcoder2TransformerLayerWeight,
     ) -> torch.Tensor:
         return layernorm_forward(
             input.view(-1, self.embed_dim_),
@@ -20,7 +27,10 @@ class Starcoder2TransformerLayerInfer(LlamaTransformerLayerInfer):
         )
 
     def _ffn_norm(
-        self, input, infer_state: LlamaInferStateInfo, layer_weight: Starcoder2TransformerLayerWeight
+        self,
+        input,
+        infer_state: LlamaInferStateInfo,
+        layer_weight: Starcoder2TransformerLayerWeight,
     ) -> torch.Tensor:
         return layernorm_forward(
             input.view(-1, self.embed_dim_),
@@ -30,7 +40,10 @@ class Starcoder2TransformerLayerInfer(LlamaTransformerLayerInfer):
         )
 
     def _ffn(
-        self, input, infer_state: LlamaInferStateInfo, layer_weight: Starcoder2TransformerLayerWeight
+        self,
+        input,
+        infer_state: LlamaInferStateInfo,
+        layer_weight: Starcoder2TransformerLayerWeight,
     ) -> torch.Tensor:
         ffn1_out = layer_weight.up_proj.mm(input.view(-1, self.embed_dim_))
         input = None

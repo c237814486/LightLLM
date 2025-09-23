@@ -3,7 +3,10 @@ import torch
 import time
 import torch.multiprocessing as mp
 import itertools
-from lightllm.common.fused_moe.moe_sum_reduce import MoeSumReduceKernelConfig, moe_sum_reduce
+from lightllm.common.fused_moe.moe_sum_reduce import (
+    MoeSumReduceKernelConfig,
+    moe_sum_reduce,
+)
 from lightllm.utils.watchdog_utils import Watchdog
 from typing import List
 from lightllm.utils.log_utils import init_logger

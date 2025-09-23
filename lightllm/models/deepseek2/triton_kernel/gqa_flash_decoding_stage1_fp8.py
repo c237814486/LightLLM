@@ -74,11 +74,19 @@ def _fwd_kernel_flash_decode_stage1_padding_fp8(
                 head_mask = cur_q_head_range < head_num
 
             cur_batch_start_index = block_seq * loop_seq_block_index
-            cur_batch_end_index = tl.minimum(cur_batch_seq_len, cur_batch_start_index + block_seq)
+            cur_batch_end_index = tl.minimum(
+                cur_batch_seq_len, cur_batch_start_index + block_seq
+            )
 
-            off_q = cur_batch * stride_q_bs + cur_q_head_range[:, None] * stride_q_h + offs_d[None, :]
+            off_q = (
+                cur_batch * stride_q_bs
+                + cur_q_head_range[:, None] * stride_q_h
+                + offs_d[None, :]
+            )
             off_rope_q = (
-                cur_batch * stride_q_rope_bs + cur_q_head_range[:, None] * stride_q_rope_h + offs_rope_d[None, :]
+                cur_batch * stride_q_rope_bs
+                + cur_q_head_range[:, None] * stride_q_rope_h
+                + offs_rope_d[None, :]
             )
             if NEED_HEAD_MASK:
                 q = tl.load(
@@ -112,10 +120,14 @@ def _fwd_kernel_flash_decode_stage1_padding_fp8(
                 off_kv = kv_loc[None, :] * stride_kv_bs + offs_d[:, None]
                 kv = tl.load(KV_nope + off_kv, mask=seq_n_mask[None, :], other=0.0)
                 off_rope_kv = kv_loc[None, :] * stride_kv_rope_bs + offs_rope_d[:, None]
-                rope_kv = tl.load(KV_rope + off_rope_kv, mask=seq_n_mask[None, :], other=0.0)
+                rope_kv = tl.load(
+                    KV_rope + off_rope_kv, mask=seq_n_mask[None, :], other=0.0
+                )
                 if HAS_SCALE:
                     off_kv_scale = kv_loc[None, :] * stride_kv_scaled_bs
-                    kv_scale = tl.load(KV_scale + off_kv_scale, mask=seq_n_mask[None, :], other=0.0)
+                    kv_scale = tl.load(
+                        KV_scale + off_kv_scale, mask=seq_n_mask[None, :], other=0.0
+                    )
                     kv = (kv * kv_scale).to(kv_scale.dtype)
                     rope_kv = (rope_kv * kv_scale).to(kv_scale.dtype)
                 att_value = tl.dot(q, kv)
@@ -140,7 +152,11 @@ def _fwd_kernel_flash_decode_stage1_padding_fp8(
                 + (out_batch_start_index + loop_seq_block_index) * stride_mid_os
                 + offs_d[None, :]
             )
-            off_mid_o_logexpsum = cur_q_head_range * stride_mid_o_eh + out_batch_start_index + loop_seq_block_index
+            off_mid_o_logexpsum = (
+                cur_q_head_range * stride_mid_o_eh
+                + out_batch_start_index
+                + loop_seq_block_index
+            )
             if NEED_HEAD_MASK:
                 tl.store(
                     Mid_O + off_mid_o,

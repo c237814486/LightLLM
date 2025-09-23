@@ -34,12 +34,21 @@ def _fwd_kernel_destindex_copy_quantize_int4_kv(
     dest_index = tl.load(Dest_loc + cur_index)
 
     src_data_0 = tl.load(
-        K + cur_index * stride_k_bs + cur_head * stride_k_h + offs_g[:, None] * stride_k_g + offs_d[None, :] * 2,
+        K
+        + cur_index * stride_k_bs
+        + cur_head * stride_k_h
+        + offs_g[:, None] * stride_k_g
+        + offs_d[None, :] * 2,
         mask=offs_g[:, None] < group_size,
         other=0.0,
     )
     src_data_1 = tl.load(
-        K + cur_index * stride_k_bs + cur_head * stride_k_h + offs_g[:, None] * stride_k_g + offs_d[None, :] * 2 + 1,
+        K
+        + cur_index * stride_k_bs
+        + cur_head * stride_k_h
+        + offs_g[:, None] * stride_k_g
+        + offs_d[None, :] * 2
+        + 1,
         mask=offs_g[:, None] < group_size,
         other=0.0,
     )
@@ -47,7 +56,9 @@ def _fwd_kernel_destindex_copy_quantize_int4_kv(
     abs_data_0 = tl.abs(src_data_0)
     abs_data_1 = tl.abs(src_data_1)
 
-    data_scale = (tl.maximum(tl.max(abs_data_0, axis=1), tl.max(abs_data_1, axis=1)) / 7.0).to(Out_scale.dtype.element_ty)
+    data_scale = (
+        tl.maximum(tl.max(abs_data_0, axis=1), tl.max(abs_data_1, axis=1)) / 7.0
+    ).to(Out_scale.dtype.element_ty)
     q_src_data_0 = (src_data_0 / data_scale[:, None]).to(tl.int8)
     q_src_data_0 = tl.where(q_src_data_0 > 7, 7, q_src_data_0)
     q_src_data_0 = tl.where(q_src_data_0 < -7, -7, q_src_data_0)
@@ -64,7 +75,13 @@ def _fwd_kernel_destindex_copy_quantize_int4_kv(
 
     out_data = low_4 | high_4
 
-    o_ptrs = Out + dest_index * stride_o_bs + cur_head * stride_o_h + offs_g[:, None] * stride_o_g + offs_d[None, :]
+    o_ptrs = (
+        Out
+        + dest_index * stride_o_bs
+        + cur_head * stride_o_h
+        + offs_g[:, None] * stride_o_g
+        + offs_d[None, :]
+    )
     os_ptrs = Out_scale + dest_index * stride_os_bs + cur_head * stride_os_h + offs_g
     tl.store(o_ptrs, out_data, mask=offs_g[:, None] < group_size)
     tl.store(os_ptrs, data_scale, mask=offs_g < group_size)
@@ -78,7 +95,9 @@ def destindex_copy_int4kv(K, DestLoc, Out, Out_scale):
     head_dim = K.shape[2]
     quant_group_dim = 8
 
-    assert head_dim % quant_group_dim == 0, "error head dim, can not been supported to copy quant kv"
+    assert (
+        head_dim % quant_group_dim == 0
+    ), "error head dim, can not been supported to copy quant kv"
     # grid = (seq_len, head_num)
     # num_warps = 1
 

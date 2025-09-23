@@ -29,12 +29,16 @@ class SubmoduleManager:
         for index, pipe_reader in enumerate(pipe_readers):
             init_state = pipe_reader.recv()
             if init_state != "init ok":
-                logger.error(f"init func {start_funcs[index].__name__} : {str(init_state)}")
+                logger.error(
+                    f"init func {start_funcs[index].__name__} : {str(init_state)}"
+                )
                 for proc in processes:
                     proc.kill()
                 sys.exit(1)
             else:
-                logger.info(f"init func {start_funcs[index].__name__} : {str(init_state)}")
+                logger.info(
+                    f"init func {start_funcs[index].__name__} : {str(init_state)}"
+                )
 
         assert all([proc.is_alive() for proc in processes])
         self.processes.extend(processes)

@@ -5,7 +5,9 @@ import numpy as np
 import torch.nn.functional as F
 from lightllm.utils.log_utils import init_logger
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
-from lightllm.models.llama.triton_kernel.gqa_decode_flashattention_nopad import gqa_decode_attention_fwd
+from lightllm.models.llama.triton_kernel.gqa_decode_flashattention_nopad import (
+    gqa_decode_attention_fwd,
+)
 from lightllm.utils.sgl_utils import flash_attn_with_kvcache
 from sglang.srt.layers.quantization.fp8_kernel import scaled_fp8_quant
 
@@ -29,14 +31,18 @@ def kv_quantize_per_head_fp8(kv_buffer: torch.Tensor, seq_lens):
     valid_mask = (seq_range < seq_lens[:, None]).view(B, S_max, 1, 1)
     masked = kv_buffer * valid_mask
     max_per_bh = masked.float().abs().amax(dim=(1, 3))  # [B, H]
-    scales = torch.where(max_per_bh > 0, max_per_bh / max_fp8, torch.ones_like(max_per_bh))
+    scales = torch.where(
+        max_per_bh > 0, max_per_bh / max_fp8, torch.ones_like(max_per_bh)
+    )
     scales_exp = scales.view(B, 1, H, 1)
     q = (kv_buffer / scales_exp).clamp(min_fp8, max_fp8).to(torch.float8_e4m3fn)
     return q, scales
 
 
 def ref_token_attention_nopad(q, k, v, o, q_h, h_dim, infer_state, req_to_token_indexs):
-    from lightllm.models.llama.triton_kernel.token_attention_nopad_att1 import token_att_fwd
+    from lightllm.models.llama.triton_kernel.token_attention_nopad_att1 import (
+        token_att_fwd,
+    )
 
     total_token_num = infer_state.total_token_num
     batch_size = infer_state.batch_size
@@ -91,9 +97,13 @@ def test_token_attention_nopad_fa3_fp8(batch, seqlen, q_heads, kv_heads, head_di
     #     kv[i] = torch.randn((2 * KV_HEADS, HEAD_DIM), dtype=dtype, device="cuda") * (i % 10 + 1)
 
     max_input_len = Z * N_CTX
-    req_to_token_indexs = torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    req_to_token_indexs = (
+        torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
+    )
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda") * (N_CTX // 2)
-    rand_num = torch.randint_like(b_seq_len, high=(N_CTX // 2), dtype=torch.int32, device="cuda")
+    rand_num = torch.randint_like(
+        b_seq_len, high=(N_CTX // 2), dtype=torch.int32, device="cuda"
+    )
     b_seq_len += rand_num
     b_start_loc = b_seq_len.cumsum(0) - b_seq_len
     b_req_idx = torch.randperm(Z, dtype=torch.int32).cuda()
@@ -156,7 +166,9 @@ def test_token_attention_nopad_fa3_fp8(batch, seqlen, q_heads, kv_heads, head_di
     #     return_softmax_lse=False,
     # )
 
-    q, q_scale = scaled_fp8_quant(q.view(batch_size * kv_heads, -1), use_per_token_if_dynamic=True)
+    q, q_scale = scaled_fp8_quant(
+        q.view(batch_size * kv_heads, -1), use_per_token_if_dynamic=True
+    )
     k, k_scale = kv_quantize_per_head_fp8(k_cache[page_table], b_seq_len)
     v, v_scale = kv_quantize_per_head_fp8(v_cache[page_table], b_seq_len)
     o1 = flash_attn_with_kvcache(

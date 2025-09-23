@@ -2,7 +2,9 @@ import os
 import json
 import torch
 from lightllm.models.registry import ModelRegistry, is_reward_model
-from lightllm.models.internlm2_reward.layer_infer.post_layer_infer import Internlm2RewardPostLayerInfer
+from lightllm.models.internlm2_reward.layer_infer.post_layer_infer import (
+    Internlm2RewardPostLayerInfer,
+)
 from lightllm.models.internlm2_reward.layer_weights.pre_and_post_layer_weight import (
     Internlm2RewardPreAndPostLayerWeight,
 )

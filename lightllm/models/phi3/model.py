@@ -2,8 +2,12 @@ import os
 import json
 import torch
 from lightllm.models.registry import ModelRegistry
-from lightllm.models.phi3.layer_weights.transformer_layer_weight import Phi3TransformerLayerWeight
-from lightllm.models.phi3.layer_infer.transformer_layer_infer import Phi3TransformerLayerInfer
+from lightllm.models.phi3.layer_weights.transformer_layer_weight import (
+    Phi3TransformerLayerWeight,
+)
+from lightllm.models.phi3.layer_infer.transformer_layer_infer import (
+    Phi3TransformerLayerInfer,
+)
 from lightllm.models.llama.model import LlamaTpPartModel
 
 

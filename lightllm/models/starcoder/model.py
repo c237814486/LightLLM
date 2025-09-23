@@ -1,8 +1,14 @@
 from lightllm.models.registry import ModelRegistry
-from lightllm.models.starcoder.layer_infer.transformer_layer_infer import StarcoderTransformerLayerInfer
+from lightllm.models.starcoder.layer_infer.transformer_layer_infer import (
+    StarcoderTransformerLayerInfer,
+)
 from lightllm.models.starcoder.layer_infer.pre_layer_infer import StarcoderPreLayerInfer
-from lightllm.models.starcoder.layer_weights.transformer_layer_weight import StarcoderTransformerLayerWeight
-from lightllm.models.starcoder.layer_weights.pre_and_post_layer_weight import StarcoderPreAndPostLayerWeight
+from lightllm.models.starcoder.layer_weights.transformer_layer_weight import (
+    StarcoderTransformerLayerWeight,
+)
+from lightllm.models.starcoder.layer_weights.pre_and_post_layer_weight import (
+    StarcoderPreAndPostLayerWeight,
+)
 from lightllm.models.bloom.layer_infer.post_layer_infer import BloomPostLayerInfer
 from lightllm.common.build_utils import repair_config
 from lightllm.common.mem_utils import select_mem_manager_class

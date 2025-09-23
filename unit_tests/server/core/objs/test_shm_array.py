@@ -3,7 +3,9 @@
 import pytest
 import numpy as np
 from multiprocessing import shared_memory
-from lightllm.server.core.objs.shm_array import ShmArray  # Replace 'your_module' with the actual module name
+from lightllm.server.core.objs.shm_array import (
+    ShmArray,
+)  # Replace 'your_module' with the actual module name
 
 
 @pytest.fixture(scope="module")

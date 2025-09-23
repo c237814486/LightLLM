@@ -25,7 +25,9 @@ class InferStateLock:
         self.rank_in_dp = rank_in_dp
         # 默认开 128 tp 的空间, 现在应该没什么卡能开这么大的tp 吧
         self.lock_tp_infos = SharedArray(
-            f"{name}_dp_rank_{str(self.dp_rank_in_node)}_lock_tp_infos", shape=(self.dp_world_size + 1,), dtype=np.int64
+            f"{name}_dp_rank_{str(self.dp_rank_in_node)}_lock_tp_infos",
+            shape=(self.dp_world_size + 1,),
+            dtype=np.int64,
         )
         self.lock_tp_infos.arr[:] = 0
 
@@ -74,7 +76,10 @@ class G_Infer_Lock:
             # 当遇到有同步请求的时候，同时自己的mark已经是最大的mark的时候，就在这里休眠，
             # 不去竞争锁, 因为 wait_mark == 1 的时候， 说明acquire_lock_until_ready被调用，
             # 有推理进程在申请同步点操作
-            while self.obj.get_group_wait_mark() == 1 and self.obj.judge_cur_mark_equal_max_mark_in_group():
+            while (
+                self.obj.get_group_wait_mark() == 1
+                and self.obj.judge_cur_mark_equal_max_mark_in_group()
+            ):
                 time.sleep(0)
 
             self.obj.acquire_lock_and_update_cur_mark()

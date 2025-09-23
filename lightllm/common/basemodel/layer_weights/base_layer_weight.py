@@ -2,7 +2,11 @@ import torch
 import numpy as np
 import threading
 from lightllm.common.basemodel.layer_weights.meta_weights import BaseWeight
-from lightllm.utils.dist_utils import get_current_device_id, get_current_rank_in_dp, get_dp_world_size
+from lightllm.utils.dist_utils import (
+    get_current_device_id,
+    get_current_rank_in_dp,
+    get_dp_world_size,
+)
 
 
 class BaseLayerWeight:
@@ -33,7 +37,9 @@ class BaseLayerWeight:
         for attr_name in dir(self):
             attr = getattr(self, attr_name)
             if isinstance(attr, BaseWeight):
-                assert attr.verify_load(), f"Loading {attr_name} of layers {self.layer_num_} fails."
+                assert (
+                    attr.verify_load()
+                ), f"Loading {attr_name} of layers {self.layer_num_} fails."
 
     def _cuda(self, cpu_tensor):
         return cpu_tensor.contiguous().to(self.data_type_).cuda(get_current_device_id())

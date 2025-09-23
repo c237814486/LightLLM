@@ -79,7 +79,9 @@ def _fwd_kernel_fp8(
     )
 
     q = tl.load(Q_nope + off_q, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
-    q_rope = tl.load(Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
+    q_rope = tl.load(
+        Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0
+    )
 
     # initialize pointer to m and l
     m_i = tl.zeros([BLOCK_M], dtype=tl.float32) - float("inf")
@@ -87,36 +89,60 @@ def _fwd_kernel_fp8(
     acc = tl.zeros([BLOCK_M, BLOCK_DMODEL], dtype=tl.float32)
 
     block_mask = tl.where(block_start_loc < cur_batch_seq_len, 1, 0)
-    block_end_loc = tl.minimum((start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len)
+    block_end_loc = tl.minimum(
+        (start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len
+    )
 
     for start_n in range(0, block_mask * block_end_loc, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         kv_loc = tl.load(
-            Req_to_tokens + stride_req_to_tokens_b * cur_batch_req_idx + stride_req_to_tokens_s * (start_n + offs_n),
+            Req_to_tokens
+            + stride_req_to_tokens_b * cur_batch_req_idx
+            + stride_req_to_tokens_s * (start_n + offs_n),
             mask=(start_n + offs_n) < block_end_loc,
             other=0,
         ).to(tl.int64)
-        off_kv = kv_loc[None, :] * stride_kv_bs + cur_kv_head * stride_kv_h + offs_d[:, None] * stride_kv_d
+        off_kv = (
+            kv_loc[None, :] * stride_kv_bs
+            + cur_kv_head * stride_kv_h
+            + offs_d[:, None] * stride_kv_d
+        )
         off_kv_rope = (
             kv_loc[None, :] * stride_kv_rope_bs
             + cur_kv_head * stride_kv_rope_h
             + offs_rope_d[:, None] * stride_kv_rope_d
         )
-        kv = tl.load(KV_nope + off_kv, mask=(start_n + offs_n[None, :]) < block_end_loc, other=0.0)
-        kv_rope = tl.load(KV_rope + off_kv_rope, mask=(start_n + offs_n[None, :]) < block_end_loc, other=0.0)
+        kv = tl.load(
+            KV_nope + off_kv,
+            mask=(start_n + offs_n[None, :]) < block_end_loc,
+            other=0.0,
+        )
+        kv_rope = tl.load(
+            KV_rope + off_kv_rope,
+            mask=(start_n + offs_n[None, :]) < block_end_loc,
+            other=0.0,
+        )
 
         qk = tl.zeros([BLOCK_M, BLOCK_N], dtype=tl.float32)
         if HAS_SCALE:
             off_kv_scale = kv_loc[None, :] * stride_kv_scale_bs
-            kv_scale = tl.load(KV_scale + off_kv_scale, mask=(start_n + offs_n[None, :]) < block_end_loc, other=0.0)
+            kv_scale = tl.load(
+                KV_scale + off_kv_scale,
+                mask=(start_n + offs_n[None, :]) < block_end_loc,
+                other=0.0,
+            )
             kv = (kv * kv_scale).to(kv_scale.dtype)
             kv_rope = (kv_rope * kv_scale).to(kv_scale.dtype)
         qk += tl.dot(q, kv)
         qk += tl.dot(q_rope, kv_rope)
 
         qk *= sm_scale
-        qk = tl.where(offs_m[:, None] + prompt_cache_len >= start_n + offs_n[None, :], qk, float("-100000000.0"))
+        qk = tl.where(
+            offs_m[:, None] + prompt_cache_len >= start_n + offs_n[None, :],
+            qk,
+            float("-100000000.0"),
+        )
 
         # -- compute m_ij, p, l_ij
         m_ij = tl.max(qk, 1)
