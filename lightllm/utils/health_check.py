@@ -26,9 +26,7 @@ class HealthObj:
     _failure_threshold: int = int(os.getenv("HEALTH_FAILURE_THRESHOLD", 3))
     timeout: int = int(os.getenv("HEALTH_TIMEOUT", 100))
     dynamic_timeout: int = int(os.getenv("HEALTH_TIMEOUT", 100))
-    latest_success_infer_time_mark = SharedInt(
-        f"{get_unique_server_name()}_latest_success_infer_time_mark"
-    )
+    latest_success_infer_time_mark = SharedInt(f"{get_unique_server_name()}_latest_success_infer_time_mark")
 
     def begin_check(self):
         self._is_health_checking = True
@@ -80,9 +78,7 @@ async def health_check(args, httpserver_manager: HttpServerManager, request: Req
         prompt = request_dict.pop("inputs")
         sample_params_dict = request_dict["parameters"]
         sampling_params = SamplingParams()
-        sampling_params.init(
-            tokenizer=httpserver_manager.tokenizer, **sample_params_dict
-        )
+        sampling_params.init(tokenizer=httpserver_manager.tokenizer, **sample_params_dict)
         sampling_params.verify()
 
         if get_env_start_args().run_mode == "pd_master":
@@ -90,29 +86,21 @@ async def health_check(args, httpserver_manager: HttpServerManager, request: Req
             # a normal request id is required instead of a negative id.
             sampling_params.group_request_id = _g_health_req_id_gen.generate_id()
         else:
-            sampling_params.group_request_id = (
-                -_g_health_req_id_gen.generate_id()
-            )  # health monitor 的 id 是负的
+            sampling_params.group_request_id = -_g_health_req_id_gen.generate_id()  # health monitor 的 id 是负的
         multimodal_params_dict = request_dict.get("multimodal_params", {})
         multimodal_params = MultimodalParams(**multimodal_params_dict)
-        results_generator = httpserver_manager.generate(
-            prompt, sampling_params, multimodal_params, request, is_health_req=True
-        )
+        results_generator = httpserver_manager.generate(prompt, sampling_params, multimodal_params, request, is_health_req=True)
 
         async def check_timeout(results_generator):
             async for _, _, _, _ in results_generator:
                 pass
 
         try:
-            await asyncio.wait_for(
-                check_timeout(results_generator), timeout=health_obj.dynamic_timeout
-            )
+            await asyncio.wait_for(check_timeout(results_generator), timeout=health_obj.dynamic_timeout)
             health_obj.set_health()
         except asyncio.TimeoutError:
             health_obj.set_unhealth()
-            logger.warning(
-                f"Health check timeout! The failure count is: {str(health_obj._failure_count)}"
-            )
+            logger.warning(f"Health check timeout! The failure count is: {str(health_obj._failure_count)}")
         return health_obj.is_health()
     except Exception as e:
         logger.exception(str(e))

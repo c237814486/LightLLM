@@ -30,9 +30,7 @@ class QwenTransformerLayerInfer(LlamaTransformerLayerInfer):
         q = layer_weight.q_proj.mm(input_emb)
         cache_kv = layer_weight.kv_proj.mm(
             input_emb,
-            out=cache_kv.view(
-                -1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_
-            ),
+            out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),
         ).view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_), self.head_dim_)
 
         rotary_emb_fwd(

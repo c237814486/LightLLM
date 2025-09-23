@@ -51,9 +51,7 @@ class Qwen2_5_VLMLP(nn.Module):
         self.act_fn = ACT2FN[hidden_act]
 
     def forward(self, hidden_state):
-        return self.down_proj(
-            self.act_fn(self.gate_proj(hidden_state)) * self.up_proj(hidden_state)
-        )
+        return self.down_proj(self.act_fn(self.gate_proj(hidden_state)) * self.up_proj(hidden_state))
 
 
 class Qwen2_5_VLVisionFlashAttention(nn.Module):
@@ -73,12 +71,7 @@ class Qwen2_5_VLVisionFlashAttention(nn.Module):
         rotary_sin: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         seq_length = hidden_states.shape[0]
-        q, k, v = (
-            self.qkv(hidden_states)
-            .reshape(seq_length, 3, self.num_heads, -1)
-            .permute(1, 0, 2, 3)
-            .unbind(0)
-        )
+        q, k, v = self.qkv(hidden_states).reshape(seq_length, 3, self.num_heads, -1).permute(1, 0, 2, 3).unbind(0)
         q = apply_rotary_pos_emb_triton(q, rotary_cos, rotary_sin)
         k = apply_rotary_pos_emb_triton(k, rotary_cos, rotary_sin)
 
@@ -131,7 +124,7 @@ class Qwen2_5_VLVisionBlock(nn.Module):
 class Qwen2_5_VLPatchMerger(nn.Module):
     def __init__(self, dim: int, context_dim: int, spatial_merge_size: int = 2) -> None:
         super().__init__()
-        self.hidden_size = context_dim * (spatial_merge_size**2)
+        self.hidden_size = context_dim * (spatial_merge_size ** 2)
         self.ln_q = Qwen2RMSNorm(context_dim, eps=1e-6)
         self.mlp = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size),
@@ -213,9 +206,7 @@ class Qwen2_5_VisionTransformerPretrainedModel(nn.Module):
 
         self.gradient_checkpointing = False
 
-        processor_config_path = os.path.join(
-            self.weight_dir, "preprocessor_config.json"
-        )
+        processor_config_path = os.path.join(self.weight_dir, "preprocessor_config.json")
         with open(processor_config_path, "r") as f:
             processor_config_dict = json.load(f)
         self.processor = Qwen2VLImageProcessor(**processor_config_dict)
@@ -257,18 +248,14 @@ class Qwen2_5_VisionTransformerPretrainedModel(nn.Module):
         window_index: list = []
         cu_window_seqlens: list = [0]
         window_index_id = 0
-        vit_merger_window_size = (
-            self.window_size // self.spatial_merge_size // self.patch_size
-        )
+        vit_merger_window_size = self.window_size // self.spatial_merge_size // self.patch_size
 
         for grid_t, grid_h, grid_w in grid_thw:
             llm_grid_h, llm_grid_w = (
                 grid_h // self.spatial_merge_size,
                 grid_w // self.spatial_merge_size,
             )
-            index = torch.arange(grid_t * llm_grid_h * llm_grid_w).reshape(
-                grid_t, llm_grid_h, llm_grid_w
-            )
+            index = torch.arange(grid_t * llm_grid_h * llm_grid_w).reshape(grid_t, llm_grid_h, llm_grid_w)
             pad_h = vit_merger_window_size - llm_grid_h % vit_merger_window_size
             pad_w = vit_merger_window_size - llm_grid_w % vit_merger_window_size
             num_windows_h = (llm_grid_h + pad_h) // vit_merger_window_size
@@ -291,26 +278,20 @@ class Qwen2_5_VisionTransformerPretrainedModel(nn.Module):
             index_padded = index_padded.reshape(-1)
             index_new = index_padded[index_padded != -100]
             window_index.append(index_new + window_index_id)
-            cu_seqlens_tmp = (
-                seqlens.cumsum(0) * self.spatial_merge_unit + cu_window_seqlens[-1]
-            )
+            cu_seqlens_tmp = seqlens.cumsum(0) * self.spatial_merge_unit + cu_window_seqlens[-1]
             cu_window_seqlens.extend(cu_seqlens_tmp.tolist())
             window_index_id += (grid_t * llm_grid_h * llm_grid_w).item()
         window_index = torch.cat(window_index, dim=0)
 
         return window_index, cu_window_seqlens
 
-    def forward(
-        self, hidden_states: torch.Tensor, grid_thw: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor) -> torch.Tensor:
         hidden_states = self.patch_embed(hidden_states)
         rotary_cos, rotary_sin = self.rot_pos_emb(grid_thw)
         rotary_cos = rotary_cos.to("cuda", non_blocking=True)
         rotary_sin = rotary_sin.to("cuda", non_blocking=True)
 
-        cu_seqlens = torch.repeat_interleave(
-            grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]
-        ).cumsum(dim=0, dtype=torch.int32)
+        cu_seqlens = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cumsum(dim=0, dtype=torch.int32)
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0).to("cuda", non_blocking=True)
         max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
 
@@ -321,12 +302,8 @@ class Qwen2_5_VisionTransformerPretrainedModel(nn.Module):
             device=hidden_states.device,
             dtype=grid_thw.dtype if torch.jit.is_tracing() else torch.int32,
         )
-        cu_window_seqlens = torch.unique_consecutive(cu_window_seqlens).to(
-            "cuda", non_blocking=True
-        )
-        max_window_seqlen = (
-            (cu_window_seqlens[1:] - cu_window_seqlens[:-1]).max().item()
-        )
+        cu_window_seqlens = torch.unique_consecutive(cu_window_seqlens).to("cuda", non_blocking=True)
+        max_window_seqlen = (cu_window_seqlens[1:] - cu_window_seqlens[:-1]).max().item()
 
         seq_len, _ = hidden_states.size()
         pos_shape = (seq_len // self.spatial_merge_unit, self.spatial_merge_unit, -1)
@@ -374,9 +351,7 @@ class Qwen2_5_VisionTransformerPretrainedModel(nn.Module):
 
     def load_model(self, weight_dir):
 
-        bin_weight_files = [
-            file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")
-        ]
+        bin_weight_files = [file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")]
         if bin_weight_files:
             weight_dict = {}
             for file_ in bin_weight_files:
@@ -386,11 +361,7 @@ class Qwen2_5_VisionTransformerPretrainedModel(nn.Module):
                         weight_dict[k[len("visual.") :]] = v
 
         else:
-            hf_weight_files = [
-                file_
-                for file_ in os.listdir(weight_dir)
-                if file_.endswith(".safetensors")
-            ]
+            hf_weight_files = [file_ for file_ in os.listdir(weight_dir) if file_.endswith(".safetensors")]
             weight_dict = {}
             for file_ in hf_weight_files:
                 f = safe_open(os.path.join(weight_dir, file_), "pt", "cpu")
@@ -417,12 +388,10 @@ class Qwen2_5_VisionTransformerPretrainedModel(nn.Module):
                 img_tensors.append(pixel_values)
                 img_grids.append(image_grid_thw)
             else:
-                raise Exception(
-                    "Unsupport input types: {} for {}".format(type(img), img)
-                )
+                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
 
             # must devide merge_length
-            cur_num = img_tensors[-1].shape[0] // (self.spatial_merge_size**2)
+            cur_num = img_tensors[-1].shape[0] // (self.spatial_merge_size ** 2)
 
             valid_ids.append([valid_id, valid_id + cur_num])
             valid_id += cur_num

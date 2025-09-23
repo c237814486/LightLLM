@@ -6,9 +6,7 @@ import triton.language as tl
 from triton import Config
 
 
-def weight_dequant(
-    x: torch.Tensor, s: torch.Tensor, block_size: int = 128
-) -> torch.Tensor:
+def weight_dequant(x: torch.Tensor, s: torch.Tensor, block_size: int = 128) -> torch.Tensor:
     """
     Dequantizes the given weight tensor using the provided scale tensor.
 

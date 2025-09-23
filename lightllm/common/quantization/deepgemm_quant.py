@@ -40,9 +40,7 @@ class DeepGEMMFP8w8a8B128QuantizationMethod(DeepGEMMBaseQuantizationMethod):
         super().__init__()
         self.block_size = 128
         self.weight_scale_suffix = "weight_scale_inv"
-        self.act_scale_suffix = (
-            None  # no support for static input tensor scale for ds model.
-        )
+        self.act_scale_suffix = None  # no support for static input tensor scale for ds model.
 
     def quantize(self, weight: torch.Tensor):
         from lightllm.common.quantization.triton_quant.fp8.fp8w8a8_block_quant_kernel import (
@@ -73,12 +71,8 @@ class DeepGEMMFP8w8a8B128QuantizationMethod(DeepGEMMBaseQuantizationMethod):
                 dtype=torch.float32,
                 device=input_tensor.device,
             )
-            qinput_tensor = self.cache_manager.alloc_tensor(
-                (m, k), qweight.dtype, device=qweight.device, is_graph_out=False
-            )
-            per_token_group_quant_fp8(
-                input_tensor, self.block_size, qinput_tensor, input_scale
-            )
+            qinput_tensor = self.cache_manager.alloc_tensor((m, k), qweight.dtype, device=qweight.device, is_graph_out=False)
+            per_token_group_quant_fp8(input_tensor, self.block_size, qinput_tensor, input_scale)
             input_scale = tma_align_input_scale(input_scale)
 
         if out is None:
@@ -90,10 +84,6 @@ class DeepGEMMFP8w8a8B128QuantizationMethod(DeepGEMMBaseQuantizationMethod):
                     is_graph_out=False,
                 )
             else:
-                out = torch.empty(
-                    (m, n), dtype=input_tensor.dtype, device=input_tensor.device
-                )
-        deep_gemm.gemm_fp8_fp8_bf16_nt(
-            [qinput_tensor, input_scale], [qweight.t(), weight_scale.t()], out
-        )
+                out = torch.empty((m, n), dtype=input_tensor.dtype, device=input_tensor.device)
+        deep_gemm.gemm_fp8_fp8_bf16_nt([qinput_tensor, input_scale], [qweight.t(), weight_scale.t()], out)
         return out

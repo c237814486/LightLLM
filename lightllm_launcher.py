@@ -18,9 +18,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # 避免 typeguard 在冻结环境中尝试读取源码导致失败
 os.environ.setdefault("TYPEGUARD_DISABLE", "true")
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("lightllm_launcher")
 
 
@@ -46,11 +44,7 @@ def _prepare_runtime_env(env: dict) -> dict:
     lightllm_path = os.path.join(base_dir, "lightllm")
     if os.path.exists(lightllm_path):
         current_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = (
-            f"{lightllm_path}:{current_pythonpath}"
-            if current_pythonpath
-            else lightllm_path
-        )
+        env["PYTHONPATH"] = f"{lightllm_path}:{current_pythonpath}" if current_pythonpath else lightllm_path
 
     # 配置 lightllm_kernel 路径（PYTHONPATH 与动态库路径）
     # 在冻结环境中，lightllm_kernel 在 _internal 目录下
@@ -62,11 +56,7 @@ def _prepare_runtime_env(env: dict) -> dict:
     if os.path.exists(kernel_pkg_dir):
         # 确保 python 可以找到 lightllm_kernel 包
         current_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = (
-            f"{kernel_pkg_dir}:{current_pythonpath}"
-            if current_pythonpath
-            else kernel_pkg_dir
-        )
+        env["PYTHONPATH"] = f"{kernel_pkg_dir}:{current_pythonpath}" if current_pythonpath else kernel_pkg_dir
 
         # 动态库搜索路径：顶层、_internal、包目录、_libs 目录
         ld_paths = [
@@ -78,9 +68,7 @@ def _prepare_runtime_env(env: dict) -> dict:
         ld_old = env.get("LD_LIBRARY_PATH", "")
         ld_new_parts = [p for p in ld_paths if os.path.exists(p)]
         if ld_new_parts:
-            env["LD_LIBRARY_PATH"] = ":".join(
-                ld_new_parts + ([ld_old] if ld_old else [])
-            )
+            env["LD_LIBRARY_PATH"] = ":".join(ld_new_parts + ([ld_old] if ld_old else []))
 
     # 抑制常见警告
     env["PYTHONWARNINGS"] = "ignore::DeprecationWarning,ignore::FutureWarning"
@@ -255,20 +243,12 @@ def main() -> int:
         default="triton_flashdecoding",
         help="推理模式，如triton_flashdecoding, ppl_int8kv_flashdecoding等",
     )
-    parser.add_argument(
-        "--data_type", type=str, default="bf16", help="数据类型，如bf16, fp16, fp8等"
-    )
-    parser.add_argument(
-        "--quant_type", type=str, default=None, help="量化类型，如vllm-fp8w8a8等"
-    )
+    parser.add_argument("--data_type", type=str, default="bf16", help="数据类型，如bf16, fp16, fp8等")
+    parser.add_argument("--quant_type", type=str, default=None, help="量化类型，如vllm-fp8w8a8等")
 
     # 性能配置参数
-    parser.add_argument(
-        "--max_req_total_len", type=int, default=4000, help="最大请求总长度"
-    )
-    parser.add_argument(
-        "--max_total_token_num", type=int, default=4096, help="最大总token数"
-    )
+    parser.add_argument("--max_req_total_len", type=int, default=4000, help="最大请求总长度")
+    parser.add_argument("--max_total_token_num", type=int, default=4096, help="最大总token数")
     parser.add_argument("--cache_capacity", type=int, default=20000, help="缓存容量")
     parser.add_argument("--mem_fraction", type=float, default=0.9, help="内存使用比例")
 
@@ -277,44 +257,22 @@ def main() -> int:
     parser.add_argument("--nccl_port", type=int, default=28765, help="NCCL端口")
 
     # 多模态配置参数
-    parser.add_argument(
-        "--enable_multimodal", action="store_true", help="启用多模态支持"
-    )
-    parser.add_argument(
-        "--enable_multimodal_audio", action="store_true", help="启用多模态语音支持"
-    )
-    parser.add_argument(
-        "--visual_gpu_ids", type=str, default="0", help="视觉处理GPU ID"
-    )
+    parser.add_argument("--enable_multimodal", action="store_true", help="启用多模态支持")
+    parser.add_argument("--enable_multimodal_audio", action="store_true", help="启用多模态语音支持")
+    parser.add_argument("--visual_gpu_ids", type=str, default="0", help="视觉处理GPU ID")
     parser.add_argument("--audio_gpu_ids", type=str, default="0", help="音频处理GPU ID")
-    parser.add_argument(
-        "--visual_nccl_ports", type=int, default=29501, help="视觉NCCL端口"
-    )
-    parser.add_argument(
-        "--visual_infer_batch_size", type=int, default=8, help="视觉推理批次大小"
-    )
+    parser.add_argument("--visual_nccl_ports", type=int, default=29501, help="视觉NCCL端口")
+    parser.add_argument("--visual_infer_batch_size", type=int, default=8, help="视觉推理批次大小")
 
     # 其他配置参数
     parser.add_argument("--tokenizer_mode", type=str, default="auto", help="分词器模式")
     parser.add_argument("--trust_remote_code", action="store_true", help="信任远程代码")
-    parser.add_argument(
-        "--use_dynamic_prompt_cache", action="store_true", help="使用动态提示缓存"
-    )
-    parser.add_argument(
-        "--sampling_backend", type=str, default="triton_top_kp", help="采样后端"
-    )
-    parser.add_argument(
-        "--enable_concurrent_alloc", action="store_true", help="启用并发分配"
-    )
-    parser.add_argument(
-        "--graph_max_batch_size", type=int, default=4, help="图最大批次大小"
-    )
-    parser.add_argument(
-        "--graph_max_len_in_batch", type=int, default=1024, help="批次中图最大长度"
-    )
-    parser.add_argument(
-        "--chunked_prefill_size", type=int, default=1024, help="分块预填充大小"
-    )
+    parser.add_argument("--use_dynamic_prompt_cache", action="store_true", help="使用动态提示缓存")
+    parser.add_argument("--sampling_backend", type=str, default="triton_top_kp", help="采样后端")
+    parser.add_argument("--enable_concurrent_alloc", action="store_true", help="启用并发分配")
+    parser.add_argument("--graph_max_batch_size", type=int, default=4, help="图最大批次大小")
+    parser.add_argument("--graph_max_len_in_batch", type=int, default=1024, help="批次中图最大长度")
+    parser.add_argument("--chunked_prefill_size", type=int, default=1024, help="分块预填充大小")
 
     args = parser.parse_args()
 
@@ -403,9 +361,7 @@ def main() -> int:
                 ]
             )
         if args.enable_multimodal_audio:
-            server_args.extend(
-                ["--enable_multimodal_audio", "--audio_gpu_ids", args.audio_gpu_ids]
-            )
+            server_args.extend(["--enable_multimodal_audio", "--audio_gpu_ids", args.audio_gpu_ids])
 
         # 设置sys.argv并启动服务器
         old_argv = list(sys.argv)

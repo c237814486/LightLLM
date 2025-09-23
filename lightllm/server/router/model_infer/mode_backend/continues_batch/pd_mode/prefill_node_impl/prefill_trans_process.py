@@ -52,14 +52,9 @@ def _handle_kvmove_task(
                     dp_size_in_node,
                     connect_id_to_comm[connect_id],
                 )
-            logger.info(
-                f"trans finished: {move_tasks[0].to_prefill_log_info()} move len: {total_move_kv_len}"
-            )
+            logger.info(f"trans finished: {move_tasks[0].to_prefill_log_info()} move len: {total_move_kv_len}")
         torch.cuda.synchronize()
-        logger.info(
-            f"trans cost time: {(time.time() - start)},"
-            f"move_total_kv_len: {total_move_kv_len}, {move_tasks[0].to_prefill_log_info()}"
-        )
+        logger.info(f"trans cost time: {(time.time() - start)}," f"move_total_kv_len: {total_move_kv_len}, {move_tasks[0].to_prefill_log_info()}")
         task_out_queue.put("ok")
     except BaseException as e:
         logger.exception(str(e))
@@ -81,9 +76,7 @@ def _handle_decode_join(
 
         def async_connect():
             torch.cuda.set_device(node_info.prefill_device_id)
-            group = StatelessP2PProcessGroup.create(
-                src_id=src_id, dest_id=dest_id, is_server=True, store=store
-            )
+            group = StatelessP2PProcessGroup.create(src_id=src_id, dest_id=dest_id, is_server=True, store=store)
             comm = PyNcclCommunicator(group, node_info.prefill_device_id)
             result_list.append(comm)
             return
@@ -131,16 +124,12 @@ def _init_env(
         )
         dp_size_in_node = max(1, args.dp // args.nnodes)
         task_out_queue.put("proc_start")
-        mem_managers: List[MemoryManager] = [
-            mem_queue.get(timeout=60) for mem_queue in mem_queues
-        ]
+        mem_managers: List[MemoryManager] = [mem_queue.get(timeout=60) for mem_queue in mem_queues]
         task_out_queue.put("get_mem_managers_ok")
         connect_id_to_comm: Dict[str, PyNcclCommunicator] = {}
 
         while True:
-            task: Union[KVMoveTaskGroup, PDTransJoinInfo, PDTransLeaveInfo] = (
-                task_in_queue.get()
-            )
+            task: Union[KVMoveTaskGroup, PDTransJoinInfo, PDTransLeaveInfo] = task_in_queue.get()
             if isinstance(task, KVMoveTaskGroup):
                 _handle_kvmove_task(
                     task.tasks,
@@ -151,18 +140,14 @@ def _init_env(
                     dp_size_in_node,
                 )
             elif isinstance(task, PDTransJoinInfo):
-                _handle_decode_join(
-                    task, task_out_queue, connect_id_to_comm, master_store
-                )
+                _handle_decode_join(task, task_out_queue, connect_id_to_comm, master_store)
             elif isinstance(task, PDTransLeaveInfo):
                 if task.connect_id in connect_id_to_comm:
                     connect_id_to_comm[task.connect_id].destroy()
                     connect_id_to_comm.pop(task.connect_id, None)
                     logger.info(f"destory {task} nccl communicator.")
                 else:
-                    logger.error(
-                        f"connect id {task.connect_id} dont exist in connect_id_to_comm"
-                    )
+                    logger.error(f"connect id {task.connect_id} dont exist in connect_id_to_comm")
             else:
                 logger.warning(f"unexpected task type: {task}")
 

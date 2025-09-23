@@ -36,9 +36,7 @@ class MlaDecodeAttentionKernelConfig(KernelConfigs):
                     key=lambda x: abs(int(x) - avg_seq_len_in_batch),
                 )
             ]
-            config = batch_size_config[
-                min(batch_size_config.keys(), key=lambda x: abs(int(x) - batch_size))
-            ]
+            config = batch_size_config[min(batch_size_config.keys(), key=lambda x: abs(int(x) - batch_size))]
 
             return config
         else:

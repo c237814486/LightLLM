@@ -18,16 +18,10 @@ SKIP_SPECIAL_TOKENS = os.getenv("SKIP_SPECIAL_TOKENS", "True").upper() in [
 
 # 从环境变量获取最大长度限制
 STOP_SEQUENCE_MAX_LENGTH = int(os.getenv("LIGHTLLM_STOP_SEQUENCE_MAX_LENGTH", 256))
-ALLOWED_TOKEN_IDS_MAX_LENGTH = int(
-    os.getenv("LIGHTLLM_ALLOWED_TOKEN_IDS_MAX_LENGTH", 256)
-)
+ALLOWED_TOKEN_IDS_MAX_LENGTH = int(os.getenv("LIGHTLLM_ALLOWED_TOKEN_IDS_MAX_LENGTH", 256))
 MAX_STOP_SEQUENCES = int(os.getenv("LIGHTLLM_MAX_STOP_SEQUENCES", 10))
-REGULAR_CONSTRAINT_MAX_LENGTH = int(
-    os.getenv("LIGHTLLM_REGULAR_CONSTRAINT_MAX_LENGTH", 2048)
-)
-GRAMMAR_CONSTRAINT_MAX_LENGTH = int(
-    os.getenv("LIGHTLLM_GRAMMAR_CONSTRAINT_MAX_LENGTH", 2048)
-)
+REGULAR_CONSTRAINT_MAX_LENGTH = int(os.getenv("LIGHTLLM_REGULAR_CONSTRAINT_MAX_LENGTH", 2048))
+GRAMMAR_CONSTRAINT_MAX_LENGTH = int(os.getenv("LIGHTLLM_GRAMMAR_CONSTRAINT_MAX_LENGTH", 2048))
 JSON_SCHEMA_MAX_LENGTH = int(os.getenv("LIGHTLLM_JSON_SCHEMA_MAX_LENGTH", 2048))
 
 
@@ -56,9 +50,7 @@ class StopSequenceGroups(ctypes.Structure):
     ]
 
     def initialize(self, stop_sequences: Union[str, List], tokenizer):
-        groups: List[List[int]] = self.stop_sentences_to_token_ids(
-            stop_sequences, tokenizer
-        )
+        groups: List[List[int]] = self.stop_sentences_to_token_ids(stop_sequences, tokenizer)
         self.size = len(groups)
         assert self.size <= MAX_STOP_SEQUENCES, "Too many stop sequence groups."
         for group_idx in range(self.size):
@@ -101,9 +93,7 @@ class RegularConstraint(ctypes.Structure):
 
     def initialize(self, constraint: str):
         constraint_bytes = constraint.encode("utf-8")
-        assert (
-            len(constraint_bytes) < REGULAR_CONSTRAINT_MAX_LENGTH
-        ), "Regular constraint is too long."
+        assert len(constraint_bytes) < REGULAR_CONSTRAINT_MAX_LENGTH, "Regular constraint is too long."
 
         ctypes.memmove(self.constraint, constraint_bytes, len(constraint_bytes))
         self.length = len(constraint_bytes)
@@ -112,9 +102,7 @@ class RegularConstraint(ctypes.Structure):
 
             interegular.parse_pattern(constraint)
         except Exception as e:
-            raise ValueError(
-                f"regular_expression '{constraint}' has parse_pattern_error: {str(e)}"
-            )
+            raise ValueError(f"regular_expression '{constraint}' has parse_pattern_error: {str(e)}")
         return
 
     def to_str(self):
@@ -130,9 +118,7 @@ class GuidedGrammar(ctypes.Structure):
 
     def initialize(self, constraint: str, tokenizer):
         constraint_bytes = constraint.encode("utf-8")
-        assert (
-            len(constraint_bytes) < GRAMMAR_CONSTRAINT_MAX_LENGTH
-        ), "Guided grammar is too long."
+        assert len(constraint_bytes) < GRAMMAR_CONSTRAINT_MAX_LENGTH, "Guided grammar is too long."
 
         ctypes.memmove(self.constraint, constraint_bytes, len(constraint_bytes))
         self.length = len(constraint_bytes)
@@ -144,9 +130,7 @@ class GuidedGrammar(ctypes.Structure):
                 xgrammar_compiler = xgr.GrammarCompiler(tokenizer_info, max_threads=8)
                 xgrammar_compiler.compile_grammar(constraint)
         except Exception as e:
-            raise ValueError(
-                f"guided_grammar '{constraint}' has compile_grammar_error: {str(e)}"
-            )
+            raise ValueError(f"guided_grammar '{constraint}' has compile_grammar_error: {str(e)}")
         return
 
     def to_str(self):
@@ -164,9 +148,7 @@ class GuidedJsonSchema(ctypes.Structure):
 
     def initialize(self, constraint: str, tokenizer):
         constraint_bytes = constraint.encode("utf-8")
-        assert (
-            len(constraint_bytes) < JSON_SCHEMA_MAX_LENGTH
-        ), "Guided json schema is too long."
+        assert len(constraint_bytes) < JSON_SCHEMA_MAX_LENGTH, "Guided json schema is too long."
 
         ctypes.memmove(self.constraint, constraint_bytes, len(constraint_bytes))
         self.length = len(constraint_bytes)
@@ -178,9 +160,7 @@ class GuidedJsonSchema(ctypes.Structure):
                 xgrammar_compiler = xgr.GrammarCompiler(tokenizer_info, max_threads=8)
                 xgrammar_compiler.compile_json_schema(constraint)
         except Exception as e:
-            raise ValueError(
-                f"guided_grammar '{constraint}' has compile_grammar_error: {str(e)}"
-            )
+            raise ValueError(f"guided_grammar '{constraint}' has compile_grammar_error: {str(e)}")
         return
 
     def to_str(self):
@@ -214,15 +194,11 @@ class ExponentialDecayLengthPenalty(ctypes.Structure):
     ]
 
     def initialize(self, inputs: Tuple[int, float]):
-        assert (
-            len(inputs) == 2
-        ), "ExponentialDecayLengthPenalty must be Tuple[int, float]"
+        assert len(inputs) == 2, "ExponentialDecayLengthPenalty must be Tuple[int, float]"
         self.item0 = inputs[0]
         assert self.item0 >= 0, "ExponentialDecayLengthPenalty item0 must be int >= 0"
         self.item1 = inputs[1]
-        assert (
-            self.item1 >= 1.0
-        ), "ExponentialDecayLengthPenalty item1 must be a float >= 1.0"
+        assert self.item1 >= 1.0, "ExponentialDecayLengthPenalty item1 must be a float >= 1.0"
         return
 
     def to_tuple(self):
@@ -271,9 +247,7 @@ class DecodeNode(ctypes.Structure):
             "ip": ".".join(str(self.ip[i]) for i in range(4)),
             "rpyc_port": self.rpyc_port,
             "max_new_tokens": self.max_new_tokens,
-            "pd_master_node_id": (
-                (self.pd_master_node_id_high << 64) | self.pd_master_node_id_low
-            ),
+            "pd_master_node_id": ((self.pd_master_node_id_high << 64) | self.pd_master_node_id_low),
         }
 
 
@@ -345,15 +319,9 @@ class SamplingParams(ctypes.Structure):
         self.best_of = kwargs.get("best_of", 1)
         self.n = kwargs.get("n", self.best_of)
         self.do_sample = kwargs.get("do_sample", SamplingParams._do_sample)
-        self.presence_penalty = kwargs.get(
-            "presence_penalty", SamplingParams._presence_penalty
-        )
-        self.frequency_penalty = kwargs.get(
-            "frequency_penalty", SamplingParams._frequency_penalty
-        )
-        self.repetition_penalty = kwargs.get(
-            "repetition_penalty", SamplingParams._repetition_penalty
-        )
+        self.presence_penalty = kwargs.get("presence_penalty", SamplingParams._presence_penalty)
+        self.frequency_penalty = kwargs.get("frequency_penalty", SamplingParams._frequency_penalty)
+        self.repetition_penalty = kwargs.get("repetition_penalty", SamplingParams._repetition_penalty)
         self.temperature = kwargs.get("temperature", SamplingParams._temperature)
         self.top_p = kwargs.get("top_p", SamplingParams._top_p)
         self.top_k = kwargs.get("top_k", SamplingParams._top_k)
@@ -365,25 +333,17 @@ class SamplingParams(ctypes.Structure):
         self.group_request_id = kwargs.get("group_request_id", -1)
         self.suggested_dp_index = kwargs.get("suggested_dp_index", -1)
 
-        self.skip_special_tokens = kwargs.get(
-            "skip_special_tokens", SKIP_SPECIAL_TOKENS
-        )
+        self.skip_special_tokens = kwargs.get("skip_special_tokens", SKIP_SPECIAL_TOKENS)
 
         self.add_special_tokens = kwargs.get("add_special_tokens", True)
-        self.add_spaces_between_special_tokens = kwargs.get(
-            "add_spaces_between_special_tokens", True
-        )
+        self.add_spaces_between_special_tokens = kwargs.get("add_spaces_between_special_tokens", True)
         self.print_eos_token = kwargs.get("print_eos_token", False)
 
         self.exponential_decay_length_penalty = ExponentialDecayLengthPenalty()
-        self.exponential_decay_length_penalty.initialize(
-            kwargs.get("exponential_decay_length_penalty", (1, 1.0))
-        )
+        self.exponential_decay_length_penalty.initialize(kwargs.get("exponential_decay_length_penalty", (1, 1.0)))
 
         self.move_kv_to_decode_node = DecodeNode()
-        self.move_kv_to_decode_node.initialize(
-            kwargs.get("move_kv_to_decode_node", None)
-        )
+        self.move_kv_to_decode_node.initialize(kwargs.get("move_kv_to_decode_node", None))
 
         # Initialize regular_constraint
         regular_constraint = kwargs.get("regular_constraint", "")
@@ -414,9 +374,7 @@ class SamplingParams(ctypes.Structure):
             self.temperature = 1.0
             self.top_p = 1.0
             self.top_k = 1
-        if (
-            self.temperature >= 0.0 and self.temperature < _SAMPLING_EPS
-        ):  # temperature is too slow, change to greedy search
+        if self.temperature >= 0.0 and self.temperature < _SAMPLING_EPS:  # temperature is too slow, change to greedy search
             self.temperature = 1.0
             self.top_k = 1
 
@@ -425,9 +383,7 @@ class SamplingParams(ctypes.Structure):
     @classmethod
     def load_generation_cfg(cls, weight_dir):
         try:
-            generation_cfg = GenerationConfig.from_pretrained(
-                weight_dir, trust_remote_code=True
-            ).to_dict()
+            generation_cfg = GenerationConfig.from_pretrained(weight_dir, trust_remote_code=True).to_dict()
             cls._do_sample = generation_cfg.get("do_sample", False)
             cls._presence_penalty = generation_cfg.get("presence_penalty", 0.0)
             cls._frequency_penalty = generation_cfg.get("frequency_penalty", 0.0)
@@ -440,47 +396,29 @@ class SamplingParams(ctypes.Structure):
 
     def verify(self):
         if self.best_of <= 0 or self.best_of > MAX_BEST_OF:
-            raise ValueError(
-                f"need 0 < best_of <= {MAX_BEST_OF}, but got {self.best_of}"
-            )
+            raise ValueError(f"need 0 < best_of <= {MAX_BEST_OF}, but got {self.best_of}")
         if self.n != self.best_of:
             raise ValueError("current only supported n == best_of")
         if self.n <= 0 or self.n > MAX_BEST_OF or self.n > self.best_of:
-            raise ValueError(
-                f"need 0 < n <= {MAX_BEST_OF}, n <= {self.best_of}, but got {self.n}"
-            )
+            raise ValueError(f"need 0 < n <= {MAX_BEST_OF}, n <= {self.best_of}, but got {self.n}")
         if self.presence_penalty < 0.0:
-            raise ValueError(
-                f"presence_penalty must >= 0.0, got {self.presence_penalty}"
-            )
+            raise ValueError(f"presence_penalty must >= 0.0, got {self.presence_penalty}")
         if self.frequency_penalty < 0.0:
-            raise ValueError(
-                f"frequency_penalty must >= 0.0, got {self.frequency_penalty}"
-            )
+            raise ValueError(f"frequency_penalty must >= 0.0, got {self.frequency_penalty}")
         if self.repetition_penalty < 1.0:
-            raise ValueError(
-                f"repetition_penalty must >= 1.0, got {self.repetition_penalty}"
-            )
+            raise ValueError(f"repetition_penalty must >= 1.0, got {self.repetition_penalty}")
         if self.temperature <= 0.0:
             raise ValueError(f"temperature must > 0.0, got {self.temperature}")
         if self.top_p <= 0.0 or self.top_p > 1.0:
             raise ValueError(f"top_p must be in (0.0, 1.0], got {self.top_p}")
         if self.top_k < -1 or self.top_k == 0:
-            raise ValueError(
-                f"top_k must be -1 (disable), or at least 1, got {self.top_k}."
-            )
+            raise ValueError(f"top_k must be -1 (disable), or at least 1, got {self.top_k}.")
         if self.max_new_tokens < 1:
-            raise ValueError(
-                f"max_new_tokens must be at least 1, got {self.max_new_tokens}."
-            )
+            raise ValueError(f"max_new_tokens must be at least 1, got {self.max_new_tokens}.")
         if self.min_new_tokens < 1:
-            raise ValueError(
-                f"min_new_tokens must be at least 1, got {self.min_new_tokens}."
-            )
+            raise ValueError(f"min_new_tokens must be at least 1, got {self.min_new_tokens}.")
         if self.min_new_tokens > self.max_new_tokens:
-            raise ValueError(
-                f"min_new_tokens must <= max_new_tokens, but got min {self.min_new_tokens}, max {self.max_new_tokens}."
-            )
+            raise ValueError(f"min_new_tokens must <= max_new_tokens, but got min {self.min_new_tokens}, max {self.max_new_tokens}.")
 
         self._verify_allowed_token_ids()
         self._verify_grammar_constraint()
@@ -490,29 +428,19 @@ class SamplingParams(ctypes.Structure):
     def _verify_grammar_constraint(self):
         if self.guided_grammar.length != 0:
             if self.regular_constraint.length != 0:
-                raise ValueError(
-                    "guided_grammar and regular_constraint can not be used in same time"
-                )
+                raise ValueError("guided_grammar and regular_constraint can not be used in same time")
             if self.guided_json.length != 0:
-                raise ValueError(
-                    "guided_grammar and guided_json can not be used in same time"
-                )
+                raise ValueError("guided_grammar and guided_json can not be used in same time")
         return
 
     def _verify_allowed_token_ids(self):
         if self.allowed_token_ids.size != 0:
             if self.regular_constraint.length != 0:
-                raise ValueError(
-                    "allowed_token_ids and regular_constraint can not be used in same time"
-                )
+                raise ValueError("allowed_token_ids and regular_constraint can not be used in same time")
             if self.guided_grammar.length != 0:
-                raise ValueError(
-                    "allowed_token_ids and guided_grammar can not be used in same time"
-                )
+                raise ValueError("allowed_token_ids and guided_grammar can not be used in same time")
             if self.guided_json.length != 0:
-                raise ValueError(
-                    "allowed_token_ids and guided_json can not be used in same time"
-                )
+                raise ValueError("allowed_token_ids and guided_json can not be used in same time")
         return
 
     def to_dict(self):

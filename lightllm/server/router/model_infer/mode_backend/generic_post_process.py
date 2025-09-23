@@ -17,9 +17,7 @@ def sample(logits: torch.Tensor, reqs: List[InferReq], eos_id: List[int] = [2]):
         b_length_penalty_param,
         b_mask_eos_reqs,
     ) = _get_post_sample_tensors(reqs)
-    eos_ids = torch.tensor(
-        eos_id, dtype=torch.int32, device="cpu", pin_memory=True
-    ).cuda(non_blocking=True)
+    eos_ids = torch.tensor(eos_id, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
 
     sampling_params_manager = g_infer_context.req_manager.req_sampling_params_manager
 
@@ -40,9 +38,7 @@ def sample(logits: torch.Tensor, reqs: List[InferReq], eos_id: List[int] = [2]):
             p_token_ids,
             p_token_counts,
             p_cumsum_seq_len,
-        ) = sampling_params_manager.gen_cpu_out_token_counter_sampling_params(
-            req_objs=reqs
-        )
+        ) = sampling_params_manager.gen_cpu_out_token_counter_sampling_params(req_objs=reqs)
 
         apply_penalty(
             Logits=logits,
@@ -71,9 +67,7 @@ def sample(logits: torch.Tensor, reqs: List[InferReq], eos_id: List[int] = [2]):
         probs_sort, probs_idx = _top_p_top_k(probs, b_top_ps, b_top_ks)
         sampled_index = torch.multinomial(probs_sort, num_samples=1, replacement=True)
         next_token_ids = torch.gather(probs_idx, dim=1, index=sampled_index)
-        next_token_logprobs = torch.log(
-            torch.gather(probs_sort, dim=1, index=sampled_index)
-        )
+        next_token_logprobs = torch.log(torch.gather(probs_sort, dim=1, index=sampled_index))
         return next_token_ids.view(-1), next_token_logprobs.view(-1)
 
     elif get_env_start_args().sampling_backend == "triton_top_kp":
@@ -82,9 +76,7 @@ def sample(logits: torch.Tensor, reqs: List[InferReq], eos_id: List[int] = [2]):
         sampled_index = torch.multinomial(probs_sort, num_samples=1, replacement=False)
 
         next_token_ids = torch.gather(probs_idx, dim=1, index=sampled_index)
-        next_token_logprobs = torch.log(
-            torch.gather(probs_sort, dim=1, index=sampled_index)
-        )
+        next_token_logprobs = torch.log(torch.gather(probs_sort, dim=1, index=sampled_index))
         return next_token_ids.view(-1), next_token_logprobs.view(-1)
 
     elif get_env_start_args().sampling_backend == "sglang_kernel":
@@ -97,13 +89,9 @@ def sample(logits: torch.Tensor, reqs: List[InferReq], eos_id: List[int] = [2]):
             filter_apply_order="joint",
             check_nan=False,
         )
-        int64_batch_next_token_ids = torch.empty_like(
-            batch_next_token_ids, dtype=torch.int64
-        )
+        int64_batch_next_token_ids = torch.empty_like(batch_next_token_ids, dtype=torch.int64)
         int64_batch_next_token_ids[:] = batch_next_token_ids
-        batch_next_token_probs = torch.gather(
-            probs, dim=1, index=int64_batch_next_token_ids.view(-1, 1)
-        )
+        batch_next_token_probs = torch.gather(probs, dim=1, index=int64_batch_next_token_ids.view(-1, 1))
         return batch_next_token_ids.view(-1), torch.log(batch_next_token_probs).view(-1)
     else:
         assert False, "dead path"
@@ -115,10 +103,7 @@ def _top_p_top_k(probs: torch.Tensor, top_ps: torch.Tensor, top_ks: torch.Tensor
     probs_sum = torch.cumsum(probs_sort, dim=-1)
     probs_sort[(probs_sum - probs_sort) > top_ps.view(-1, 1)] = 0.0
 
-    probs_sort[
-        torch.arange(0, probs.shape[-1], device="cuda").view(1, -1)
-        >= top_ks.view(-1, 1)
-    ] = 0.0
+    probs_sort[torch.arange(0, probs.shape[-1], device="cuda").view(1, -1) >= top_ks.view(-1, 1)] = 0.0
 
     return probs_sort, probs_idx
 
@@ -156,13 +141,9 @@ def _get_post_sample_tensors(reqs: List[InferReq]):
     for i, req_obj in enumerate(reqs):
         sample_param = req_obj.sampling_param
         shm_param = sample_param.shm_param
-        exponential_decay_length_penalty = (
-            shm_param.exponential_decay_length_penalty.to_tuple()
-        )
+        exponential_decay_length_penalty = shm_param.exponential_decay_length_penalty.to_tuple()
         out_token_len = req_obj.get_cur_total_len() - req_obj.shm_req.input_len
-        length_penalty_param.append(
-            max(out_token_len - exponential_decay_length_penalty[0], 0)
-        )
+        length_penalty_param.append(max(out_token_len - exponential_decay_length_penalty[0], 0))
         mask_eos_reqs.append(out_token_len < shm_param.min_new_tokens - 1)
 
         temperatures.append(shm_param.temperature)
@@ -170,20 +151,12 @@ def _get_post_sample_tensors(reqs: List[InferReq]):
         top_ks.append(shm_param.top_k)
         req_idxes.append(req_obj.req_idx)
 
-    req_idxes_cpu = torch.tensor(
-        req_idxes, dtype=torch.int32, device="cpu", pin_memory=True
-    )
-    temperatures_cpu = torch.tensor(
-        temperatures, dtype=torch.float, device="cpu", pin_memory=True
-    )
+    req_idxes_cpu = torch.tensor(req_idxes, dtype=torch.int32, device="cpu", pin_memory=True)
+    temperatures_cpu = torch.tensor(temperatures, dtype=torch.float, device="cpu", pin_memory=True)
     top_ps_cpu = torch.tensor(top_ps, dtype=torch.float, device="cpu", pin_memory=True)
     top_ks_cpu = torch.tensor(top_ks, dtype=torch.int32, device="cpu", pin_memory=True)
-    length_penalty_param_cpu = torch.tensor(
-        length_penalty_param, dtype=torch.int32, device="cpu", pin_memory=True
-    )
-    mask_eos_reqs_cpu = torch.tensor(
-        mask_eos_reqs, dtype=torch.bool, device="cpu", pin_memory=True
-    )
+    length_penalty_param_cpu = torch.tensor(length_penalty_param, dtype=torch.int32, device="cpu", pin_memory=True)
+    mask_eos_reqs_cpu = torch.tensor(mask_eos_reqs, dtype=torch.bool, device="cpu", pin_memory=True)
 
     return (
         req_idxes_cpu.cuda(non_blocking=True),

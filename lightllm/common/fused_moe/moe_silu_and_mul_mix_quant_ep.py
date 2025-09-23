@@ -42,15 +42,9 @@ def _silu_and_mul_post_quant_kernel(
     offs_in_d = hidden_dim_block_index * BLOCK_N + tl.arange(0, BLOCK_N)
     input_ptr_offs = input_ptr + expert_id * stride_input_0 + offs_in_d
     output_ptr_offs = output_ptr + expert_id * stride_output_0 + offs_in_d
-    output_scale_offs = (
-        output_scale_ptr
-        + expert_id * stride_output_scale_0
-        + hidden_dim_block_index * stride_output_scale_2
-    )
+    output_scale_offs = output_scale_ptr + expert_id * stride_output_scale_0 + hidden_dim_block_index * stride_output_scale_2
 
-    for token_index in tl.range(
-        token_id, token_num_cur_expert, block_num_per_expert, num_stages=NUM_STAGE
-    ):
+    for token_index in tl.range(token_id, token_num_cur_expert, block_num_per_expert, num_stages=NUM_STAGE):
         gate = tl.load(
             input_ptr_offs + token_index * stride_input_1,
             mask=offs_in_d < size_n,
@@ -66,9 +60,7 @@ def _silu_and_mul_post_quant_kernel(
         gate_up = up * gate
         _absmax = tl.maximum(tl.max(tl.abs(gate_up)), 1e-10)
         output_s = _absmax / fp8_max
-        output_q = tl.clamp(gate_up / output_s, fp8_min, fp8_max).to(
-            output_ptr.dtype.element_ty
-        )
+        output_q = tl.clamp(gate_up / output_s, fp8_min, fp8_max).to(output_ptr.dtype.element_ty)
         tl.store(
             output_ptr_offs + token_index * stride_output_1,
             output_q,

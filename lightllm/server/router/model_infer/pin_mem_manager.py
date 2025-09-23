@@ -7,9 +7,7 @@ from typing import List, Dict
 class PinMemTensorManager:
     def __init__(self):
         self.lock = threading.Lock()
-        self.key_to_tensor_list: Dict[str, List[torch.Tensor]] = (
-            collections.defaultdict(list)
-        )
+        self.key_to_tensor_list: Dict[str, List[torch.Tensor]] = collections.defaultdict(list)
         self.key_to_alloc_index: Dict[str, int] = {}
         self.buffer_size = 4
 
@@ -34,9 +32,7 @@ class PinMemTensorManager:
             alloc_index = self.key_to_alloc_index[key]
             buff_tensor = self.key_to_tensor_list[key][alloc_index]
             if buff_tensor.numel() < size:
-                self.key_to_tensor_list[key][alloc_index] = torch.empty(
-                    size=(size,), dtype=dtype, device="cpu", pin_memory=True
-                )
+                self.key_to_tensor_list[key][alloc_index] = torch.empty(size=(size,), dtype=dtype, device="cpu", pin_memory=True)
                 buff_tensor = self.key_to_tensor_list[key][alloc_index]
             self.key_to_alloc_index[key] = (alloc_index + 1) % self.buffer_size
             return buff_tensor[0:size]
@@ -47,9 +43,7 @@ class PinMemTensorManager:
         pin_mem.numpy()[:] = data
         return pin_mem
 
-    def async_copy_from_gpu_tensor(
-        self, key: str, gpu_tensor: torch.Tensor
-    ) -> torch.Tensor:
+    def async_copy_from_gpu_tensor(self, key: str, gpu_tensor: torch.Tensor) -> torch.Tensor:
         size = gpu_tensor.numel()
         pin_mem = self.alloc_pin_tensor(key, size=size, dtype=gpu_tensor.dtype)
         pin_mem.copy_(gpu_tensor.view(-1), non_blocking=True)

@@ -50,22 +50,12 @@ def _fwd_kernel_flash_decode_stage2(
         sum_exp = sum_exp * old_scale + exp_logic
         max_logic = new_max_logic
 
-    tl.store(
-        Out + cur_batch * stride_obs + cur_head * stride_oh + offs_d, acc / sum_exp
-    )
+    tl.store(Out + cur_batch * stride_obs + cur_head * stride_oh + offs_d, acc / sum_exp)
     return
 
 
 @torch.no_grad()
-def flash_decode_stage2(
-    out_block_seq: torch.Tensor,
-    batch_start_index: torch.Tensor,
-    mid_out,
-    mid_out_logexpsum,
-    B_Seqlen,
-    Out,
-    **run_config
-):
+def flash_decode_stage2(out_block_seq: torch.Tensor, batch_start_index: torch.Tensor, mid_out, mid_out_logexpsum, B_Seqlen, Out, **run_config):
     if run_config:
         num_warps = run_config["stage2_num_warps"]
         num_stages = run_config["stage2_num_stages"]

@@ -13,10 +13,6 @@ def init_req_to_token_indexes(
     for i in range(len(b_seq_len)):
         cur_seq_len = b_seq_len_numpy[i]
         cur_ready_cache_len = b_ready_cache_len_numpy[i]
-        req_to_token_indexs[b_req_idx_numpy[i], cur_ready_cache_len:cur_seq_len] = (
-            alloc_mem_index[
-                start_index : start_index + cur_seq_len - cur_ready_cache_len
-            ]
-        )
+        req_to_token_indexs[b_req_idx_numpy[i], cur_ready_cache_len:cur_seq_len] = alloc_mem_index[start_index : start_index + cur_seq_len - cur_ready_cache_len]
         start_index += cur_seq_len - cur_ready_cache_len
     return

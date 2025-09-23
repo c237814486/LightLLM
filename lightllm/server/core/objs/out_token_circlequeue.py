@@ -22,13 +22,9 @@ class QueueItem(ctypes.Structure):
         self.special = False
         self.count_output_tokens = -1
 
-    def set(
-        self, token_str: str, src_index: int, special: bool, count_output_tokens: int
-    ):
+    def set(self, token_str: str, src_index: int, special: bool, count_output_tokens: int):
         str_bytes = token_str.encode("utf-8")
-        assert (
-            len(str_bytes) <= LIGHTLLM_TOKEN_MAX_BYTES
-        ), f"Token string {len(str_bytes)} exceeds maximum length of {LIGHTLLM_TOKEN_MAX_BYTES} bytes."
+        assert len(str_bytes) <= LIGHTLLM_TOKEN_MAX_BYTES, f"Token string {len(str_bytes)} exceeds maximum length of {LIGHTLLM_TOKEN_MAX_BYTES} bytes."
         ctypes.memmove(self.data, str_bytes, len(str_bytes))
         self.data_len = len(str_bytes)
         self.src_index = src_index
@@ -64,9 +60,7 @@ class CircularQueue(ctypes.Structure):
     def is_full(self):
         return (self.tail + 1) % LIGHTLLM_OUT_TOKEN_QUEUE_SIZE == self.head
 
-    def push(
-        self, token_str: str, src_index: int, special: bool, count_output_tokens: int
-    ):
+    def push(self, token_str: str, src_index: int, special: bool, count_output_tokens: int):
         if self.is_full():
             raise Exception("Queue is full")
 
@@ -108,6 +102,4 @@ class CircularQueue(ctypes.Structure):
 
     def __len__(self):
         # 计算当前元素数量
-        return (
-            self.tail - self.head + LIGHTLLM_OUT_TOKEN_QUEUE_SIZE
-        ) % LIGHTLLM_OUT_TOKEN_QUEUE_SIZE
+        return (self.tail - self.head + LIGHTLLM_OUT_TOKEN_QUEUE_SIZE) % LIGHTLLM_OUT_TOKEN_QUEUE_SIZE

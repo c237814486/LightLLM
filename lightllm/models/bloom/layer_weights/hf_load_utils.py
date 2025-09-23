@@ -39,9 +39,7 @@ def load_hf_weights(
     if len(candidate_files) == 0:
         use_safetensors = False
         candidate_files = list(filter(lambda x: x.endswith(".bin"), files))
-    assert (
-        len(candidate_files) != 0
-    ), "can only support pytorch tensor and safetensors format for weights."
+    assert len(candidate_files) != 0, "can only support pytorch tensor and safetensors format for weights."
     for file_ in candidate_files:
         if use_safetensors:
             weights = safe_open(os.path.join(weight_dir, file_), "pt", "cpu")

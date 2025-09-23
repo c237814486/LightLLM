@@ -61,18 +61,9 @@ def ref_token_attention_nopad(q, k, v, o, q_h, h_dim, infer_state, req_to_token_
 
 @pytest.mark.parametrize(
     "batch, seqlen, q_heads, kv_heads, head_dim",
-    [
-        (a, b, c, d, e)
-        for a in [1, 16, 32, 128, 512]
-        for b in [16, 32, 512, 1024]
-        for c in [28]
-        for d in [4]
-        for e in [128]
-    ],
+    [(a, b, c, d, e) for a in [1, 16, 32, 128, 512] for b in [16, 32, 512, 1024] for c in [28] for d in [4] for e in [128]],
 )
-def test_token_attention_nopad_flashinfer_fp8(
-    batch, seqlen, q_heads, kv_heads, head_dim
-):
+def test_token_attention_nopad_flashinfer_fp8(batch, seqlen, q_heads, kv_heads, head_dim):
     Z, N_CTX, Q_HEADS, KV_HEADS, HEAD_DIM = batch, seqlen, q_heads, kv_heads, head_dim
     dtype = torch.bfloat16
     q = torch.randn((Z, Q_HEADS, HEAD_DIM), dtype=dtype, device="cuda")
@@ -81,13 +72,9 @@ def test_token_attention_nopad_flashinfer_fp8(
     #     kv[i] = torch.randn((2 * KV_HEADS, HEAD_DIM), dtype=dtype, device="cuda") * (i % 10 + 1)
 
     max_input_len = Z * N_CTX
-    req_to_token_indexs = (
-        torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
-    )
+    req_to_token_indexs = torch.randperm(max_input_len, dtype=torch.int32).cuda().view(Z, N_CTX)
     b_seq_len = torch.ones((Z,), dtype=torch.int32, device="cuda") * (N_CTX // 2)
-    rand_num = torch.randint_like(
-        b_seq_len, high=(N_CTX // 2), dtype=torch.int32, device="cuda"
-    )
+    rand_num = torch.randint_like(b_seq_len, high=(N_CTX // 2), dtype=torch.int32, device="cuda")
     b_seq_len += rand_num
     b_start_loc = b_seq_len.cumsum(0) - b_seq_len
     b_req_idx = torch.randperm(Z, dtype=torch.int32).cuda()
@@ -135,9 +122,7 @@ def test_token_attention_nopad_flashinfer_fp8(
     kv_indices = torch.arange(Z * N_CTX).cuda().int()
     for b, sl, start in zip(b_req_idx, b_seq_len, b_start_loc):
         kv_indices[start : start + sl] = req_to_token_indexs[b][:sl]
-    kv_last_page_len_buffer = torch.empty(
-        batch_size, device="cuda:0", dtype=torch.int32
-    )
+    kv_last_page_len_buffer = torch.empty(batch_size, device="cuda:0", dtype=torch.int32)
     wrapper = flashinfer.decode.BatchDecodeWithPagedKVCacheWrapper(
         workspace_buffer,
         "NHD",

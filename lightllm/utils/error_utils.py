@@ -1,9 +1,7 @@
 class ServerBusyError(Exception):
     """Custom exception for server busy/overload situations"""
 
-    def __init__(
-        self, message="Server is busy, please try again later", status_code=503
-    ):
+    def __init__(self, message="Server is busy, please try again later", status_code=503):
         """
         Initialize the ServerBusyError
 

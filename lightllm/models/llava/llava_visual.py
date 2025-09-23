@@ -63,17 +63,9 @@ class LlavaVisionModel:
                 d = safe_open(os.path.join(weight_dir, f), "pt", "cpu")
                 for k in d.keys():
                     if "multi_modal_projector.linear_1" in k:
-                        self.projector_weights[
-                            k.replace(
-                                "multi_modal_projector.linear_1", "model.mm_projector.0"
-                            )
-                        ] = d.get_tensor(k).half()
+                        self.projector_weights[k.replace("multi_modal_projector.linear_1", "model.mm_projector.0")] = d.get_tensor(k).half()
                     if "multi_modal_projector.linear_2" in k:
-                        self.projector_weights[
-                            k.replace(
-                                "multi_modal_projector.linear_2", "model.mm_projector.2"
-                            )
-                        ] = d.get_tensor(k).half()
+                        self.projector_weights[k.replace("multi_modal_projector.linear_2", "model.mm_projector.2")] = d.get_tensor(k).half()
 
     def load_bin_model(self, config, weight_dir):
         self.select_layer = config.get("mm_vision_select_layer", -2)
@@ -143,14 +135,10 @@ class LlavaVisionModel:
                 uuids.append(img.uuid)
                 image_data = read_shm(get_shm_name_data(img.uuid))
                 image_data = Image.open(BytesIO(image_data)).convert("RGB")
-                t = self.image_processor.preprocess(image_data, return_tensors="pt")[
-                    "pixel_values"
-                ]
+                t = self.image_processor.preprocess(image_data, return_tensors="pt")["pixel_values"]
                 img_tensors.append(t)
             else:
-                raise Exception(
-                    "Unsupport input types: {} for {}".format(type(img), img)
-                )
+                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
 
             cur_num = img_tensors[-1].shape[0]
             valid_ids.append([valid_id, valid_id + cur_num])

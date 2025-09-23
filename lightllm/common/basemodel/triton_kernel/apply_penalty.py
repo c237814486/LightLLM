@@ -53,9 +53,7 @@ def _fwd_kernel_apply_penalty(
             mask=(cur_batch_id_offset < cur_batch_end_index) & (token_ids < vocab_size),
             other=0.0,
         )
-        rep_logits = tl.where(
-            cur_logits > 0, cur_logits / cur_repetition, cur_logits * cur_repetition
-        )
+        rep_logits = tl.where(cur_logits > 0, cur_logits / cur_repetition, cur_logits * cur_repetition)
         freq_logits = rep_logits - token_ids_count * cur_freqency
         pre_logits = freq_logits - cur_presence
         output_ptr = Logits + cur_batch * stride_logit_b + token_ids
@@ -66,13 +64,9 @@ def _fwd_kernel_apply_penalty(
         )
 
     mask_eos = tl.load(b_mask_eos_reqs + cur_batch)
-    exponential_decay_length_penalty = tl.load(
-        req_to_exponential_decay_length_penalty + cur_req_idx
-    )
+    exponential_decay_length_penalty = tl.load(req_to_exponential_decay_length_penalty + cur_req_idx)
     length_penalty = tl.load(b_length_penalty_param + cur_batch)
-    penalty_scale = (
-        tl.exp2(tl.log2(exponential_decay_length_penalty) * length_penalty) - 1
-    )
+    penalty_scale = tl.exp2(tl.log2(exponential_decay_length_penalty) * length_penalty) - 1
 
     for eos_index in range(EOS_ID_NUM):
         eos_id = tl.load(eos_ids + eos_index)

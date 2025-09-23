@@ -36,9 +36,7 @@ class DeepSeek2FlashInferStateExtraInfo:
         self.kv_lora_rank = model.kv_lora_rank
         self.q_data_type = model.data_type
         self.kv_data_type = model.data_type
-        self.workspace_buffer = torch.empty(
-            256 * 1024 * 1024, dtype=torch.int8, device=get_current_device_id()
-        )
+        self.workspace_buffer = torch.empty(256 * 1024 * 1024, dtype=torch.int8, device=get_current_device_id())
         self.max_seq_length = model.max_seq_length
         self.softmax_scale = (self.qk_nope_head_dim + self.qk_rope_head_dim) ** (-0.5)
         self.kv_indices_buffer = [
@@ -74,10 +72,7 @@ class Deepseek2TpPartModel(LlamaTpPartModel):
     infer_state_class = Deepseek2InferStateInfo
 
     def __init__(self, kvargs):
-        self.enable_flashinfer = (
-            get_env_start_args().enable_flashinfer_prefill
-            or get_env_start_args().enable_flashinfer_decode
-        )
+        self.enable_flashinfer = get_env_start_args().enable_flashinfer_prefill or get_env_start_args().enable_flashinfer_decode
         super().__init__(kvargs)
         return
 
@@ -101,9 +96,7 @@ class Deepseek2TpPartModel(LlamaTpPartModel):
 
     def _init_custom(self):
         self._init_to_get_yarn_rotary()
-        dist_group_manager.new_deepep_group(
-            self.config["n_routed_experts"], self.config["hidden_size"]
-        )
+        dist_group_manager.new_deepep_group(self.config["n_routed_experts"], self.config["hidden_size"])
 
     def _verify_params(self):
         return super()._verify_params()
@@ -129,9 +122,7 @@ class Deepseek2TpPartModel(LlamaTpPartModel):
         return
 
     def _init_weights(self):
-        self.pre_post_weight = self.pre_and_post_weight_class(
-            self.data_type, network_config=self.config, mode=self.mode
-        )
+        self.pre_post_weight = self.pre_and_post_weight_class(self.data_type, network_config=self.config, mode=self.mode)
         self.trans_layers_weight = [
             self.transformer_weight_class(
                 i,
@@ -154,12 +145,8 @@ class Deepseek2TpPartModel(LlamaTpPartModel):
         return
 
     def _init_infer_layer(self):
-        self.pre_infer = self.pre_layer_infer_class(
-            network_config=self.config, mode=self.mode
-        )
-        self.post_infer = self.post_layer_infer_class(
-            network_config=self.config, mode=self.mode
-        )
+        self.pre_infer = self.pre_layer_infer_class(network_config=self.config, mode=self.mode)
+        self.post_infer = self.post_layer_infer_class(network_config=self.config, mode=self.mode)
         self.layers_infer = [
             self.transformer_layer_infer_class(
                 i,
@@ -187,9 +174,7 @@ class Deepseek2TpPartModel(LlamaTpPartModel):
             scale = rope_scaling.get("factor", 1.0)
             mscale = rope_scaling.get("mscale", 1)
             mscale_all_dim = rope_scaling.get("mscale_all_dim", 0)
-        original_max_position_embeddings = rope_scaling.get(
-            "original_max_position_embeddings", 2048
-        )
+        original_max_position_embeddings = rope_scaling.get("original_max_position_embeddings", 2048)
         extrapolation_factor = 1.0
         beta_fast = rope_scaling.get("beta_fast", 32.0)
         beta_slow = rope_scaling.get("beta_slow", 1.0)
@@ -198,21 +183,11 @@ class Deepseek2TpPartModel(LlamaTpPartModel):
         inv_freq_extrapolation = 1.0 / pos_freqs
         inv_freq_interpolation = 1.0 / (scale * pos_freqs)
 
-        low, high = find_correction_range(
-            beta_fast, beta_slow, dim, base, original_max_position_embeddings
-        )
-        inv_freq_mask = (
-            1 - linear_ramp_mask(low, high, dim // 2).float().cuda()
-        ) * extrapolation_factor  # Get n-d rotational scaling corrected for extrapolation
-        inv_freq = (
-            inv_freq_interpolation * (1 - inv_freq_mask)
-            + inv_freq_extrapolation * inv_freq_mask
-        )
+        low, high = find_correction_range(beta_fast, beta_slow, dim, base, original_max_position_embeddings)
+        inv_freq_mask = (1 - linear_ramp_mask(low, high, dim // 2).float().cuda()) * extrapolation_factor  # Get n-d rotational scaling corrected for extrapolation
+        inv_freq = inv_freq_interpolation * (1 - inv_freq_mask) + inv_freq_extrapolation * inv_freq_mask
 
-        _mscale = float(
-            get_deepseek_mscale(scale, mscale)
-            / get_deepseek_mscale(scale, mscale_all_dim)
-        )  # Get n-d magnitude scaling corrected for interpolation
+        _mscale = float(get_deepseek_mscale(scale, mscale) / get_deepseek_mscale(scale, mscale_all_dim))  # Get n-d magnitude scaling corrected for interpolation
 
         # Build here to make `torch.jit.trace` work.
         max_seq_len_cached = max_position_embeddings

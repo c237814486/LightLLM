@@ -26,17 +26,7 @@ class INT8KVMemoryManager(MemoryManager):
         )
 
     def get_cell_size(self):
-        return (
-            2
-            * self.head_num
-            * self.head_dim
-            * self.layer_num
-            * torch._utils._element_size(self.kv_dtype)
-            + 2
-            * self.head_num
-            * self.layer_num
-            * torch._utils._element_size(self.dtype)
-        )
+        return 2 * self.head_num * self.head_dim * self.layer_num * torch._utils._element_size(self.kv_dtype) + 2 * self.head_num * self.layer_num * torch._utils._element_size(self.dtype)
 
     def _init_buffers(self, size, dtype, head_num, head_dim, layer_num):
         self.kv_buffer = torch.empty(
@@ -44,9 +34,7 @@ class INT8KVMemoryManager(MemoryManager):
             dtype=torch.int8,
             device="cuda",
         )
-        self.scale_buffer = torch.empty(
-            (layer_num, size + 1, 2 * head_num, 1), dtype=dtype, device="cuda"
-        )
+        self.scale_buffer = torch.empty((layer_num, size + 1, 2 * head_num, 1), dtype=dtype, device="cuda")
 
     def _free_buffers(self):
         self.kv_buffer = None

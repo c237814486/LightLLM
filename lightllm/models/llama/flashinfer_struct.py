@@ -22,13 +22,9 @@ class LlamaFlashInferStateInfo(LlamaInferStateInfo):
 
         if not self.is_prefill:
             if get_env_start_args().enable_flashinfer_decode:
-                self.kv_last_page_len_buffer = torch.full(
-                    (self.batch_size,), 1, dtype=torch.int32, device=input_ids.device
-                )
+                self.kv_last_page_len_buffer = torch.full((self.batch_size,), 1, dtype=torch.int32, device=input_ids.device)
                 if self.batch_size <= model.graph_max_batch_size:
-                    self.kv_indices = self.flashinfer_extra_state.kv_indices_buffer[
-                        self.microbatch_index
-                    ][: self.batch_size * self.flashinfer_extra_state.max_seq_length]
+                    self.kv_indices = self.flashinfer_extra_state.kv_indices_buffer[self.microbatch_index][: self.batch_size * self.flashinfer_extra_state.max_seq_length]
                 else:
                     self.kv_indices = torch.empty(
                         self.batch_size * self.flashinfer_extra_state.max_seq_length,
@@ -46,16 +42,14 @@ class LlamaFlashInferStateInfo(LlamaInferStateInfo):
                 )
                 self.kv_starts = self.b1_cu_kv_seq_len.int()
                 if self.decode_wrapper is None:
-                    self.decode_wrapper = (
-                        flashinfer.decode.BatchDecodeWithPagedKVCacheWrapper(
-                            self.flashinfer_extra_state.workspace_buffer,
-                            "NHD",
-                            use_cuda_graph=True,
-                            use_tensor_cores=True,
-                            paged_kv_indptr_buffer=self.kv_starts,
-                            paged_kv_indices_buffer=self.kv_indices,
-                            paged_kv_last_page_len_buffer=self.kv_last_page_len_buffer,
-                        )
+                    self.decode_wrapper = flashinfer.decode.BatchDecodeWithPagedKVCacheWrapper(
+                        self.flashinfer_extra_state.workspace_buffer,
+                        "NHD",
+                        use_cuda_graph=True,
+                        use_tensor_cores=True,
+                        paged_kv_indptr_buffer=self.kv_starts,
+                        paged_kv_indices_buffer=self.kv_indices,
+                        paged_kv_last_page_len_buffer=self.kv_last_page_len_buffer,
                     )
                     self.decode_wrapper.plan(
                         self.kv_starts,
@@ -73,9 +67,7 @@ class LlamaFlashInferStateInfo(LlamaInferStateInfo):
             if get_env_start_args().enable_flashinfer_prefill:
                 q_starts = self.b1_cu_q_seq_len.int()
                 kv_starts = self.b1_cu_kv_seq_len.int()
-                kv_last_page_len = torch.full(
-                    (self.batch_size,), 1, dtype=torch.int32, device=input_ids.device
-                )
+                kv_last_page_len = torch.full((self.batch_size,), 1, dtype=torch.int32, device=input_ids.device)
                 kv_indices = torch.empty(
                     self.batch_size * self.flashinfer_extra_state.max_seq_length,
                     dtype=torch.int32,
@@ -89,14 +81,12 @@ class LlamaFlashInferStateInfo(LlamaInferStateInfo):
                     self.max_kv_seq_len,
                     kv_indices,
                 )
-                self.prefill_wrapper = (
-                    flashinfer.prefill.BatchPrefillWithPagedKVCacheWrapper(
-                        self.flashinfer_extra_state.workspace_buffer,
-                        qo_indptr_buf=q_starts,
-                        paged_kv_indptr_buf=kv_starts,
-                        paged_kv_indices_buf=kv_indices,
-                        paged_kv_last_page_len_buf=kv_last_page_len,
-                    )
+                self.prefill_wrapper = flashinfer.prefill.BatchPrefillWithPagedKVCacheWrapper(
+                    self.flashinfer_extra_state.workspace_buffer,
+                    qo_indptr_buf=q_starts,
+                    paged_kv_indptr_buf=kv_starts,
+                    paged_kv_indices_buf=kv_indices,
+                    paged_kv_last_page_len_buf=kv_last_page_len,
                 )
                 self.prefill_wrapper.plan(
                     q_starts,

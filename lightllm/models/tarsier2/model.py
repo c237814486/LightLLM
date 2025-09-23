@@ -22,9 +22,7 @@ class Tarsier2Tokenizer(BaseMultiModalTokenizer):
     def __init__(self, tokenizer=None, image_processor=None, **kwargs):
         super().__init__(tokenizer)
         self.image_processor = image_processor
-        self.image_start_id = kwargs["model_cfg"]["text_config"][
-            "vision_start_token_id"
-        ]
+        self.image_start_id = kwargs["model_cfg"]["text_config"]["vision_start_token_id"]
         self.image_end_id = kwargs["model_cfg"]["text_config"]["vision_end_token_id"]
         self.image_token_id = kwargs["model_cfg"]["text_config"]["image_token_id"]
 
@@ -55,7 +53,7 @@ class Tarsier2Tokenizer(BaseMultiModalTokenizer):
             resized_height // self.patch_size,
             resized_width // self.patch_size,
         )
-        merge_length = self.merge_size**2
+        merge_length = self.merge_size ** 2
         self.token_num = (grid_t * grid_h * grid_w) // merge_length
         self.image_length = self.token_num
         return self.image_length

@@ -39,9 +39,7 @@ class Deepseek3MTPModel(Deepseek2TpPartModel):
     def _init_weights(self):
         super()._init_weights()
         self.pre_post_weight.wte_weight_ = self.main_model.pre_post_weight.wte_weight_
-        self.pre_post_weight.lm_head_weight_ = (
-            self.main_model.pre_post_weight.lm_head_weight_
-        )
+        self.pre_post_weight.lm_head_weight_ = self.main_model.pre_post_weight.lm_head_weight_
         return
 
     def _init_infer_layer(self):

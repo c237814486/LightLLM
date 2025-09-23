@@ -59,9 +59,7 @@ class LlamaMultimodalPreLayerInfer(LlamaPreLayerInfer):
                     continue
                 # pull the img_embeds by uid from shm
                 data = read_shm(get_shm_name_embed(img["uuid"]))
-                img_weight.append(
-                    bytes2tensor(data).cuda().reshape(img["token_num"], -1)
-                )
+                img_weight.append(bytes2tensor(data).cuda().reshape(img["token_num"], -1))
                 img_start_token_ids.append(img["token_id"])
                 img_token_lens.append(img["token_num"])
                 img_start_locs.append(img_start_loc)
@@ -71,21 +69,12 @@ class LlamaMultimodalPreLayerInfer(LlamaPreLayerInfer):
             img_weight = torch.cat(img_weight, dim=0).to(device=device, dtype=dtype)
         else:
             img_weight = torch.empty((0, hidden_size), device=device, dtype=dtype)
-        assert img_weight.shape[1] == hidden_size, (
-            f"Dimension mismatch: text weight dimension is {hidden_size}, "
-            f"but image weight dimension is {img_weight.shape[1]}"
-        )
+        assert img_weight.shape[1] == hidden_size, f"Dimension mismatch: text weight dimension is {hidden_size}, " f"but image weight dimension is {img_weight.shape[1]}"
         # each tp will fill the img embeds, should divide by world_size
         img_weight = img_weight / self.tp_world_size_
-        img_start_token_ids = torch.Tensor(img_start_token_ids).to(
-            device=device, dtype=torch.long
-        )
-        img_token_lens = torch.Tensor(img_token_lens).to(
-            device=device, dtype=torch.long
-        )
-        img_start_locs = torch.Tensor(img_start_locs).to(
-            device=device, dtype=torch.long
-        )
+        img_start_token_ids = torch.Tensor(img_start_token_ids).to(device=device, dtype=torch.long)
+        img_token_lens = torch.Tensor(img_token_lens).to(device=device, dtype=torch.long)
+        img_start_locs = torch.Tensor(img_start_locs).to(device=device, dtype=torch.long)
 
         multimodal_emb(
             out,
@@ -99,7 +88,5 @@ class LlamaMultimodalPreLayerInfer(LlamaPreLayerInfer):
             self.vob_end_id_,
         )
         if self.tp_world_size_ > 1:
-            all_reduce(
-                out, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False
-            )
+            all_reduce(out, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False)
         return out

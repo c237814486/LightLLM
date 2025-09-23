@@ -27,15 +27,11 @@ class LlavaTokenizer(BaseMultiModalTokenizer):
             patch_size = model_cfg["vision_config"]["patch_size"]
             image_size = model_cfg["vision_config"]["image_size"]
         else:
-            mm_vision_tower = model_cfg.get(
-                "mm_vision_tower", "openai/clip-vit-large-patch14-336"
-            )
+            mm_vision_tower = model_cfg.get("mm_vision_tower", "openai/clip-vit-large-patch14-336")
             if isinstance(mm_vision_tower, list):
                 mm_vision_tower = mm_vision_tower[0]
             mm_vision_tower = mm_vision_tower.split("/")[-1]
-            vision_tower_match = re.match(
-                r"^clip-vit-large-patch(\d+)-(\d+)$", mm_vision_tower
-            )
+            vision_tower_match = re.match(r"^clip-vit-large-patch(\d+)-(\d+)$", mm_vision_tower)
             patch_size = int(vision_tower_match.group(1))
             default_img_size = int(vision_tower_match.group(2))
             image_size = model_cfg.get("img_size", default_img_size)
@@ -73,35 +69,25 @@ class LlavaTokenizer(BaseMultiModalTokenizer):
     def encode(self, prompt, multimodal_params: MultimodalParams = None, **kwargs):
 
         # split prompt by <image>, and merge parts by [pad_id] * 576
-        ids_chunks = [
-            self.tokenizer(x).input_ids for x in prompt.split(self.image_token)
-        ]
+        ids_chunks = [self.tokenizer(x).input_ids for x in prompt.split(self.image_token)]
         input_ids = ids_chunks[0]
         image_id = 0
 
         for ids in ids_chunks[1:]:
             # skip the start token
-            if (
-                len(ids) > 0
-                and ids[0] == self.tokenizer.bos_token_id
-                and self.skip_start
-            ):
+            if len(ids) > 0 and ids[0] == self.tokenizer.bos_token_id and self.skip_start:
                 ids = ids[1:]
 
             token_id = multimodal_params.images[image_id].token_id
             token_num = multimodal_params.images[image_id].token_num
-            assert (
-                token_num == self.image_length
-            ), "invalid token num: {} vs {}!".format(token_num, self.image_length)
+            assert token_num == self.image_length, "invalid token num: {} vs {}!".format(token_num, self.image_length)
 
             input_ids.extend(range(token_id, token_id + token_num))
             input_ids.extend(ids)
             image_id += 1
         if multimodal_params:
             image_cnt = len(multimodal_params.images)
-            assert image_cnt == image_id, "invalid image tag num: {} vs {}!".format(
-                image_cnt, image_id
-            )
+            assert image_cnt == image_id, "invalid image tag num: {} vs {}!".format(image_cnt, image_id)
         return input_ids
 
 
@@ -122,9 +108,7 @@ class LlavaTpPartModel(LlamaTpPartModel):
             self.config = json.load(json_file)
         # for llava-v1.5-7b-hf model, should load config from transformers
         if "text_config" in self.config:
-            config = AutoConfig.from_pretrained(
-                self.weight_dir_, trust_remote_code=True
-            )
+            config = AutoConfig.from_pretrained(self.weight_dir_, trust_remote_code=True)
             self.config = config.text_config.to_dict()
         # rename keys
         repair_config(self.config, same_names=["num_attention_heads", "n_head"])

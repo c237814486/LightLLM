@@ -12,19 +12,7 @@ logger = init_logger(__name__)
 
 
 def gqa_token_decode_attention_flash_decoding(
-    q_nope,
-    q_rope,
-    kv_nope,
-    kv_rope,
-    infer_state,
-    q_head_num,
-    kv_lora_rank,
-    q_rope_dim,
-    qk_nope_head_dim,
-    softmax_scale,
-    out=None,
-    alloc_tensor_func=torch.empty,
-    **run_config
+    q_nope, q_rope, kv_nope, kv_rope, infer_state, q_head_num, kv_lora_rank, q_rope_dim, qk_nope_head_dim, softmax_scale, out=None, alloc_tensor_func=torch.empty, **run_config
 ):
     batch_size = infer_state.batch_size
     max_len_in_batch = infer_state.max_len_in_batch
@@ -51,16 +39,10 @@ def gqa_token_decode_attention_flash_decoding(
     from .gqa_flash_decoding_stage1 import flash_decode_stage1
     from .gqa_flash_decoding_stage2 import flash_decode_stage2
 
-    o_tensor = (
-        alloc_tensor_func(q_nope.shape, q_nope.dtype, q_nope.device)
-        if out is None
-        else out
-    )
+    o_tensor = alloc_tensor_func(q_nope.shape, q_nope.dtype, q_nope.device) if out is None else out
 
     fake_decode_att_block_seq = torch.empty([0], dtype=torch.int64, device="cuda")
-    mid_o = torch.empty(
-        [q_head_num, 0, kv_lora_rank], dtype=torch.float32, device="cuda"
-    )
+    mid_o = torch.empty([q_head_num, 0, kv_lora_rank], dtype=torch.float32, device="cuda")
     mid_o_logexpsum = torch.empty([q_head_num, 0], dtype=torch.float32, device="cuda")
 
     vsm_count = flash_decode_stage1(
@@ -113,9 +95,7 @@ def gqa_token_decode_attention_flash_decoding(
         dtype=torch.float32,
         device="cuda",
     )
-    mid_o_logexpsum = torch.empty(
-        [q_head_num, vsm_count * 4 + batch_size], dtype=torch.float32, device="cuda"
-    )
+    mid_o_logexpsum = torch.empty([q_head_num, vsm_count * 4 + batch_size], dtype=torch.float32, device="cuda")
 
     flash_decode_stage1(
         infer_state.decode_att_block_seq,
@@ -133,15 +113,7 @@ def gqa_token_decode_attention_flash_decoding(
         **run_config
     )
 
-    flash_decode_stage2(
-        infer_state.decode_att_block_seq,
-        infer_state.mid_o_batch_start_index,
-        mid_o,
-        mid_o_logexpsum,
-        infer_state.b_seq_len,
-        o_tensor.view(calcu_shape1),
-        **run_config
-    )
+    flash_decode_stage2(infer_state.decode_att_block_seq, infer_state.mid_o_batch_start_index, mid_o, mid_o_logexpsum, infer_state.b_seq_len, o_tensor.view(calcu_shape1), **run_config)
     return o_tensor
 
 

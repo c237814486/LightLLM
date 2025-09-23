@@ -46,10 +46,7 @@ class VisionTransformer:
         self.tp_world_size_ = get_dp_world_size()
         self.weight_dir_ = kvargs["weight_dir"]
         self.load_way = kvargs.get("load_way", "HF")
-        self.mode = [
-            m.replace("int4weight", "w4a16").replace("int8weight", "w8a16")
-            for m in kvargs.get("mode", [])
-        ]
+        self.mode = [m.replace("int4weight", "w4a16").replace("int8weight", "w8a16") for m in kvargs.get("mode", [])]
         self.weight_dict = kvargs.get("weight_dict", None)
         self.data_type = kvargs.get("data_type", "float16")
         self.quant_type = kvargs.get("quant_type", None)
@@ -69,9 +66,7 @@ class VisionTransformer:
     @final
     @torch.no_grad()
     def _check_max_len_infer(self):
-        disable_check_max_len_infer = (
-            os.getenv("DISABLE_CHECK_MAX_LEN_INFER", None) is not None
-        )
+        disable_check_max_len_infer = os.getenv("DISABLE_CHECK_MAX_LEN_INFER", None) is not None
         if disable_check_max_len_infer:
             return
 
@@ -90,10 +85,7 @@ class VisionTransformer:
             logger.info(f"vit check max_len {self.max_batch_size} infer ok")
         except (RuntimeError, torch.OutOfMemoryError) as e:
             logger.exception(str(e))
-            exception_str = (
-                "Vit check max len infer fail, you can try:"
-                "1.Set the --visual_infer_batch_size to a smaller value."
-            )
+            exception_str = "Vit check max len infer fail, you can try:" "1.Set the --visual_infer_batch_size to a smaller value."
             logger.error(exception_str)
             raise Exception(exception_str)
         return
@@ -102,12 +94,8 @@ class VisionTransformer:
         with open(os.path.join(self.weight_dir_, "config.json"), "r") as json_file:
             self.config = json.load(json_file)
             self.select_layer = self.config["select_layer"]
-            self.config["vision_config"]["llm_hidden_size"] = self.config["llm_config"][
-                "hidden_size"
-            ]
-            self.config["vision_config"]["downsample_ratio"] = self.config[
-                "downsample_ratio"
-            ]
+            self.config["vision_config"]["llm_hidden_size"] = self.config["llm_config"]["hidden_size"]
+            self.config["vision_config"]["downsample_ratio"] = self.config["downsample_ratio"]
             self.config = self.config["vision_config"]
         repair_config(self.config, same_names=["num_attention_heads", "n_head"])
         repair_config(self.config, same_names=["hidden_size", "n_embd", "n_embed"])
@@ -126,19 +114,13 @@ class VisionTransformer:
 
         head_dim = self.config["hidden_size"] // self.config["num_attention_heads"]
         if self.config["num_attention_heads"] % self.tp_world_size_ != 0:
-            padding_head_num = (
-                self.config["num_attention_heads"] + self.tp_world_size_ - 1
-            ) // self.tp_world_size_ * self.tp_world_size_ - self.config[
-                "num_attention_heads"
-            ]
+            padding_head_num = (self.config["num_attention_heads"] + self.tp_world_size_ - 1) // self.tp_world_size_ * self.tp_world_size_ - self.config["num_attention_heads"]
             self.config["padding_hidden_size"] = padding_head_num * head_dim
             self.config["padding_head_num"] += padding_head_num
         return
 
     def _init_weights(self):
-        self.pre_post_weight = self.pre_and_post_weight_class(
-            self.data_type, network_config=self.config, mode=self.mode
-        )
+        self.pre_post_weight = self.pre_and_post_weight_class(self.data_type, network_config=self.config, mode=self.mode)
         self.trans_layers_weight = [
             self.transformer_weight_class(
                 i,
@@ -162,24 +144,12 @@ class VisionTransformer:
 
     def _init_quant(self):
         self.quant_cfg = Quantcfg(self.config, self.quant_type, self.quant_cfg_path)
-        logger.info(
-            f"Initial quantization. "
-            f"The default quantization method is {self.quant_cfg.quant_type}"
-        )
+        logger.info(f"Initial quantization. " f"The default quantization method is {self.quant_cfg.quant_type}")
 
     def _init_infer_layer(self):
-        self.pre_infer = self.pre_layer_infer_class(
-            network_config=self.config, mode=self.mode
-        )
-        self.post_infer = self.post_layer_infer_class(
-            network_config=self.config, mode=self.mode
-        )
-        self.layers_infer = [
-            self.transformer_layer_infer_class(
-                i, network_config=self.config, mode=self.mode
-            )
-            for i in range(self.config["num_hidden_layers"])
-        ]
+        self.pre_infer = self.pre_layer_infer_class(network_config=self.config, mode=self.mode)
+        self.post_infer = self.post_layer_infer_class(network_config=self.config, mode=self.mode)
+        self.layers_infer = [self.transformer_layer_infer_class(i, network_config=self.config, mode=self.mode) for i in range(self.config["num_hidden_layers"])]
         return
 
     def _init_datatype(self):
@@ -197,9 +167,7 @@ class VisionTransformer:
         g_cache_manager.cache_env_in()
         input_embs = self.pre_infer.forward(pixel_values, self.pre_post_weight)
         for i in range(self.layers_num + self.select_layer + 1):
-            input_embs = self.layers_infer[i].forward(
-                input_embs, self.trans_layers_weight[i]
-            )
+            input_embs = self.layers_infer[i].forward(input_embs, self.trans_layers_weight[i])
         input_embs = self.post_infer.forward(input_embs[:, 1:, :], self.pre_post_weight)
         g_cache_manager.cache_env_out()
         return input_embs
@@ -215,14 +183,10 @@ class VisionTransformer:
                 uuids.append(img.uuid)
                 image_data = read_shm(get_shm_name_data(img.uuid))
                 image_data = Image.open(BytesIO(image_data))
-                t = self.load_image_func(
-                    image_data, max_num=img.extra_params["image_patch_max_num"]
-                )
+                t = self.load_image_func(image_data, max_num=img.extra_params["image_patch_max_num"])
                 img_tensors.append(t)
             else:
-                raise Exception(
-                    "Unsupport input types: {} for {}".format(type(img), img)
-                )
+                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
 
             cur_num = img_tensors[-1].shape[0]
             valid_ids.append([valid_id, valid_id + cur_num])

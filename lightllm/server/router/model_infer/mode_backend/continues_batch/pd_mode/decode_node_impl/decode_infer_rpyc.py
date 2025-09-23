@@ -35,19 +35,13 @@ class PDDecodeInferRpcServer(rpyc.Service):
         if self.backend.dp_world_size == 1:
             with g_router_lock.obj:
                 shared_token_load = self.backend.shared_token_load
-                peak_num = shared_token_load.get_estimated_peak_token_count(
-                    self.dp_rank_in_node
-                )
-                peak_num += shared_token_load.get_frozened_token_count(
-                    self.dp_rank_in_node
-                )
+                peak_num = shared_token_load.get_estimated_peak_token_count(self.dp_rank_in_node)
+                peak_num += shared_token_load.get_frozened_token_count(self.dp_rank_in_node)
                 peak_num += key_len + max_new_token
 
                 if peak_num < self.backend.get_max_total_token_num():
                     object_list = [True]
-                    shared_token_load.add_frozened_token_count(
-                        key_len + max_new_token, self.dp_rank_in_node
-                    )
+                    shared_token_load.add_frozened_token_count(key_len + max_new_token, self.dp_rank_in_node)
                 else:
                     object_list = [False]
             return object_list[0]
@@ -56,55 +50,37 @@ class PDDecodeInferRpcServer(rpyc.Service):
         if self.is_master_in_dp:
             with g_router_lock.obj:
                 shared_token_load = self.backend.shared_token_load
-                peak_num = shared_token_load.get_estimated_peak_token_count(
-                    self.dp_rank_in_node
-                )
-                peak_num += shared_token_load.get_frozened_token_count(
-                    self.dp_rank_in_node
-                )
+                peak_num = shared_token_load.get_estimated_peak_token_count(self.dp_rank_in_node)
+                peak_num += shared_token_load.get_frozened_token_count(self.dp_rank_in_node)
                 peak_num += key_len + max_new_token
 
                 if peak_num < self.backend.get_max_total_token_num():
                     object_list = [True]
-                    shared_token_load.add_frozened_token_count(
-                        key_len + max_new_token, self.dp_rank_in_node
-                    )
+                    shared_token_load.add_frozened_token_count(key_len + max_new_token, self.dp_rank_in_node)
                 else:
                     object_list = [False]
-            dist.broadcast_object_list(
-                object_list, src=0, group=self.backend.lock_nccl_group
-            )
+            dist.broadcast_object_list(object_list, src=0, group=self.backend.lock_nccl_group)
         else:
             object_list = [None]
-            dist.broadcast_object_list(
-                object_list, src=0, group=self.backend.lock_nccl_group
-            )
+            dist.broadcast_object_list(object_list, src=0, group=self.backend.lock_nccl_group)
         return object_list[0]
 
     def recover_frozen_token(self, key_len, max_new_token):
         if self.is_master_in_dp:
             with g_router_lock.obj:
                 shared_token_load = self.backend.shared_token_load
-                shared_token_load.add_frozened_token_count(
-                    -(key_len + max_new_token), self.dp_rank_in_node
-                )
+                shared_token_load.add_frozened_token_count(-(key_len + max_new_token), self.dp_rank_in_node)
         return
 
     def _alloc_to_frozen_some_tokens(self, move_task: KVMoveTask):
-        is_ok = self.judge_token_is_ok(
-            len(move_task.input_tokens), move_task.decode_node.max_new_tokens
-        )
+        is_ok = self.judge_token_is_ok(len(move_task.input_tokens), move_task.decode_node.max_new_tokens)
         if not is_ok:
             if self.is_master_in_dp:
-                logger.info(
-                    f"req_id: {move_task.to_decode_log_info()}  alloc token failed"
-                )
+                logger.info(f"req_id: {move_task.to_decode_log_info()}  alloc token failed")
                 shared_token_load = self.backend.shared_token_load
                 dp_rank = self.dp_rank_in_node
                 frozen_token_num = shared_token_load.get_frozened_token_count(dp_rank)
-                estimated_peak_token_num = (
-                    shared_token_load.get_estimated_peak_token_count(dp_rank)
-                )
+                estimated_peak_token_num = shared_token_load.get_estimated_peak_token_count(dp_rank)
                 logger.debug(
                     f"radix refed token num {self.backend.radix_cache.get_refed_tokens_num()}\n"
                     f"radix hold token num {self.backend.radix_cache.get_tree_total_tokens_num()}\n"
@@ -116,13 +92,9 @@ class PDDecodeInferRpcServer(rpyc.Service):
             return None
 
         key = torch.tensor(move_task.input_tokens, dtype=torch.int64, device="cpu")
-        tree_node, kv_len, fused_token_indexes = self.backend.radix_cache.match_prefix(
-            key, update_refs=True
-        )
+        tree_node, kv_len, fused_token_indexes = self.backend.radix_cache.match_prefix(key, update_refs=True)
         # 如果没匹配到，说明长度是0， 将fused_token_indexes做一下转换
-        fused_token_indexes = (
-            [] if fused_token_indexes is None else fused_token_indexes.tolist()
-        )
+        fused_token_indexes = [] if fused_token_indexes is None else fused_token_indexes.tolist()
         need_len = len(move_task.input_tokens) - kv_len
         if need_len == 0:
             alloc_token_indexes = []
@@ -134,9 +106,7 @@ class PDDecodeInferRpcServer(rpyc.Service):
 
         if alloc_token_indexes is None:
             self.backend.radix_cache.dec_node_ref_counter(tree_node)
-            self.recover_frozen_token(
-                len(move_task.input_tokens), move_task.decode_node.max_new_tokens
-            )
+            self.recover_frozen_token(len(move_task.input_tokens), move_task.decode_node.max_new_tokens)
             return None
 
         move_task.decode_token_indexes = alloc_token_indexes
@@ -150,9 +120,7 @@ class PDDecodeInferRpcServer(rpyc.Service):
         return move_task.decode_token_indexes
 
     # 返回 None 代表服务繁忙已经无法调度新的请求进入了
-    def exposed_alloc_to_frozen_some_tokens(
-        self, move_tasks: List[KVMoveTask]
-    ) -> List[Optional[List[int]]]:
+    def exposed_alloc_to_frozen_some_tokens(self, move_tasks: List[KVMoveTask]) -> List[Optional[List[int]]]:
         move_tasks = obtain(move_tasks)
         acquire_lock_until_ready(self.backend.lock_nccl_group)
         try:
@@ -167,9 +135,7 @@ class PDDecodeInferRpcServer(rpyc.Service):
             release_acquired_lock()
 
     def _put_kv_received_to_radix_cache(self, group_req_id: int):
-        move_task, tree_node, fused_token_indexes = g_kv_move_task_cache.pop(
-            group_req_id
-        )
+        move_task, tree_node, fused_token_indexes = g_kv_move_task_cache.pop(group_req_id)
         radix_cache = self.backend.radix_cache
         key = torch.tensor(move_task.input_tokens, dtype=torch.int64, device="cpu")
         value = torch.tensor(
@@ -179,15 +145,11 @@ class PDDecodeInferRpcServer(rpyc.Service):
         )
         prefix_len = radix_cache.insert(key, value)
         assert len(fused_token_indexes) <= prefix_len
-        self.backend.model.mem_manager.free(
-            value[len(fused_token_indexes) : prefix_len]
-        )
+        self.backend.model.mem_manager.free(value[len(fused_token_indexes) : prefix_len])
         self.backend.radix_cache.dec_node_ref_counter(tree_node)
 
         # 申请一段key，把 radix cache 锁住，防止极端情况下被刷掉, decode 端通过减两次引用计数来修正。
-        tree_node, kv_len, _ = self.backend.radix_cache.match_prefix(
-            key, update_refs=True
-        )
+        tree_node, kv_len, _ = self.backend.radix_cache.match_prefix(key, update_refs=True)
         assert len(key) == kv_len
         g_success_kv_move_task_cache[group_req_id] = (move_task, tree_node, time.time())
         return
@@ -201,17 +163,11 @@ class PDDecodeInferRpcServer(rpyc.Service):
         return
 
     def _fail_to_realese_forzen_tokens(self, group_req_id: int):
-        move_task, tree_node, fused_token_indexes = g_kv_move_task_cache.pop(
-            group_req_id
-        )
-        value = torch.tensor(
-            move_task.decode_token_indexes, dtype=torch.int64, device="cpu"
-        )
+        move_task, tree_node, fused_token_indexes = g_kv_move_task_cache.pop(group_req_id)
+        value = torch.tensor(move_task.decode_token_indexes, dtype=torch.int64, device="cpu")
         self.backend.model.mem_manager.free(value)
         self.backend.radix_cache.dec_node_ref_counter(tree_node)
-        self.recover_frozen_token(
-            len(move_task.input_tokens), move_task.decode_node.max_new_tokens
-        )
+        self.recover_frozen_token(len(move_task.input_tokens), move_task.decode_node.max_new_tokens)
         return
 
     def exposed_fail_to_realese_forzen_tokens(self, group_req_ids: List[int]):
@@ -235,28 +191,20 @@ class PDDecodeInferRpcServer(rpyc.Service):
             remove_tokens = self._remove_time_out_reqs(need_release_reqs)
             if remove_tokens != 0:
                 with g_router_lock.obj:
-                    self.backend.shared_token_load.add_frozened_token_count(
-                        -remove_tokens, self.dp_rank_in_node
-                    )
+                    self.backend.shared_token_load.add_frozened_token_count(-remove_tokens, self.dp_rank_in_node)
         else:
             if self.is_master_in_dp:
                 need_release_reqs = self._get_time_out_reqs()
                 logger.info(f"kv time out reqs: {need_release_reqs}")
-                dist.broadcast_object_list(
-                    [need_release_reqs], src=0, group=self.backend.lock_nccl_group
-                )
+                dist.broadcast_object_list([need_release_reqs], src=0, group=self.backend.lock_nccl_group)
             else:
                 receive_objs = [None]
-                dist.broadcast_object_list(
-                    receive_objs, src=0, group=self.backend.lock_nccl_group
-                )
+                dist.broadcast_object_list(receive_objs, src=0, group=self.backend.lock_nccl_group)
                 need_release_reqs = receive_objs[0]
             remove_tokens = self._remove_time_out_reqs(need_release_reqs)
             if self.is_master_in_dp and remove_tokens != 0:
                 with g_router_lock.obj:
-                    self.backend.shared_token_load.add_frozened_token_count(
-                        -remove_tokens, self.dp_rank_in_node
-                    )
+                    self.backend.shared_token_load.add_frozened_token_count(-remove_tokens, self.dp_rank_in_node)
 
         release_acquired_lock()
         return

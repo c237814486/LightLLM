@@ -29,13 +29,9 @@ def _silu_and_mul_kernel(
     input_n_offsets = pid * BLOCK_N + tl.arange(0, BLOCK_N)
     output_n_offsets = pid * BLOCK_N + tl.arange(0, BLOCK_N)
 
-    up_offsets = input_m_offsets[:, None] * stride_input_m + (
-        input_n_offsets[None, :] + size_n
-    )
+    up_offsets = input_m_offsets[:, None] * stride_input_m + (input_n_offsets[None, :] + size_n)
     gate_offsets = input_m_offsets[:, None] * stride_input_m + input_n_offsets[None, :]
-    res_offsets = (
-        output_m_offsets[:, None] * stride_output_m + output_n_offsets[None, :]
-    )
+    res_offsets = output_m_offsets[:, None] * stride_output_m + output_n_offsets[None, :]
 
     up = tl.load(
         input_ptr + up_offsets,
@@ -54,8 +50,7 @@ def _silu_and_mul_kernel(
     tl.store(
         output_ptr + res_offsets,
         up * gate,
-        mask=(output_n_offsets < size_n)[None, :]
-        * (output_m_offsets < size_m)[:, None],
+        mask=(output_n_offsets < size_n)[None, :] * (output_m_offsets < size_m)[:, None],
     )
 
 
@@ -71,9 +66,7 @@ def silu_and_mul_fwd(input: torch.Tensor, output: torch.Tensor, **run_config):
     size_n = input.shape[-1] // 2
 
     if not run_config:
-        run_config = MoeSiluAndMulKernelConfig.try_to_get_best_config(
-            M=size_m, N=size_n, out_dtype=str(output.dtype)
-        )
+        run_config = MoeSiluAndMulKernelConfig.try_to_get_best_config(M=size_m, N=size_n, out_dtype=str(output.dtype))
 
     BLOCK_M = run_config["BLOCK_M"]
     BLOCK_N = run_config["BLOCK_N"]

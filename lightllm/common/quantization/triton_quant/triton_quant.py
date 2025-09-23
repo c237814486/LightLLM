@@ -55,12 +55,8 @@ class TritonFP8w8a8QuantizationMethod(TritonBaseQuantizationMethod):
                 device=input_tensor.device,
                 is_graph_out=False,
             )
-            input_tensor_q = self.cache_manager.alloc_tensor(
-                (m, k), qweight.dtype, device=qweight.device, is_graph_out=False
-            )
-            per_token_group_quant_fp8(
-                input_tensor, self.block_size, input_tensor_q, input_scale
-            )
+            input_tensor_q = self.cache_manager.alloc_tensor((m, k), qweight.dtype, device=qweight.device, is_graph_out=False)
+            per_token_group_quant_fp8(input_tensor, self.block_size, input_tensor_q, input_scale)
         else:
             # TODO
             raise "statci input scale is not supported by triton fp8 block gemm kernel."
@@ -75,9 +71,7 @@ class TritonFP8w8a8QuantizationMethod(TritonBaseQuantizationMethod):
                     is_graph_out=False,
                 )
             else:
-                out = torch.empty(
-                    (m, n), dtype=input_tensor.dtype, device=input_tensor.device
-                )
+                out = torch.empty((m, n), dtype=input_tensor.dtype, device=input_tensor.device)
         w8a8_block_fp8_matmul(
             input_tensor_q,
             qweight,

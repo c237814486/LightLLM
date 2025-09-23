@@ -5,9 +5,7 @@ from pydantic import BaseModel, constr, conlist
 from enum import Enum
 from typing import List
 
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from format_out.impl import ChatSession
 from format_out.impl import SamplingParams
@@ -46,24 +44,16 @@ class QaBot:
 
         title = "lightllm的仓库链接"
         content = "https://github.com/ModelTC/lightllm"
-        chat_session.add_prompt(
-            f"<item><title>{title}</title><content>{content}</content></item>\n"
-        )
+        chat_session.add_prompt(f"<item><title>{title}</title><content>{content}</content></item>\n")
         title = "lightllm的文档链接"
         content = "https://github.com/ModelTC/lightllm/tree/main/docs"
-        chat_session.add_prompt(
-            f"<item><title>{title}</title><content>{content}</content></item>\n"
-        )
+        chat_session.add_prompt(f"<item><title>{title}</title><content>{content}</content></item>\n")
         title = "steam 账号"
         content = "account:12312321312, password:xxxxxxx"
-        chat_session.add_prompt(
-            f"<item><title>{title}</title><content>{content}</content></item>\n"
-        )
+        chat_session.add_prompt(f"<item><title>{title}</title><content>{content}</content></item>\n")
         title = "今天的天气"
         content = "天气很热"
-        chat_session.add_prompt(
-            f"<item><title>{title}</title><content>{content}</content></item>\n"
-        )
+        chat_session.add_prompt(f"<item><title>{title}</title><content>{content}</content></item>\n")
 
         chat_session.add_prompt(knowledge_end)
 
@@ -86,9 +76,7 @@ class QaBot:
             thoughts: List[str]
             question_type: QAType
 
-        json_ans_str = self.chat_session.gen_json_object(
-            ClassQuestion, max_new_tokens=2048, prefix_regex=r"[\s]{0,20}"
-        )
+        json_ans_str = self.chat_session.gen_json_object(ClassQuestion, max_new_tokens=2048, prefix_regex=r"[\s]{0,20}")
         json_ans_str: str = json_ans_str.strip()
         json_ans_str = json_ans_str.replace("”", '"')  # 修复 json 格式问题
         print(json_ans_str)
@@ -106,11 +94,7 @@ class QaBot:
 
         class_ans = ClassQuestion(**json_ans)
         if class_ans.question_type == QAType.Q3:
-            ans_str = (
-                "对不起,我无法处理这个问题, 我只会下列问题:"
-                "1. 知识问答 (根据已有的知识库信息,回答对应的问题）"
-                "2. 查询占用端口的进程号 (通过生成指令，然后由系统执行返回结)"
-            )
+            ans_str = "对不起,我无法处理这个问题, 我只会下列问题:" "1. 知识问答 (根据已有的知识库信息,回答对应的问题）" "2. 查询占用端口的进程号 (通过生成指令，然后由系统执行返回结)"
             self.chat_session.add_prompt("给用户回答:" + ans_str)
             self.chat_session.add_prompt(assistant_end)
             return ans_str
@@ -129,9 +113,7 @@ class QaBot:
             preliminary_results: str
             summary_result: constr(min_length=0, max_length=1000)
 
-        json_ans_str = self.chat_session.gen_json_object(
-            Result, max_new_tokens=2048, prefix_regex=r"[\s]{0,20}"
-        )
+        json_ans_str = self.chat_session.gen_json_object(Result, max_new_tokens=2048, prefix_regex=r"[\s]{0,20}")
         json_ans_str: str = json_ans_str.strip()
         json_ans_str = json_ans_str.replace("”", '"')  # 修复 json 格式问题
 
@@ -165,9 +147,7 @@ class QaBot:
             port_can_be_determined: bool
             port: str
 
-        json_ans_str = self.chat_session.gen_json_object(
-            Result, max_new_tokens=2048, prefix_regex=r"[\s]{0,20}"
-        )
+        json_ans_str = self.chat_session.gen_json_object(Result, max_new_tokens=2048, prefix_regex=r"[\s]{0,20}")
         json_ans_str: str = json_ans_str.strip()
         json_ans_str = json_ans_str.replace("”", '"')  # 修复 json 格式问题
 

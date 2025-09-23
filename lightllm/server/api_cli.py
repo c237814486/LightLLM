@@ -122,9 +122,7 @@ def make_argument_parser() -> argparse.ArgumentParser:
         help="the max size for forward requests in the same time",
     )
     parser.add_argument("--nnodes", type=int, default=1, help="the number of nodes")
-    parser.add_argument(
-        "--node_rank", type=int, default=0, help="the rank of the current node"
-    )
+    parser.add_argument("--node_rank", type=int, default=0, help="the rank of the current node")
     parser.add_argument(
         "--multinode_httpmanager_port",
         type=int,
@@ -137,9 +135,7 @@ def make_argument_parser() -> argparse.ArgumentParser:
         default=20001,
         help="the gloo port for multinode router, default is 20001",
     )
-    parser.add_argument(
-        "--tp", type=int, default=1, help="model tp parral size, the default is 1"
-    )
+    parser.add_argument("--tp", type=int, default=1, help="model tp parral size, the default is 1")
     parser.add_argument(
         "--dp",
         type=int,
@@ -267,20 +263,14 @@ def make_argument_parser() -> argparse.ArgumentParser:
         help="disable dynamic prompt cache",
     )
 
-    parser.add_argument(
-        "--chunked_prefill_size", type=int, default=4096, help="chunked prefill size"
-    )
+    parser.add_argument("--chunked_prefill_size", type=int, default=4096, help="chunked prefill size")
     parser.add_argument(
         "--disable_chunked_prefill",
         action="store_true",
         help="whether to disable chunked prefill",
     )
-    parser.add_argument(
-        "--diverse_mode", action="store_true", help="diversity generation mode"
-    )
-    parser.add_argument(
-        "--token_healing_mode", action="store_true", help="code model infer mode"
-    )
+    parser.add_argument("--diverse_mode", action="store_true", help="diversity generation mode")
+    parser.add_argument("--token_healing_mode", action="store_true", help="code model infer mode")
 
     parser.add_argument(
         "--output_constraint_mode",
@@ -385,9 +375,7 @@ def make_argument_parser() -> argparse.ArgumentParser:
         help="return all prompt tokens logprobs",
     )
 
-    parser.add_argument(
-        "--use_reward_model", action="store_true", help="use reward model"
-    )
+    parser.add_argument("--use_reward_model", action="store_true", help="use reward model")
 
     parser.add_argument(
         "--long_truncation_mode",
@@ -399,9 +387,7 @@ def make_argument_parser() -> argparse.ArgumentParser:
         head : remove some head tokens to make input_token_len + max_new_tokens <= max_req_total_len
         center : remove some tokens in center loc to make input_token_len + max_new_tokens <= max_req_total_len""",
     )
-    parser.add_argument(
-        "--use_tgi_api", action="store_true", help="use tgi input and ouput format"
-    )
+    parser.add_argument("--use_tgi_api", action="store_true", help="use tgi input and ouput format")
     parser.add_argument(
         "--health_monitor",
         action="store_true",
@@ -413,9 +399,7 @@ def make_argument_parser() -> argparse.ArgumentParser:
         default=None,
         help="address for collecting monitoring metrics",
     )
-    parser.add_argument(
-        "--job_name", type=str, default="lightllm", help="job name for monitor"
-    )
+    parser.add_argument("--job_name", type=str, default="lightllm", help="job name for monitor")
     parser.add_argument(
         "--grouping_key",
         action="append",

@@ -39,15 +39,11 @@ def test_multiple_processes_locking():
     p.start()
 
     time.sleep(0.1)  # Ensure the first process has acquired the lock
-    assert (
-        lock.shm.buf.cast("i")[0] == 1
-    )  # The lock should be held by the first process
+    assert lock.shm.buf.cast("i")[0] == 1  # The lock should be held by the first process
 
     # Wait for the first process to finish
     p.join()
-    assert (
-        lock.shm.buf.cast("i")[0] == 0
-    )  # The lock should be released after the process finishes
+    assert lock.shm.buf.cast("i")[0] == 0  # The lock should be released after the process finishes
 
 
 def test_lock_recreation_on_size_mismatch():

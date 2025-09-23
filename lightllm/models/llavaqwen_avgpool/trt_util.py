@@ -112,9 +112,7 @@ def convert_dtype(dtype, to="np"):
         else:
             return np.dtype(dtype)
 
-    raise TypeError(
-        f"expected dtype as a string, type, or torch.dtype (was {type(dtype)}) and with to='np' or to='pt' (was {to})"
-    )
+    raise TypeError(f"expected dtype as a string, type, or torch.dtype (was {type(dtype)}) and with to='np' or to='pt' (was {to})")
 
 
 def convert_tensor(tensor, return_tensors="pt", device=None, dtype=None, **kwargs):
@@ -132,9 +130,7 @@ def convert_tensor(tensor, return_tensors="pt", device=None, dtype=None, **kwarg
         elif return_tensors == list:
             return_tensors = "list"
         else:
-            raise TypeError(
-                f"expected return_tensors as np.ndarray, torch.Tensor, or list (was {return_tensors})"
-            )
+            raise TypeError(f"expected return_tensors as np.ndarray, torch.Tensor, or list (was {return_tensors})")
 
     dtype = convert_dtype(dtype, to=return_tensors)
 
@@ -144,9 +140,7 @@ def convert_tensor(tensor, return_tensors="pt", device=None, dtype=None, **kwarg
                 tensor = tensor.astype(dtype=convert_dtype(dtype, to="np"), copy=False)
             return tensor
         elif return_tensors == "pt":  # np->pt
-            return torch.from_numpy(tensor).to(
-                device=device, dtype=convert_dtype(dtype, to="pt"), **kwargs
-            )
+            return torch.from_numpy(tensor).to(device=device, dtype=convert_dtype(dtype, to="pt"), **kwargs)
         elif return_tensors == "list":  # np->list
             return tensor.tolist()
     elif isinstance(tensor, torch.Tensor):
@@ -156,9 +150,7 @@ def convert_tensor(tensor, return_tensors="pt", device=None, dtype=None, **kwarg
             return tensor.detach().cpu().numpy()
         elif return_tensors == "pt":  # pt->pt
             if device is not None or dtype is not None:
-                return tensor.to(
-                    device=device, dtype=convert_dtype(dtype, to="pt"), **kwargs
-                )
+                return tensor.to(device=device, dtype=convert_dtype(dtype, to="pt"), **kwargs)
             else:
                 return tensor
         elif return_tensors == "list":
@@ -171,9 +163,7 @@ def convert_tensor(tensor, return_tensors="pt", device=None, dtype=None, **kwarg
         elif return_tensors == "list":
             return tensor
 
-    raise ValueError(
-        f"unsupported tensor input/output type (in={type(tensor)} out={return_tensors})"
-    )
+    raise ValueError(f"unsupported tensor input/output type (in={type(tensor)} out={return_tensors})")
 
 
 class AttributeDict(dict):

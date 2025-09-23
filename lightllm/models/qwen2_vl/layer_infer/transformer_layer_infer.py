@@ -23,21 +23,13 @@ class Qwen2VLTransformerLayerInfer(LlamaTransformerLayerInfer):
         q = layer_weight.q_proj.mm(input)
         cache_kv = layer_weight.kv_proj.mm(
             input,
-            out=cache_kv.view(
-                -1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_
-            ),
+            out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),
         ).view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_), self.head_dim_)
         seq_len, _ = q.shape
         q = q.view(1, seq_len, -1, self.head_dim_).transpose(1, 2)
         self.axis_map = self.axis_map.to(q.device)
-        k = (
-            cache_kv[:, : self.tp_k_head_num_, :]
-            .view(1, seq_len, -1, self.head_dim_)
-            .transpose(1, 2)
-        )
-        new_q, new_k = mrope_triton(
-            q, k, infer_state.position_cos, infer_state.position_sin, self.axis_map
-        )
+        k = cache_kv[:, : self.tp_k_head_num_, :].view(1, seq_len, -1, self.head_dim_).transpose(1, 2)
+        new_q, new_k = mrope_triton(q, k, infer_state.position_cos, infer_state.position_sin, self.axis_map)
         new_q = new_q.transpose(1, 2).reshape(1, seq_len, -1)
         cache_kv[:, : self.tp_k_head_num_, :] = new_k.squeeze(0).permute(1, 0, 2)
 

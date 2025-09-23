@@ -35,9 +35,7 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/chat/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/chat/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
@@ -88,9 +86,7 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
@@ -132,9 +128,7 @@ class LightLLMClient:
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def function_call(
-        self, message: str, tools: List[Dict], tool_choice: str = "auto", **kwargs
-    ) -> Dict[str, Any]:
+    def function_call(self, message: str, tools: List[Dict], tool_choice: str = "auto", **kwargs) -> Dict[str, Any]:
         """Function calling"""
         data = {
             "model": self.model_name,
@@ -146,18 +140,14 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/chat/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/chat/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def stream_function_call(
-        self, message: str, tools: List[Dict], tool_choice: str = "auto", **kwargs
-    ):
+    def stream_function_call(self, message: str, tools: List[Dict], tool_choice: str = "auto", **kwargs):
         """stream Function calling"""
         data = {
             "model": self.model_name,
@@ -218,18 +208,14 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def completions_with_multiple_prompts(
-        self, prompts: List[str], **kwargs
-    ) -> Dict[str, Any]:
+    def completions_with_multiple_prompts(self, prompts: List[str], **kwargs) -> Dict[str, Any]:
         """使用多个prompt进行文本补全（只处理第一个）"""
         data = {
             "model": self.model_name,
@@ -239,18 +225,14 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def completions_with_logprobs(
-        self, prompt: str, logprobs: int = 5, **kwargs
-    ) -> Dict[str, Any]:
+    def completions_with_logprobs(self, prompt: str, logprobs: int = 5, **kwargs) -> Dict[str, Any]:
         """测试带logprobs的文本补全"""
         data = {
             "model": self.model_name,
@@ -261,18 +243,14 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def completions_with_echo(
-        self, prompt: str, echo: bool = True, **kwargs
-    ) -> Dict[str, Any]:
+    def completions_with_echo(self, prompt: str, echo: bool = True, **kwargs) -> Dict[str, Any]:
         """测试带echo参数的文本补全"""
         data = {
             "model": self.model_name,
@@ -283,18 +261,14 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def completions_with_echo_and_logprobs(
-        self, prompt: str, echo: bool = True, logprobs: int = 5, **kwargs
-    ) -> Dict[str, Any]:
+    def completions_with_echo_and_logprobs(self, prompt: str, echo: bool = True, logprobs: int = 5, **kwargs) -> Dict[str, Any]:
         """测试带echo和logprobs参数的文本补全（重点测试修复后的功能）"""
         data = {
             "model": self.model_name,
@@ -306,18 +280,14 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def completions_logprobs_structure_test(
-        self, prompt: str, **kwargs
-    ) -> Dict[str, Any]:
+    def completions_logprobs_structure_test(self, prompt: str, **kwargs) -> Dict[str, Any]:
         """专门测试logprobs数据结构的完整性"""
         data = {
             "model": self.model_name,
@@ -329,9 +299,7 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
@@ -350,9 +318,7 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
@@ -370,18 +336,14 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
         else:
             raise Exception(f"API调用失败: {response.status_code} - {response.text}")
 
-    def completions_with_multiple_token_arrays(
-        self, token_arrays: List[List[int]], **kwargs
-    ) -> Dict[str, Any]:
+    def completions_with_multiple_token_arrays(self, token_arrays: List[List[int]], **kwargs) -> Dict[str, Any]:
         """测试多个token数组的批处理"""
         data = {
             "model": self.model_name,
@@ -391,9 +353,7 @@ class LightLLMClient:
             **kwargs,
         }
 
-        response = requests.post(
-            f"{self.base_url}/v1/completions", headers=self.headers, json=data
-        )
+        response = requests.post(f"{self.base_url}/v1/completions", headers=self.headers, json=data)
 
         if response.status_code == 200:
             return response.json()
@@ -621,9 +581,7 @@ def test_logprobs():
 
     try:
         print("=== 测试logprobs ===")
-        result = client.completions_with_logprobs(
-            "The capital of France is", logprobs=5, max_tokens=20
-        )
+        result = client.completions_with_logprobs("The capital of France is", logprobs=5, max_tokens=20)
         print("提示: The capital of France is")
         print("补全:", result["choices"][0]["text"])
 
@@ -634,9 +592,7 @@ def test_logprobs():
             print(f"  tokens: {logprobs.get('tokens', [])[:5]}...")  # 只显示前5个
             print(f"  token_logprobs: {logprobs.get('token_logprobs', [])[:5]}...")
             print(f"  text_offset: {logprobs.get('text_offset', [])[:5]}...")
-            print(
-                f"  top_logprobs: {logprobs.get('top_logprobs', [])[:2]}..."
-            )  # 只显示前2个
+            print(f"  top_logprobs: {logprobs.get('top_logprobs', [])[:2]}...")  # 只显示前2个
         print()
     except Exception as e:
         print(f"错误: {e}")
@@ -672,18 +628,14 @@ def test_stop_parameter():
         print("=== 测试stop参数 ===")
 
         # 测试单个stop字符串
-        result = client.completions_with_stop(
-            "Count: 1, 2, 3, 4", stop="12", max_tokens=50
-        )
+        result = client.completions_with_stop("Count: 1, 2, 3, 4", stop="12", max_tokens=50)
         print("提示: Count: 1, 2, 3, 4 (stop='12')")
         print("补全:", repr(result["choices"][0]["text"]))
         print("完成原因:", result["choices"][0]["finish_reason"])
         print()
 
         # 测试多个stop字符串
-        result = client.completions_with_stop(
-            "The colors are red, blue, green", stop=["red", "blue"], max_tokens=50
-        )
+        result = client.completions_with_stop("The colors are red, blue, green", stop=["red", "blue"], max_tokens=50)
         print("提示: The colors are red, blue, green (stop=['red', 'blue'])")
         print("补全:", repr(result["choices"][0]["text"]))
         print("完成原因:", result["choices"][0]["finish_reason"])
@@ -700,9 +652,7 @@ def test_multiple_token_arrays():
         print("=== 测试多个token数组批处理 ===")
         token_arrays = [[2701, 525, 5248], [4755, 8394, 1234], [9876, 5432, 1098]]
 
-        result = client.completions_with_multiple_token_arrays(
-            token_arrays, max_tokens=20
-        )
+        result = client.completions_with_multiple_token_arrays(token_arrays, max_tokens=20)
         print(f"发送了 {len(token_arrays)} 个token数组进行批处理:")
 
         for i, choice in enumerate(result["choices"]):

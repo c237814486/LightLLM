@@ -56,9 +56,7 @@ class MemoryManager:
         from lightllm.utils.envs_utils import get_unique_server_name
 
         rank_in_node = get_current_rank_in_node()
-        self.shared_can_use_token_num = SharedInt(
-            f"{get_unique_server_name()}_mem_manger_can_use_token_num_{rank_in_node}"
-        )
+        self.shared_can_use_token_num = SharedInt(f"{get_unique_server_name()}_mem_manger_can_use_token_num_{rank_in_node}")
 
         self.shared_can_use_token_num.set_value(self.can_use_mem_size)
         self._init_buffers(
@@ -71,13 +69,7 @@ class MemoryManager:
         self.HOLD_TOKEN_MEMINDEX = self.size
 
     def get_cell_size(self):
-        return (
-            2
-            * self.head_num
-            * self.head_dim
-            * self.layer_num
-            * torch._utils._element_size(self.dtype)
-        )
+        return 2 * self.head_num * self.head_dim * self.layer_num * torch._utils._element_size(self.dtype)
 
     def profile_size(self, mem_fraction):
         if self.size is not None:
@@ -85,15 +77,11 @@ class MemoryManager:
 
         world_size = dist.get_world_size()
         total_memory = get_total_gpu_memory()
-        available_memory = get_available_gpu_memory(world_size) - total_memory * (
-            1 - mem_fraction
-        )
+        available_memory = get_available_gpu_memory(world_size) - total_memory * (1 - mem_fraction)
         cell_size = self.get_cell_size()
-        self.size = int(available_memory * 1024**3 / cell_size)
+        self.size = int(available_memory * 1024 ** 3 / cell_size)
         if world_size > 1:
-            tensor = torch.tensor(
-                self.size, dtype=torch.int64, device=f"cuda:{get_current_device_id()}"
-            )
+            tensor = torch.tensor(self.size, dtype=torch.int64, device=f"cuda:{get_current_device_id()}")
             dist.all_reduce(tensor, op=dist.ReduceOp.MIN)
             self.size = tensor.item()
         logger.info(
@@ -108,9 +96,7 @@ class MemoryManager:
         # 分配，内部实际也没有管理，这个token是预留来对一些特殊的运行模式，如多dp下，overlap microbatch
         # 等模式下 padding 一些请求，使推理过程可以正常运行采用的，其索引值为size，存储在HOLD_TOKEN_MEMINDEX
         # 成员变量中，其与 req_manager 中的HOLD_REQUEST_ID具有类似的作用和意义。
-        self.kv_buffer = torch.empty(
-            (layer_num, size + 1, 2 * head_num, head_dim), dtype=dtype, device="cuda"
-        )
+        self.kv_buffer = torch.empty((layer_num, size + 1, 2 * head_num, head_dim), dtype=dtype, device="cuda")
 
     def alloc_kv_move_buffer(self, max_req_total_len):
         """
@@ -123,12 +109,8 @@ class MemoryManager:
             dtype=self.dtype,
             device="cuda",
         )
-        self.kv_move_buf_indexes = torch.arange(
-            0, max_req_total_len + 8, dtype=torch.int64, device="cuda"
-        )
-        self.token_dim_size = (
-            self.kv_move_buffer.shape[-2] * self.kv_move_buffer.shape[-1]
-        )
+        self.kv_move_buf_indexes = torch.arange(0, max_req_total_len + 8, dtype=torch.int64, device="cuda")
+        self.token_dim_size = self.kv_move_buffer.shape[-2] * self.kv_move_buffer.shape[-1]
         return
 
     def send_to_decode_node(
@@ -145,9 +127,7 @@ class MemoryManager:
         move_token_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(
-                    task.prefill_token_indexes[-task.move_kv_len :]
-                )
+                move_token_indexes.extend(task.prefill_token_indexes[-task.move_kv_len :])
 
         cur_device_index = self.kv_buffer.get_device()
         cur_mem = mem_managers[cur_device_index]
@@ -158,9 +138,7 @@ class MemoryManager:
                     nccl_comm.send(move_buffer, dst=1)
                 else:
                     move_size = move_buffer.numel()
-                    new_move_buffer = cur_mem.kv_move_buffer.view(-1)[0:move_size].view(
-                        move_buffer.shape
-                    )
+                    new_move_buffer = cur_mem.kv_move_buffer.view(-1)[0:move_size].view(move_buffer.shape)
                     from torch.cuda import comm
 
                     comm.broadcast(move_buffer, out=[new_move_buffer])
@@ -169,9 +147,7 @@ class MemoryManager:
 
     def _get_kv_move_data(self, token_indexes: List[int], layer_index: int):
         move_size = self.token_dim_size * len(token_indexes)
-        move_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(
-            1, len(token_indexes), 2 * self.head_num, self.head_dim
-        )
+        move_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(1, len(token_indexes), 2 * self.head_num, self.head_dim)
         move_buffer[:, :, :, :] = self.kv_buffer[layer_index, token_indexes, :, :]
         return move_buffer
 
@@ -189,41 +165,27 @@ class MemoryManager:
         move_token_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(
-                    task.decode_token_indexes[-task.move_kv_len :]
-                )
+                move_token_indexes.extend(task.decode_token_indexes[-task.move_kv_len :])
 
         cur_device_index = self.kv_buffer.get_device()
         token_num = len(move_token_indexes)
         move_size = self.token_dim_size * token_num
-        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(
-            1, token_num, 2 * self.head_num, self.head_dim
-        )
+        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(1, token_num, 2 * self.head_num, self.head_dim)
         for i, mem in enumerate(mem_managers):
             for layer_index in range(mem.layer_num):
                 nccl_comm.recv(recive_buffer, src=0)
                 if i == cur_device_index:
-                    mem._write_kv_move_data(
-                        move_token_indexes, recive_buffer, layer_index
-                    )
+                    mem._write_kv_move_data(move_token_indexes, recive_buffer, layer_index)
                 else:
-                    new_recive_buffer = mem.kv_move_buffer.view(-1)[0:move_size].view(
-                        recive_buffer.shape
-                    )
+                    new_recive_buffer = mem.kv_move_buffer.view(-1)[0:move_size].view(recive_buffer.shape)
                     from torch.cuda import comm
 
                     comm.broadcast(recive_buffer, out=[new_recive_buffer])
-                    mem._write_kv_move_data(
-                        move_token_indexes, new_recive_buffer, layer_index
-                    )
+                    mem._write_kv_move_data(move_token_indexes, new_recive_buffer, layer_index)
         return
 
-    def _write_kv_move_data(
-        self, token_indexes: torch.Tensor, buffer_tensor: torch.Tensor, layer_index
-    ):
-        self.kv_buffer[layer_index : layer_index + 1, token_indexes, :, :] = (
-            buffer_tensor
-        )
+    def _write_kv_move_data(self, token_indexes: torch.Tensor, buffer_tensor: torch.Tensor, layer_index):
+        self.kv_buffer[layer_index : layer_index + 1, token_indexes, :, :] = buffer_tensor
         return
 
     def send_to_decode_node_p2p(
@@ -243,18 +205,12 @@ class MemoryManager:
         move_token_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(
-                    task.prefill_token_indexes[-task.move_kv_len :]
-                )
+                move_token_indexes.extend(task.prefill_token_indexes[-task.move_kv_len :])
 
-        move_token_indexes = torch.tensor(
-            move_token_indexes, dtype=torch.int64, device="cuda"
-        )
+        move_token_indexes = torch.tensor(move_token_indexes, dtype=torch.int64, device="cuda")
         for i, mem in enumerate(mem_managers):
             for layer_index in range(mem.layer_num):
-                move_buffer = mem._get_kv_move_data_p2p(
-                    move_token_indexes, layer_index, self.kv_move_buffer
-                )
+                move_buffer = mem._get_kv_move_data_p2p(move_token_indexes, layer_index, self.kv_move_buffer)
                 nccl_comm.send(move_buffer, dst=1)
         return
 
@@ -266,9 +222,7 @@ class MemoryManager:
     ):
         move_token_num = len(token_indexes)
         move_size = self.token_dim_size * move_token_num
-        move_buffer = kv_move_buffer.view(-1)[0:move_size].view(
-            move_token_num, 2 * self.head_num, self.head_dim
-        )
+        move_buffer = kv_move_buffer.view(-1)[0:move_size].view(move_token_num, 2 * self.head_num, self.head_dim)
         kv_trans(
             self.kv_buffer[layer_index, :, :, :],
             token_indexes,
@@ -291,30 +245,20 @@ class MemoryManager:
         move_token_indexes = []
         for task in move_tasks:
             if task.move_kv_len != 0:
-                move_token_indexes.extend(
-                    task.decode_token_indexes[-task.move_kv_len :]
-                )
+                move_token_indexes.extend(task.decode_token_indexes[-task.move_kv_len :])
 
-        move_token_indexes = torch.tensor(
-            move_token_indexes, dtype=torch.int64, device="cuda"
-        )
+        move_token_indexes = torch.tensor(move_token_indexes, dtype=torch.int64, device="cuda")
 
         token_num = len(move_token_indexes)
         move_size = self.token_dim_size * token_num
-        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(
-            token_num, 2 * self.head_num, self.head_dim
-        )
+        recive_buffer = self.kv_move_buffer.view(-1)[0:move_size].view(token_num, 2 * self.head_num, self.head_dim)
         for i, mem in enumerate(mem_managers):
             for layer_index in range(mem.layer_num):
                 nccl_comm.recv(recive_buffer, src=0)
-                mem._write_kv_move_data_p2p(
-                    move_token_indexes, recive_buffer, layer_index
-                )
+                mem._write_kv_move_data_p2p(move_token_indexes, recive_buffer, layer_index)
         return
 
-    def _write_kv_move_data_p2p(
-        self, token_indexes: torch.Tensor, buffer_tensor: torch.Tensor, layer_index
-    ):
+    def _write_kv_move_data_p2p(self, token_indexes: torch.Tensor, buffer_tensor: torch.Tensor, layer_index):
         move_token_num = len(token_indexes)
         kv_trans(
             buffer_tensor,
@@ -329,9 +273,7 @@ class MemoryManager:
 
     def alloc(self, need_size) -> torch.Tensor:
         if need_size > self.mark_end - self.mark_start:
-            logger.error(
-                f"warn no enough cache need_size {need_size} left_size {self.can_use_mem_size}"
-            )
+            logger.error(f"warn no enough cache need_size {need_size} left_size {self.can_use_mem_size}")
             assert False, "error alloc state"
 
         start = self.mark_start
@@ -352,9 +294,7 @@ class MemoryManager:
 
         end = self.mark_start
         start = self.mark_start - len(free_index)
-        assert (
-            start >= 0
-        ), f"error free state start: {self.mark_start} free len {len(free_index)}"
+        assert start >= 0, f"error free state start: {self.mark_start} free len {len(free_index)}"
 
         if isinstance(free_index, list):
             self.mem_state.numpy()[start:end] = free_index
@@ -424,12 +364,7 @@ class ReadOnlyStaticsMemoryManager:
         self.dp_world_size = self.global_world_size // args.dp
         # 兼容多机 dp size=1 纯 tp 模式的情况
         self.is_multinode_tp = args.dp == 1 and args.nnodes > 1
-        self.shared_tp_infos = [
-            SharedInt(
-                f"{get_unique_server_name()}_mem_manger_can_use_token_num_{rank_in_node}"
-            )
-            for rank_in_node in range(0, self.node_world_size, self.dp_world_size)
-        ]
+        self.shared_tp_infos = [SharedInt(f"{get_unique_server_name()}_mem_manger_can_use_token_num_{rank_in_node}") for rank_in_node in range(0, self.node_world_size, self.dp_world_size)]
 
     def get_unrefed_token_num(self, dp_rank_in_node: int):
         if self.is_multinode_tp:

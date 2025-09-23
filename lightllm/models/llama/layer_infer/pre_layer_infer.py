@@ -18,12 +18,8 @@ class LlamaPreLayerInfer(PreLayerInferTpl):
 
     def __init__(self, network_config, mode):
         super().__init__(network_config, mode)
-        tp_vob_ids = np.linspace(
-            0, network_config["vocab_size"], self.tp_world_size_ + 1, dtype=np.int64
-        )
-        self.vob_start_id_, self.vob_end_id_ = int(tp_vob_ids[self.tp_rank_]), int(
-            tp_vob_ids[self.tp_rank_ + 1]
-        )
+        tp_vob_ids = np.linspace(0, network_config["vocab_size"], self.tp_world_size_ + 1, dtype=np.int64)
+        self.vob_start_id_, self.vob_end_id_ = int(tp_vob_ids[self.tp_rank_]), int(tp_vob_ids[self.tp_rank_ + 1])
 
         return
 
@@ -85,14 +81,10 @@ class LlamaPreLayerInfer(PreLayerInferTpl):
         infer_state: LlamaInferStateInfo,
         layer_weight: LlamaPreAndPostLayerWeight,
     ):
-        input_embdings = self.context_forward(
-            input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight
-        )
+        input_embdings = self.context_forward(input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight)
         from lightllm.common.basemodel.triton_kernel.sp_pad_copy import sp_pad_copy
 
-        padded_input_embdings = sp_pad_copy(
-            input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_
-        )
+        padded_input_embdings = sp_pad_copy(input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_)
         return padded_input_embdings
 
     def tpsp_token_forward(
@@ -101,14 +93,10 @@ class LlamaPreLayerInfer(PreLayerInferTpl):
         infer_state: LlamaInferStateInfo,
         layer_weight: LlamaPreAndPostLayerWeight,
     ):
-        input_embdings = self.token_forward(
-            input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight
-        )
+        input_embdings = self.token_forward(input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight)
         from lightllm.common.basemodel.triton_kernel.sp_pad_copy import sp_pad_copy
 
-        padded_input_embdings = sp_pad_copy(
-            input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_
-        )
+        padded_input_embdings = sp_pad_copy(input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_)
         return padded_input_embdings
 
     def overlap_tpsp_token_forward(
@@ -120,23 +108,15 @@ class LlamaPreLayerInfer(PreLayerInferTpl):
         layer_weight: LlamaPreAndPostLayerWeight,
     ):
 
-        input_embdings = self.token_forward(
-            input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight
-        )
+        input_embdings = self.token_forward(input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight)
         from lightllm.common.basemodel.triton_kernel.sp_pad_copy import sp_pad_copy
 
-        padded_input_embdings = sp_pad_copy(
-            input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_
-        )
+        padded_input_embdings = sp_pad_copy(input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_)
 
-        input_embdings1 = self.token_forward(
-            input_ids=input_ids1, infer_state=infer_state1, layer_weight=layer_weight
-        )
+        input_embdings1 = self.token_forward(input_ids=input_ids1, infer_state=infer_state1, layer_weight=layer_weight)
         from lightllm.common.basemodel.triton_kernel.sp_pad_copy import sp_pad_copy
 
-        padded_input_embdings1 = sp_pad_copy(
-            input_embdings1, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_
-        )
+        padded_input_embdings1 = sp_pad_copy(input_embdings1, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_)
 
         return padded_input_embdings, padded_input_embdings1
 
@@ -149,22 +129,14 @@ class LlamaPreLayerInfer(PreLayerInferTpl):
         layer_weight: LlamaPreAndPostLayerWeight,
     ):
 
-        input_embdings = self.context_forward(
-            input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight
-        )
+        input_embdings = self.context_forward(input_ids=input_ids, infer_state=infer_state, layer_weight=layer_weight)
         from lightllm.common.basemodel.triton_kernel.sp_pad_copy import sp_pad_copy
 
-        padded_input_embdings = sp_pad_copy(
-            input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_
-        )
+        padded_input_embdings = sp_pad_copy(input_embdings, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_)
 
-        input_embdings1 = self.context_forward(
-            input_ids=input_ids1, infer_state=infer_state1, layer_weight=layer_weight
-        )
+        input_embdings1 = self.context_forward(input_ids=input_ids1, infer_state=infer_state1, layer_weight=layer_weight)
         from lightllm.common.basemodel.triton_kernel.sp_pad_copy import sp_pad_copy
 
-        padded_input_embdings1 = sp_pad_copy(
-            input_embdings1, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_
-        )
+        padded_input_embdings1 = sp_pad_copy(input_embdings1, sp_rank_id=self.tp_rank_, sp_world_size=self.tp_world_size_)
 
         return padded_input_embdings, padded_input_embdings1

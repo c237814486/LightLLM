@@ -48,14 +48,8 @@ if triton.__version__ >= "2.1.0":
         offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
 
         mask_d = offs_d < head_dim_act
-        off_q = (
-            cur_head * q_stride_h
-            + (seq_start + offs_m[:, None]) * q_stride_s
-            + offs_d[None, :] * q_stride_d
-        )
-        q = tl.load(
-            Q + off_q, mask=(offs_m[:, None] < seq_len) & mask_d[None, :], other=0.0
-        )
+        off_q = cur_head * q_stride_h + (seq_start + offs_m[:, None]) * q_stride_s + offs_d[None, :] * q_stride_d
+        q = tl.load(Q + off_q, mask=(offs_m[:, None] < seq_len) & mask_d[None, :], other=0.0)
         # initialize pointer to m and l
         m_i = tl.zeros([BLOCK_M], dtype=tl.float32) - float("inf")
         l_i = tl.zeros([BLOCK_M], dtype=tl.float32) - float("inf")
@@ -64,11 +58,7 @@ if triton.__version__ >= "2.1.0":
         for start_n in range(0, seq_len, BLOCK_N):
             start_n = tl.multiple_of(start_n, BLOCK_N)
             # -- compute qk ----
-            off_k = (
-                (seq_start + start_n + offs_n[None, :]) * k_stride_s
-                + cur_head * k_stride_h
-                + offs_d[:, None] * k_stride_d
-            )
+            off_k = (seq_start + start_n + offs_n[None, :]) * k_stride_s + cur_head * k_stride_h + offs_d[:, None] * k_stride_d
             k = tl.load(
                 K + off_k,
                 mask=((start_n + offs_n[None, :]) < seq_len) & mask_d[:, None],
@@ -89,11 +79,7 @@ if triton.__version__ >= "2.1.0":
             acc = acc * acc_scale[:, None]
 
             # update acc
-            off_v = (
-                (seq_start + start_n + offs_n[:, None]) * v_stride_s
-                + cur_head * v_stride_h
-                + offs_d[None, :] * v_stride_d
-            )
+            off_v = (seq_start + start_n + offs_n[:, None]) * v_stride_s + cur_head * v_stride_h + offs_d[None, :] * v_stride_d
             v = tl.load(
                 V + off_v,
                 mask=((start_n + offs_n[:, None]) < seq_len) & mask_d[None, :],
@@ -109,11 +95,7 @@ if triton.__version__ >= "2.1.0":
         o_scale = tl.exp(m_i - l_i)
         acc = acc * o_scale[:, None]
         # initialize pointers to output
-        off_o = (
-            (seq_start + offs_m[:, None]) * o_stride_s
-            + cur_head * o_stride_h
-            + offs_d[None, :] * o_stride_d
-        )
+        off_o = (seq_start + offs_m[:, None]) * o_stride_s + cur_head * o_stride_h + offs_d[None, :] * o_stride_d
         out_ptrs = Out + off_o
         tl.store(out_ptrs, acc, mask=(offs_m[:, None] < seq_len) & mask_d[None, :])
         return
@@ -129,13 +111,11 @@ if triton.__version__ >= "2.1.0":
     ):
         BLOCK = 64
         # shape constraints
-        assert (
-            q.ndim == k.ndim == v.ndim == o.ndim == 3
-        ), "q, k, v, o must be 3D tensors"
+        assert q.ndim == k.ndim == v.ndim == o.ndim == 3, "q, k, v, o must be 3D tensors"
         _, head_num, head_dim = q.shape
         batch_size = cu_seqlens.numel() - 1
 
-        sm_scale = 1.0 / (head_dim**0.5)  # 计算scale系数
+        sm_scale = 1.0 / (head_dim ** 0.5)  # 计算scale系数
         d_pad = triton.next_power_of_2(head_dim)
         grid = (triton.cdiv(max_seqlen, BLOCK), head_num, batch_size)  # batch, head,
         num_warps = 4
@@ -185,7 +165,7 @@ try:
         max_seqlen,
     ):
         head_dim = q.shape[-1]
-        softmax_scale = head_dim**-0.5
+        softmax_scale = head_dim ** -0.5
         window_size = (-1, -1)
         torch.ops.sgl_kernel.fwd.default(
             q,

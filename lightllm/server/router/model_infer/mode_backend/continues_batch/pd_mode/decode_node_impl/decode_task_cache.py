@@ -7,6 +7,4 @@ from lightllm.server.router.dynamic_prompt.radix_cache import TreeNode
 
 g_kv_move_task_cache: Dict[int, Tuple[KVMoveTask, TreeNode, List[int]]] = {}
 
-g_success_kv_move_task_cache: Dict[int, Tuple[KVMoveTask, TreeNode, float]] = (
-    {}
-)  # 第三个float代表的是时间，用于判断过期条件。
+g_success_kv_move_task_cache: Dict[int, Tuple[KVMoveTask, TreeNode, float]] = {}  # 第三个float代表的是时间，用于判断过期条件。

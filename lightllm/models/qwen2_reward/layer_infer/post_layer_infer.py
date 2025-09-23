@@ -20,12 +20,8 @@ class Qwen2RewardPostLayerInfer(LlamaPostLayerInfer):
         input_embdings = None
         last_input = self._norm(last_input, infer_state, layer_weight)
 
-        last_input = torch.addmm(
-            layer_weight.score_up_bias, last_input, layer_weight.score_up_weight
-        )
+        last_input = torch.addmm(layer_weight.score_up_bias, last_input, layer_weight.score_up_weight)
         last_input = torch.nn.functional.relu(last_input)
-        score = torch.addmm(
-            layer_weight.score_down_bias, last_input, layer_weight.score_down_weight
-        )
+        score = torch.addmm(layer_weight.score_down_bias, last_input, layer_weight.score_down_weight)
 
         return score

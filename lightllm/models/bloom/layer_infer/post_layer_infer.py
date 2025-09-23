@@ -22,9 +22,7 @@ class BloomPostLayerInfer(PostLayerInferTpl):
         self.embed_dim_ = network_config["n_embed"]
         return
 
-    def _norm(
-        self, input, infer_state, layer_weight: BloomPreAndPostLayerWeight
-    ) -> torch.Tensor:
+    def _norm(self, input, infer_state, layer_weight: BloomPreAndPostLayerWeight) -> torch.Tensor:
         return layernorm_forward(
             input,
             layer_weight.final_norm_weight_,
@@ -60,11 +58,7 @@ class BloomPostLayerInfer(PostLayerInferTpl):
         input_embdings_dtype = input_embdings.dtype
         input_embdings = None
         last_input = self._norm(last_input, infer_state, layer_weight)
-        last_input = (
-            rearrange(last_input, "batch embed_dim -> embed_dim batch")
-            .contiguous()
-            .reshape(-1, batch_size)
-        )
+        last_input = rearrange(last_input, "batch embed_dim -> embed_dim batch").contiguous().reshape(-1, batch_size)
         logic_batch = torch.mm(layer_weight.lm_head_weight_, last_input)
         last_input = None
         if self.tp_world_size_ == 1:
@@ -77,10 +71,7 @@ class BloomPostLayerInfer(PostLayerInferTpl):
             )
             split_size = self.vocab_size_ // self.tp_world_size_
             all_gather(
-                [
-                    gather_data[i * split_size : (i + 1) * split_size, :]
-                    for i in range(self.tp_world_size_)
-                ],
+                [gather_data[i * split_size : (i + 1) * split_size, :] for i in range(self.tp_world_size_)],
                 logic_batch,
                 group=infer_state.dist_group,
                 async_op=False,

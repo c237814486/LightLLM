@@ -68,11 +68,7 @@ class CLIPVisionModelTRT:
         use_tensorrt=True,
         **kwargs,
     ):
-        clip_class = (
-            CLIPVisionModelWithProjection
-            if projector or projector is None
-            else CLIPVisionModelHF
-        )
+        clip_class = CLIPVisionModelWithProjection if projector or projector is None else CLIPVisionModelHF
 
         model_types = {
             "clip": dict(
@@ -80,18 +76,14 @@ class CLIPVisionModelTRT:
                 mean=(0.48145466, 0.4578275, 0.40821073),
                 std=(0.26862954, 0.26130258, 0.27577711),
             ),
-            "siglip": dict(
-                model=SiglipVisionModel, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)
-            ),
+            "siglip": dict(model=SiglipVisionModel, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
         }
 
         # model_type = clip_model_type(model, types=model_types.keys())
         model_type = "clip"
 
         if model_type is None:
-            raise ValueError(
-                f"tried loading unrecognized CLIP model from {model} - supported model types are CLIP and SigLIP"
-            )
+            raise ValueError(f"tried loading unrecognized CLIP model from {model} - supported model types are CLIP and SigLIP")
 
         if projector is None:
             projector = model_type == "clip"
@@ -109,28 +101,20 @@ class CLIPVisionModelTRT:
             if crop:
                 logging.warning("SigLIP models don't typically have cropping enabled")
 
-        self.config = AttributeDict(
-            name=model, type=model_type, projector=projector, crop=crop
-        )
+        self.config = AttributeDict(name=model, type=model_type, projector=projector, crop=crop)
         self.stats = AttributeDict()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.stream = None
 
-        self.dtype = (
-            torch.float32 if use_tensorrt else dtype
-        )  # TRT handles FP16 internally
-        self.output_dtype = (
-            dtype  # still output the embeddings with the requested dtype
-        )
+        self.dtype = torch.float32 if use_tensorrt else dtype  # TRT handles FP16 internally
+        self.output_dtype = dtype  # still output the embeddings with the requested dtype
 
         logging.info(f"loading {model_type} vision model {model}")
 
         factory = model_types[model_type]
 
-        self.model = factory["model"].from_pretrained(
-            model, torch_dtype=self.dtype
-        )  # .to(self.device).eval()
+        self.model = factory["model"].from_pretrained(model, torch_dtype=self.dtype)  # .to(self.device).eval()
         self.config.input_shape = (
             self.model.config.image_size["height"],
             self.model.config.image_size["width"],
@@ -181,9 +165,7 @@ class CLIPVisionModelTRT:
             try:
                 self.init_trt(**kwargs)
             except Exception as error:
-                logging.error(
-                    f"Exception occurred trying to use TensorRT for {model_type} model ({self.config.name})\n\n{traceback.format_exc()}"
-                )
+                logging.error(f"Exception occurred trying to use TensorRT for {model_type} model ({self.config.name})\n\n{traceback.format_exc()}")
 
         logging.info(f"loaded {model_type} vision model {model}")
 
@@ -193,15 +175,11 @@ class CLIPVisionModelTRT:
         **kwargs,
     ):
         if Version(tensorrt.__version__) < Version("8.6"):
-            logging.warning(
-                f"disabling CLIP with TensorRT {tensorrt.__version__} (requires TensorRT 8.6 or newer)"
-            )
+            logging.warning(f"disabling CLIP with TensorRT {tensorrt.__version__} (requires TensorRT 8.6 or newer)")
             return
 
-        if psutil.virtual_memory().total < 20 * (1024**3):
-            logging.warning(
-                f"disabling CLIP with TensorRT due to limited memory (falling back to Transformers API)"
-            )
+        if psutil.virtual_memory().total < 20 * (1024 ** 3):
+            logging.warning(f"disabling CLIP with TensorRT due to limited memory (falling back to Transformers API)")
             return
 
         suffix = f"vision{'_projector' if self.config.projector else ''}"
@@ -211,9 +189,7 @@ class CLIPVisionModelTRT:
         )
 
         # 创建动态维度的测试输入
-        test_inputs = torch.ones(
-            1, 3, *self.config.input_shape, dtype=self.dtype, device="cuda"
-        )
+        test_inputs = torch.ones(1, 3, *self.config.input_shape, dtype=self.dtype, device="cuda")
 
         if os.path.isfile(trt_path):
             logging.info(f"loading TensorRT model from {trt_path}")
@@ -230,7 +206,7 @@ class CLIPVisionModelTRT:
                 [test_inputs],
                 fp16_mode=True,
                 log_level=tensorrt.Logger.VERBOSE,
-                max_workspace_size=(1024**3) * 3,
+                max_workspace_size=(1024 ** 3) * 3,
                 use_onnx=True,
                 dynamic_axes=dynamic_axes,  # 添加动态维度配置
                 max_batch_size=128,  # 设置最大batch size
@@ -254,9 +230,7 @@ class CLIPVisionModelTRT:
         print(f"benchmarking {self.config.type} vision model {self.config.name}")
         print(f"torch time:  {profile_model(self.model, test_inputs)} ms")
         print(f"trt time:    {profile_model(trt_model, test_inputs)} ms")
-        print(
-            f"y^ delta:    {torch.max(torch.abs(self.model(test_inputs)[key] - trt_model(test_inputs)[key]))}"
-        )
+        print(f"y^ delta:    {torch.max(torch.abs(self.model(test_inputs)[key] - trt_model(test_inputs)[key]))}")
 
         trt_model.config = self.model.config
         self.model = trt_model
@@ -291,9 +265,7 @@ class CLIPVisionModelTRT:
             ndims = len(image.shape)
 
             if ndims != 3 and ndims != 4:
-                raise ValueError(
-                    f"image with dims {image.shape} was not in NCHW or NHWC format"
-                )
+                raise ValueError(f"image with dims {image.shape} was not in NCHW or NHWC format")
 
             if ndims == 3:
                 image = image.unsqueeze(0)
@@ -303,18 +275,12 @@ class CLIPVisionModelTRT:
 
             # image = self.preprocessor(image)
 
-            model_output = self.model(
-                image
-            )  # , output_hidden_states=hidden_state is not None)   #.pooler_output  .last_hidden_state
+            model_output = self.model(image)  # , output_hidden_states=hidden_state is not None)   #.pooler_output  .last_hidden_state
             print(model_output.keys())
-            output_embeds = model_output[
-                "image_embeds" if self.config.projector else "pooler_output"
-            ]
+            output_embeds = model_output["image_embeds" if self.config.projector else "pooler_output"]
 
             if hidden_state is not None:
-                hidden_tensor = _convert_tensor(
-                    model_output["hidden_states"][hidden_state]
-                )
+                hidden_tensor = _convert_tensor(model_output["hidden_states"][hidden_state])
                 if return_dict:
                     output.hidden_state = hidden_tensor
                 else:

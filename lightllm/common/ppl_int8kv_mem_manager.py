@@ -27,19 +27,9 @@ class PPLINT8KVMemoryManager(MemoryManager):
         )
 
     def get_cell_size(self):
-        return (
-            2
-            * self.head_num
-            * self.head_dim
-            * self.layer_num
-            * torch._utils._element_size(self.kv_dtype)
-            + 2
-            * self.head_num
-            * self.head_dim
-            // self.group_quant_size
-            * self.layer_num
-            * torch._utils._element_size(self.dtype)
-        )
+        return 2 * self.head_num * self.head_dim * self.layer_num * torch._utils._element_size(
+            self.kv_dtype
+        ) + 2 * self.head_num * self.head_dim // self.group_quant_size * self.layer_num * torch._utils._element_size(self.dtype)
 
     def _init_buffers(self, size, dtype, head_num, head_dim, layer_num):
         self.kv_buffer = torch.empty(

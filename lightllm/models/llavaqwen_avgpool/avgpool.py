@@ -10,9 +10,7 @@ def build_eos_tokens(num_eos_tokens: int, output_hidden_size: int):
     # think tokens
 
     if num_eos_tokens:
-        eos_tokens = torch.nn.Parameter(
-            torch.zeros(1, num_eos_tokens, output_hidden_size)
-        )
+        eos_tokens = torch.nn.Parameter(torch.zeros(1, num_eos_tokens, output_hidden_size))
         nn.init.normal_(eos_tokens, mean=0.0, std=0.02)
     else:
         eos_tokens = None
@@ -35,9 +33,7 @@ class PoolPojector(nn.Module):
     ):
         super().__init__()
         self.config = config
-        self.pooling = nn.AdaptiveAvgPool2d(
-            (config["proj_output_size"]["height"], config["proj_output_size"]["width"])
-        )
+        self.pooling = nn.AdaptiveAvgPool2d((config["proj_output_size"]["height"], config["proj_output_size"]["width"]))
         self.mlp1 = build_mlp(2, config["mm_hidden_size"], config["mm_hidden_size"] * 4)
         self.mlp2 = build_mlp(2, config["mm_hidden_size"] * 4, config["hidden_size"])
         self.mlp3 = build_mlp(2, config["mm_hidden_size"], config["hidden_size"])
@@ -138,9 +134,7 @@ class Qwen25VLAvgPoolProjector(nn.Module):
             start += length
 
             # reshape to [t, h, w, hidden] -> permute to [hidden, t, h, w]
-            img_feat = img_seq.view(t, h, w, -1).permute(
-                3, 0, 1, 2
-            )  # [hidden, t, h, w]
+            img_feat = img_seq.view(t, h, w, -1).permute(3, 0, 1, 2)  # [hidden, t, h, w]
 
             Mh, Nw = get_adaptive_pool_size(h, w, scale=self.mm_downsample_ratio)
             pool = nn.AdaptiveAvgPool2d((Mh, Nw))  # pool on H, W

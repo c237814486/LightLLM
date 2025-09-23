@@ -19,7 +19,5 @@ def prepare_mtp_prefill_inputs(
         b_ready_cache_len=model_input.b_ready_cache_len,
     )
     new_model_input.input_ids = new_input_ids
-    new_model_input.deepseekv3_mtp_draft_input_hiddens = (
-        deepseekv3_mtp_draft_input_hiddens
-    )
+    new_model_input.deepseekv3_mtp_draft_input_hiddens = deepseekv3_mtp_draft_input_hiddens
     return new_model_input

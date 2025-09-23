@@ -115,9 +115,7 @@ class ModelRpcServer:
 
         is_outlines_constraint_mode = self.args.output_constraint_mode == "outlines"
         is_xgrammar_constraint_mode = self.args.output_constraint_mode == "xgrammar"
-        assert not (
-            is_outlines_constraint_mode and is_xgrammar_constraint_mode
-        ), "only one constraint mode can be true"
+        assert not (is_outlines_constraint_mode and is_xgrammar_constraint_mode), "only one constraint mode can be true"
         is_prefill_node = self.args.run_mode == "prefill"
         is_decode_node = self.args.run_mode == "decode"
 
@@ -125,9 +123,7 @@ class ModelRpcServer:
             if self.args.dp > 1:
                 self.backend = DPChunkedForPrefillNode(self.info_queue, self.mem_queue)
             else:
-                self.backend = ChunckedPrefillForPrefillNode(
-                    self.info_queue, self.mem_queue
-                )
+                self.backend = ChunckedPrefillForPrefillNode(self.info_queue, self.mem_queue)
         elif is_decode_node:
             if self.args.dp > 1:
                 self.backend = DPForDecodeNode(self.info_queue, self.mem_queue)

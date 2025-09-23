@@ -96,12 +96,7 @@ class FusedMoeWeightTP(BaseWeight):
         if self.quantized_weight:
             self._fuse_weight_scale()
         with self.lock:
-            if (
-                hasattr(self, "experts_up_projs")
-                and None not in self.experts_up_projs
-                and None not in self.experts_gate_projs
-                and None not in self.w2_list
-            ):
+            if hasattr(self, "experts_up_projs") and None not in self.experts_up_projs and None not in self.experts_gate_projs and None not in self.w2_list:
                 w1_list = []
                 for i_experts in range(self.n_routed_experts):
                     expert_gate_up_proj = torch.cat(
@@ -115,16 +110,12 @@ class FusedMoeWeightTP(BaseWeight):
                     w1_list.append(expert_gate_up_proj)
 
                 inter_shape, hidden_size = w1_list[0].shape[0], w1_list[0].shape[1]
-                w1 = torch._utils._flatten_dense_tensors(w1_list).view(
-                    len(w1_list), inter_shape, hidden_size
-                )
+                w1 = torch._utils._flatten_dense_tensors(w1_list).view(len(w1_list), inter_shape, hidden_size)
                 inter_shape, hidden_size = (
                     self.w2_list[0].shape[0],
                     self.w2_list[0].shape[1],
                 )
-                w2 = torch._utils._flatten_dense_tensors(self.w2_list).view(
-                    len(self.w2_list), inter_shape, hidden_size
-                )
+                w2 = torch._utils._flatten_dense_tensors(self.w2_list).view(len(self.w2_list), inter_shape, hidden_size)
                 if not self.quantized_weight and self.quant_method is not None:
                     self.w1 = self.quant_method.quantize(w1)
                     self.w2 = self.quant_method.quantize(w2)
@@ -137,12 +128,7 @@ class FusedMoeWeightTP(BaseWeight):
 
     def _fuse_weight_scale(self):
         with self.lock:
-            if (
-                hasattr(self, "experts_up_proj_scales")
-                and None not in self.experts_up_proj_scales
-                and None not in self.experts_gate_proj_scales
-                and None not in self.w2_scale_list
-            ):
+            if hasattr(self, "experts_up_proj_scales") and None not in self.experts_up_proj_scales and None not in self.experts_gate_proj_scales and None not in self.w2_scale_list:
                 w1_scale_list = []
                 for i_experts in range(self.n_routed_experts):
                     expert_gate_up_proj_scale = torch.cat(
@@ -158,16 +144,12 @@ class FusedMoeWeightTP(BaseWeight):
                     w1_scale_list[0].shape[0],
                     w1_scale_list[0].shape[1],
                 )
-                w1_scale = torch._utils._flatten_dense_tensors(w1_scale_list).view(
-                    len(w1_scale_list), inter_shape, hidden_size
-                )
+                w1_scale = torch._utils._flatten_dense_tensors(w1_scale_list).view(len(w1_scale_list), inter_shape, hidden_size)
                 inter_shape, hidden_size = (
                     self.w2_scale_list[0].shape[0],
                     self.w2_scale_list[0].shape[1],
                 )
-                w2_scale = torch._utils._flatten_dense_tensors(self.w2_scale_list).view(
-                    len(self.w2_scale_list), inter_shape, hidden_size
-                )
+                w2_scale = torch._utils._flatten_dense_tensors(self.w2_scale_list).view(len(self.w2_scale_list), inter_shape, hidden_size)
                 self.w1[1] = self._cuda(w1_scale)
                 self.w2[1] = self._cuda(w2_scale)
                 delattr(self, "w2_scale_list")
@@ -176,9 +158,7 @@ class FusedMoeWeightTP(BaseWeight):
 
     def load_hf_weights(self, weights):
         if self.e_score_correction_bias_name in weights:
-            self.e_score_correction_bias = self._cuda(
-                weights[self.e_score_correction_bias_name]
-            )
+            self.e_score_correction_bias = self._cuda(weights[self.e_score_correction_bias_name])
         for i_experts in range(self.n_routed_experts):
             w1_weight = f"{self.weight_prefix}.{i_experts}.{self.w1_weight_name}.weight"
             w2_weight = f"{self.weight_prefix}.{i_experts}.{self.w2_weight_name}.weight"
@@ -186,25 +166,19 @@ class FusedMoeWeightTP(BaseWeight):
 
             if w1_weight in weights:
                 self.experts_gate_projs[i_experts] = weights[w1_weight][
-                    self.split_inter_size
-                    * self.tp_rank_ : self.split_inter_size
-                    * (self.tp_rank_ + 1),
+                    self.split_inter_size * self.tp_rank_ : self.split_inter_size * (self.tp_rank_ + 1),
                     :,
                 ]
             if w3_weight in weights:
                 self.experts_up_projs[i_experts] = weights[w3_weight][
-                    self.split_inter_size
-                    * self.tp_rank_ : self.split_inter_size
-                    * (self.tp_rank_ + 1),
+                    self.split_inter_size * self.tp_rank_ : self.split_inter_size * (self.tp_rank_ + 1),
                     :,
                 ]
 
             if w2_weight in weights:
                 self.w2_list[i_experts] = weights[w2_weight][
                     :,
-                    self.split_inter_size
-                    * self.tp_rank_ : self.split_inter_size
-                    * (self.tp_rank_ + 1),
+                    self.split_inter_size * self.tp_rank_ : self.split_inter_size * (self.tp_rank_ + 1),
                 ]
         if self.quant_method is not None:
             self._load_weight_scale(weights)
@@ -220,31 +194,19 @@ class FusedMoeWeightTP(BaseWeight):
             w3_scale = f"{self.weight_prefix}.{i_experts}.{self.w3_weight_name}.{self.weight_scale_suffix}"
             if w1_scale in weights:
                 self.experts_gate_proj_scales[i_experts] = weights[w1_scale][
-                    self.split_inter_size
-                    // block_size
-                    * self.tp_rank_ : self.split_inter_size
-                    // block_size
-                    * (self.tp_rank_ + 1),
+                    self.split_inter_size // block_size * self.tp_rank_ : self.split_inter_size // block_size * (self.tp_rank_ + 1),
                     :,
                 ]
             if w3_scale in weights:
                 self.experts_up_proj_scales[i_experts] = weights[w3_scale][
-                    self.split_inter_size
-                    // block_size
-                    * self.tp_rank_ : self.split_inter_size
-                    // block_size
-                    * (self.tp_rank_ + 1),
+                    self.split_inter_size // block_size * self.tp_rank_ : self.split_inter_size // block_size * (self.tp_rank_ + 1),
                     :,
                 ]
 
             if w2_scale in weights:
                 self.w2_scale_list[i_experts] = weights[w2_scale][
                     :,
-                    self.split_inter_size
-                    // block_size
-                    * self.tp_rank_ : self.split_inter_size
-                    // block_size
-                    * (self.tp_rank_ + 1),
+                    self.split_inter_size // block_size * self.tp_rank_ : self.split_inter_size // block_size * (self.tp_rank_ + 1),
                 ]
 
     def _cuda(self, cpu_tensor):

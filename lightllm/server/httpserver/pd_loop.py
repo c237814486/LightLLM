@@ -53,9 +53,7 @@ async def pd_handle_loop(manager: HttpServerManager):
 
                 for node_id, pd_master_obj in id_to_pd_master_obj.items():
                     if node_id not in id_to_handle_task:
-                        id_to_handle_task[node_id] = asyncio.create_task(
-                            _pd_handle_task(manager, pd_master_obj)
-                        )
+                        id_to_handle_task[node_id] = asyncio.create_task(_pd_handle_task(manager, pd_master_obj))
 
             await asyncio.sleep(30)
 
@@ -99,9 +97,7 @@ async def _pd_handle_task(manager: HttpServerManager, pd_master_obj: PD_Master_O
                 logger.info(f"Sent registration JSON: {regist_json}")
 
                 # 转发任务
-                forwarding_tokens_task = asyncio.create_task(
-                    _up_tokens_to_pd_master(forwarding_queue, websocket)
-                )
+                forwarding_tokens_task = asyncio.create_task(_up_tokens_to_pd_master(forwarding_queue, websocket))
 
                 # 接收 pd master 发来的请求，并推理后，将生成的token转发回pd master。
                 while True:
@@ -152,9 +148,7 @@ async def _get_pd_master_objs(args) -> Optional[Dict[int, PD_Master_Obj]]:
     # node_id 为 0
     if not use_config_server:
         ans = dict()
-        ans[0] = PD_Master_Obj(
-            node_id=0, host_ip_port=f"{args.pd_master_ip}:{args.pd_master_port}"
-        )
+        ans[0] = PD_Master_Obj(node_id=0, host_ip_port=f"{args.pd_master_ip}:{args.pd_master_port}")
         return ans
 
     # 使用 config_server 服务来发现所有的 pd_master 节点。
@@ -194,9 +188,7 @@ async def _pd_process_generate(
             # p d 模式下，将 token 数据放入到转发队列中, 请求id 小于0的请求是health探测请求，不用转发。
             is_health_check_req = sub_req_id < 0
             if not is_health_check_req:
-                await forwarding_queue.put(
-                    (sub_req_id, request_output, metadata, finish_status)
-                )
+                await forwarding_queue.put((sub_req_id, request_output, metadata, finish_status))
 
     except BaseException as e:
         logger.error(str(e))

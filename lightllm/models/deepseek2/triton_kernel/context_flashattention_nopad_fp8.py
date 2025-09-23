@@ -67,21 +67,11 @@ def _fwd_kernel_fp8(
     offs_d = tl.arange(0, BLOCK_DMODEL)
     offs_rope_d = tl.arange(0, BLOCK_ROPE_DMODEL)
     offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
-    off_q = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_bs
-        + cur_head * stride_q_h
-        + offs_d[None, :] * stride_q_d
-    )
-    off_q_rope = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_rope_bs
-        + cur_head * stride_q_rope_h
-        + offs_rope_d[None, :] * stride_q_rope_d
-    )
+    off_q = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_bs + cur_head * stride_q_h + offs_d[None, :] * stride_q_d
+    off_q_rope = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_rope_bs + cur_head * stride_q_rope_h + offs_rope_d[None, :] * stride_q_rope_d
 
     q = tl.load(Q_nope + off_q, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
-    q_rope = tl.load(
-        Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0
-    )
+    q_rope = tl.load(Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
 
     # initialize pointer to m and l
     m_i = tl.zeros([BLOCK_M], dtype=tl.float32) - float("inf")
@@ -89,30 +79,18 @@ def _fwd_kernel_fp8(
     acc = tl.zeros([BLOCK_M, BLOCK_DMODEL], dtype=tl.float32)
 
     block_mask = tl.where(block_start_loc < cur_batch_seq_len, 1, 0)
-    block_end_loc = tl.minimum(
-        (start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len
-    )
+    block_end_loc = tl.minimum((start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len)
 
     for start_n in range(0, block_mask * block_end_loc, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         kv_loc = tl.load(
-            Req_to_tokens
-            + stride_req_to_tokens_b * cur_batch_req_idx
-            + stride_req_to_tokens_s * (start_n + offs_n),
+            Req_to_tokens + stride_req_to_tokens_b * cur_batch_req_idx + stride_req_to_tokens_s * (start_n + offs_n),
             mask=(start_n + offs_n) < block_end_loc,
             other=0,
         ).to(tl.int64)
-        off_kv = (
-            kv_loc[None, :] * stride_kv_bs
-            + cur_kv_head * stride_kv_h
-            + offs_d[:, None] * stride_kv_d
-        )
-        off_kv_rope = (
-            kv_loc[None, :] * stride_kv_rope_bs
-            + cur_kv_head * stride_kv_rope_h
-            + offs_rope_d[:, None] * stride_kv_rope_d
-        )
+        off_kv = kv_loc[None, :] * stride_kv_bs + cur_kv_head * stride_kv_h + offs_d[:, None] * stride_kv_d
+        off_kv_rope = kv_loc[None, :] * stride_kv_rope_bs + cur_kv_head * stride_kv_rope_h + offs_rope_d[:, None] * stride_kv_rope_d
         kv = tl.load(
             KV_nope + off_kv,
             mask=(start_n + offs_n[None, :]) < block_end_loc,
@@ -169,11 +147,7 @@ def _fwd_kernel_fp8(
         l_i = l_i_new
         m_i = m_i_new
     # initialize pointers to output
-    off_o = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_obs
-        + cur_head * stride_oh
-        + offs_d[None, :] * stride_od
-    )
+    off_o = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_obs + cur_head * stride_oh + offs_d[None, :] * stride_od
     out_ptrs = Out + off_o
     tl.store(out_ptrs, acc, mask=offs_m[:, None] < cur_batch_seq_len)
     return
@@ -298,9 +272,7 @@ if __name__ == "__main__":
 
     b_seq_len[0] = N_CTX
     b_req_idx[0] = 0
-    req_to_token_indexs[0][: prompt_cache_len + N_CTX] = torch.tensor(
-        np.arange(prompt_cache_len + N_CTX), dtype=torch.int32
-    ).cuda()
+    req_to_token_indexs[0][: prompt_cache_len + N_CTX] = torch.tensor(np.arange(prompt_cache_len + N_CTX), dtype=torch.int32).cuda()
 
     kv_nope = kv_fp8[:, :, :D_HEAD].to(dtype) * kv_scale
     kv_rope = kv_fp8[:, :, D_HEAD:].to(dtype) * kv_scale

@@ -57,9 +57,7 @@ def get_model_architectures(model_path: str):
         arch = config_json["architectures"][0]
         return arch
     except:
-        logger.error(
-            "can not get architectures from config.json, return unknown_architecture"
-        )
+        logger.error("can not get architectures from config.json, return unknown_architecture")
         return "unknown_architecture"
 
 

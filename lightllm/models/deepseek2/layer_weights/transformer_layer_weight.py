@@ -30,9 +30,7 @@ class Deepseek2TransformerLayerWeight(TransformerLayerWeight):
     def _parse_config(self):
         super()._parse_config()
         self.is_moe = (
-            self.network_config_["n_routed_experts"] is not None
-            and self.layer_num_ >= self.network_config_["first_k_dense_replace"]
-            and self.layer_num_ % self.network_config_["moe_layer_freq"] == 0
+            self.network_config_["n_routed_experts"] is not None and self.layer_num_ >= self.network_config_["first_k_dense_replace"] and self.layer_num_ % self.network_config_["moe_layer_freq"] == 0
         )
         self.tp_q_head_num_ = self.network_config_["num_attention_heads"]
         self.tp_q_head_num_ = self.tp_q_head_num_ // self.tp_world_size_
@@ -46,16 +44,10 @@ class Deepseek2TransformerLayerWeight(TransformerLayerWeight):
 
     def _init_weight_names(self):
         if self.q_lora_rank is None:
-            self.rope_weight_name = (
-                f"model.layers.{self.layer_num_}.self_attn.q_proj.weight"
-            )
+            self.rope_weight_name = f"model.layers.{self.layer_num_}.self_attn.q_proj.weight"
         else:
-            self.rope_weight_name = (
-                f"model.layers.{self.layer_num_}.self_attn.q_b_proj.weight"
-            )
-        self.e_score_correction_bias_name = (
-            f"model.layers.{self.layer_num_}.mlp.gate.e_score_correction_bias"
-        )
+            self.rope_weight_name = f"model.layers.{self.layer_num_}.self_attn.q_b_proj.weight"
+        self.e_score_correction_bias_name = f"model.layers.{self.layer_num_}.mlp.gate.e_score_correction_bias"
 
     def _init_weight(self):
         self._init_qkvo()
@@ -66,35 +58,21 @@ class Deepseek2TransformerLayerWeight(TransformerLayerWeight):
         self._init_norm()
 
     def _load_q_rope(self, q_weight_):
-        q_split_n_embed_with_rope = (
-            (self.qk_nope_head_dim + self.qk_rope_head_dim)
-            * self.num_attention_heads
-            // self.tp_world_size_
-        )
+        q_split_n_embed_with_rope = (self.qk_nope_head_dim + self.qk_rope_head_dim) * self.num_attention_heads // self.tp_world_size_
         q_weight_ = q_weight_[
-            q_split_n_embed_with_rope
-            * self.tp_rank_ : q_split_n_embed_with_rope
-            * (self.tp_rank_ + 1),
+            q_split_n_embed_with_rope * self.tp_rank_ : q_split_n_embed_with_rope * (self.tp_rank_ + 1),
             :,
         ]
         q_weight_ = q_weight_.transpose(0, 1).contiguous()
         q_nope_proj_, q_rope_proj_ = torch.split(
-            q_weight_.view(
-                -1, self.tp_q_head_num_, self.qk_nope_head_dim + self.qk_rope_head_dim
-            ),
+            q_weight_.view(-1, self.tp_q_head_num_, self.qk_nope_head_dim + self.qk_rope_head_dim),
             [self.qk_nope_head_dim, self.qk_rope_head_dim],
             dim=-1,
         )
-        return (
-            q_rope_proj_.reshape(-1, self.qk_rope_head_dim * self.tp_q_head_num_)
-            .transpose(0, 1)
-            .contiguous()
-        )
+        return q_rope_proj_.reshape(-1, self.qk_rope_head_dim * self.tp_q_head_num_).transpose(0, 1).contiguous()
 
     def _load_kb(self, kv_b_proj_):
-        k_b_proj_ = kv_b_proj_.view(
-            self.num_attention_heads, self.qk_nope_head_dim * 2, self.kv_lora_rank
-        )[:, : self.qk_nope_head_dim, :]
+        k_b_proj_ = kv_b_proj_.view(self.num_attention_heads, self.qk_nope_head_dim * 2, self.kv_lora_rank)[:, : self.qk_nope_head_dim, :]
         return k_b_proj_.contiguous().to(kv_b_proj_.dtype)
 
     def _load_kb_scale(self, kv_b_proj_, block_size):
@@ -106,65 +84,36 @@ class Deepseek2TransformerLayerWeight(TransformerLayerWeight):
         return k_b_proj_scale_.contiguous().to(kv_b_proj_.dtype)
 
     def _load_vb(self, kv_b_proj_):
-        v_b_proj_ = kv_b_proj_.T.view(
-            self.kv_lora_rank,
-            self.num_attention_heads,
-            self.qk_nope_head_dim * 2,
-        )[:, :, self.qk_nope_head_dim :].transpose(0, 1)
+        v_b_proj_ = kv_b_proj_.T.view(self.kv_lora_rank, self.num_attention_heads, self.qk_nope_head_dim * 2,)[
+            :, :, self.qk_nope_head_dim :
+        ].transpose(0, 1)
         return v_b_proj_.contiguous().to(kv_b_proj_.dtype)
 
     def _load_vb_scale(self, kv_b_proj_scale_, block_size):
-        v_b_proj_scale_ = kv_b_proj_scale_.T.view(
-            self.kv_lora_rank // block_size,
-            self.num_attention_heads,
-            self.qk_nope_head_dim * 2 // block_size,
-        )[:, :, self.qk_nope_head_dim // block_size :].transpose(0, 1)
+        v_b_proj_scale_ = kv_b_proj_scale_.T.view(self.kv_lora_rank // block_size, self.num_attention_heads, self.qk_nope_head_dim * 2 // block_size,)[
+            :, :, self.qk_nope_head_dim // block_size :
+        ].transpose(0, 1)
         return v_b_proj_scale_.contiguous().to(kv_b_proj_scale_.dtype)
 
     def load_hf_weights(self, weights):
-        kv_b_quant_method = self.quant_cfg.get_quant_method(
-            self.layer_num_, "kv_b_proj"
-        )
+        kv_b_quant_method = self.quant_cfg.get_quant_method(self.layer_num_, "kv_b_proj")
 
         if f"model.layers.{self.layer_num_}.self_attn.kv_b_proj.weight" in weights:
-            kv_b_proj_ = weights[
-                f"model.layers.{self.layer_num_}.self_attn.kv_b_proj.weight"
-            ]
+            kv_b_proj_ = weights[f"model.layers.{self.layer_num_}.self_attn.kv_b_proj.weight"]
             # for deepseek_v3, the bmm operator is not quantized
             if self.quant_cfg.quantized_weight:
                 kv_b_proj_ = weight_dequant(
                     kv_b_proj_.cuda(),
-                    weights[
-                        f"model.layers.{self.layer_num_}.self_attn.kv_b_proj."
-                        + kv_b_quant_method.weight_scale_suffix
-                    ].cuda(),
+                    weights[f"model.layers.{self.layer_num_}.self_attn.kv_b_proj." + kv_b_quant_method.weight_scale_suffix].cuda(),
                 ).cpu()
-            weights[f"model.layers.{self.layer_num_}.self_attn.k_b_proj.weight"] = (
-                self._load_kb(kv_b_proj_)
-            )
-            weights[f"model.layers.{self.layer_num_}.self_attn.v_b_proj.weight"] = (
-                self._load_vb(kv_b_proj_)
-            )
+            weights[f"model.layers.{self.layer_num_}.self_attn.k_b_proj.weight"] = self._load_kb(kv_b_proj_)
+            weights[f"model.layers.{self.layer_num_}.self_attn.v_b_proj.weight"] = self._load_vb(kv_b_proj_)
 
-        if (
-            self.quant_cfg.quantized_weight
-            and f"model.layers.{self.layer_num_}.self_attn.kv_b_proj."
-            + kv_b_quant_method.weight_scale_suffix
-            in weights
-        ):
-            kv_b_proj_scale_ = weights[
-                f"model.layers.{self.layer_num_}.self_attn.kv_b_proj."
-                + kv_b_quant_method.weight_scale_suffix
-            ]
+        if self.quant_cfg.quantized_weight and f"model.layers.{self.layer_num_}.self_attn.kv_b_proj." + kv_b_quant_method.weight_scale_suffix in weights:
+            kv_b_proj_scale_ = weights[f"model.layers.{self.layer_num_}.self_attn.kv_b_proj." + kv_b_quant_method.weight_scale_suffix]
             block_size = 128
-            weights[
-                f"model.layers.{self.layer_num_}.self_attn.k_b_proj."
-                + kv_b_quant_method.weight_scale_suffix
-            ] = self._load_kb_scale(kv_b_proj_scale_, block_size)
-            weights[
-                f"model.layers.{self.layer_num_}.self_attn.v_b_proj."
-                + kv_b_quant_method.weight_scale_suffix
-            ] = self._load_vb_scale(kv_b_proj_scale_, block_size)
+            weights[f"model.layers.{self.layer_num_}.self_attn.k_b_proj." + kv_b_quant_method.weight_scale_suffix] = self._load_kb_scale(kv_b_proj_scale_, block_size)
+            weights[f"model.layers.{self.layer_num_}.self_attn.v_b_proj." + kv_b_quant_method.weight_scale_suffix] = self._load_vb_scale(kv_b_proj_scale_, block_size)
 
         return super().load_hf_weights(weights)
 
@@ -302,9 +251,7 @@ class Deepseek2TransformerLayerWeight(TransformerLayerWeight):
         self._load_mlp(f"model.layers.{self.layer_num_}.mlp")
 
     def _init_norm(self):
-        self.att_norm_weight_ = NormWeight(
-            f"model.layers.{self.layer_num_}.input_layernorm.weight", self.data_type_
-        )
+        self.att_norm_weight_ = NormWeight(f"model.layers.{self.layer_num_}.input_layernorm.weight", self.data_type_)
         self.ffn_norm_weight_ = NormWeight(
             f"model.layers.{self.layer_num_}.post_attention_layernorm.weight",
             self.data_type_,

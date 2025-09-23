@@ -55,12 +55,8 @@ def test_decode_attentions(
         step=1,
         dtype=torch.int32,
     ).cuda()
-    infer_state.b_req_idx = torch.arange(
-        0, infer_state.batch_size, step=1, dtype=torch.int32
-    ).cuda()
-    infer_state.b_seq_len = torch.full(
-        (infer_state.batch_size,), fill_value=test_seq_len, dtype=torch.int32
-    ).cuda()
+    infer_state.b_req_idx = torch.arange(0, infer_state.batch_size, step=1, dtype=torch.int32).cuda()
+    infer_state.b_seq_len = torch.full((infer_state.batch_size,), fill_value=test_seq_len, dtype=torch.int32).cuda()
 
     input_tuples = []
     for _ in range(test_count):

@@ -23,9 +23,7 @@ def _fwd_kernel_token_softmax(
     cur_batch_in_all_start_index = tl.load(B_Start_Loc + cur_batch)
 
     row = tl.load(
-        Logics
-        + cur_head * stride_logic_h
-        + (cur_batch_in_all_start_index + col_offsets) * stride_logic_bs,
+        Logics + cur_head * stride_logic_h + (cur_batch_in_all_start_index + col_offsets) * stride_logic_bs,
         mask=col_offsets < cur_batch_seq_len,
         other=-float("inf"),
     ).to(tl.float32)
@@ -36,9 +34,7 @@ def _fwd_kernel_token_softmax(
     softmax_output = numerator / denominator
 
     tl.store(
-        Prob_Out
-        + cur_head * stride_prob_h
-        + (cur_batch_in_all_start_index + col_offsets) * stride_prob_bs,
+        Prob_Out + cur_head * stride_prob_h + (cur_batch_in_all_start_index + col_offsets) * stride_prob_bs,
         softmax_output,
         mask=col_offsets < cur_batch_seq_len,
     )
@@ -79,12 +75,8 @@ def test1():
 
     dtype = torch.float16
 
-    Logics = torch.empty((H, B * N_CTX), dtype=dtype, device="cuda").normal_(
-        mean=0.1, std=10
-    )
-    ProbOut = torch.empty((H, B * N_CTX), dtype=dtype, device="cuda").normal_(
-        mean=0.4, std=0.2
-    )
+    Logics = torch.empty((H, B * N_CTX), dtype=dtype, device="cuda").normal_(mean=0.1, std=10)
+    ProbOut = torch.empty((H, B * N_CTX), dtype=dtype, device="cuda").normal_(mean=0.4, std=0.2)
 
     b_start_loc = torch.zeros((B,), dtype=torch.int32, device="cuda")
     b_seq_len = torch.zeros((B,), dtype=torch.int32, device="cuda")

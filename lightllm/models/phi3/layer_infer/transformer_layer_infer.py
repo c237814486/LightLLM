@@ -26,15 +26,9 @@ class Phi3TransformerLayerInfer(LlamaTransformerLayerInfer):
         return
 
     def _bind_attention(self):
-        self._context_attention_kernel = partial(
-            Phi3TransformerLayerInfer._context_attention_kernel, self
-        )
-        self._copy_kv_to_mem_cache = partial(
-            Phi3TransformerLayerInfer._copy_kv_to_mem_cache_normal, self
-        )
-        self._token_attention_kernel = partial(
-            Phi3TransformerLayerInfer._token_decode_attention_flashdecoding, self
-        )
+        self._context_attention_kernel = partial(Phi3TransformerLayerInfer._context_attention_kernel, self)
+        self._copy_kv_to_mem_cache = partial(Phi3TransformerLayerInfer._copy_kv_to_mem_cache_normal, self)
+        self._token_attention_kernel = partial(Phi3TransformerLayerInfer._token_decode_attention_flashdecoding, self)
         return
 
     def _get_qkv(
@@ -47,9 +41,7 @@ class Phi3TransformerLayerInfer(LlamaTransformerLayerInfer):
         q = layer_weight.q_proj.mm(input_emb.view(-1, self.embed_dim_))
         cache_kv = layer_weight.kv_proj.mm(
             input_emb.view(-1, self.embed_dim_),
-            out=cache_kv.view(
-                -1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_
-            ),
+            out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),
         ).view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_), self.head_dim_)
         rotary_emb_fwd(
             q.view(-1, self.tp_q_head_num_, self.head_dim_),
@@ -63,9 +55,7 @@ class Phi3TransformerLayerInfer(LlamaTransformerLayerInfer):
         destindex_copy_kv(buffer, mem_index, mem_manager.kv_buffer[self.layer_num_])
         return
 
-    def _context_attention_kernel(
-        self, q, kv, infer_state: LlamaInferStateInfo, layer_weight, out=None
-    ) -> torch.Tensor:
+    def _context_attention_kernel(self, q, kv, infer_state: LlamaInferStateInfo, layer_weight, out=None) -> torch.Tensor:
         o_tensor = self.alloc_tensor(q.shape, q.dtype) if out is None else out
         kv = infer_state.mem_manager.kv_buffer[self.layer_num_]
         context_attention_fwd(
@@ -82,19 +72,13 @@ class Phi3TransformerLayerInfer(LlamaTransformerLayerInfer):
         )
         return o_tensor
 
-    def _token_decode_attention_flashdecoding(
-        self, q, infer_state: LlamaInferStateInfo, layer_weight, out=None
-    ):
+    def _token_decode_attention_flashdecoding(self, q, infer_state: LlamaInferStateInfo, layer_weight, out=None):
         from lightllm.models.phi3.triton_kernel.flash_decoding import (
             token_decode_attention_flash_decoding,
         )
 
-        cache_k = infer_state.mem_manager.kv_buffer[self.layer_num_][
-            :, 0 : self.tp_k_head_num_, :
-        ]
-        cache_v = infer_state.mem_manager.kv_buffer[self.layer_num_][
-            :, self.tp_k_head_num_ : self.tp_k_head_num_ + self.tp_v_head_num_, :
-        ]
+        cache_k = infer_state.mem_manager.kv_buffer[self.layer_num_][:, 0 : self.tp_k_head_num_, :]
+        cache_v = infer_state.mem_manager.kv_buffer[self.layer_num_][:, self.tp_k_head_num_ : self.tp_k_head_num_ + self.tp_v_head_num_, :]
         return token_decode_attention_flash_decoding(
             q,
             infer_state,

@@ -29,9 +29,7 @@ class MixtralTransformerLayerWeight(LlamaTransformerLayerWeight):
 
     def _init_weight_names(self):
         super()._init_weight_names()
-        self.moe_gate_weight_name = (
-            f"model.layers.{self.layer_num_}.block_sparse_moe.gate.weight"
-        )
+        self.moe_gate_weight_name = f"model.layers.{self.layer_num_}.block_sparse_moe.gate.weight"
         self.moe_gate_bias_name = None
 
     def _init_ffn(self, weights):
@@ -52,11 +50,7 @@ class MixtralTransformerLayerWeight(LlamaTransformerLayerWeight):
             tp_size=1,  # no tensor parallelism
         )
 
-        load_func = (
-            FusedMoeWeightEP
-            if enable_env_vars("ETP_MODE_ENABLED")
-            else FusedMoeWeightTP
-        )
+        load_func = FusedMoeWeightEP if enable_env_vars("ETP_MODE_ENABLED") else FusedMoeWeightTP
         self.experts = load_func(
             gate_proj_name="w1",
             down_proj_name="w2",

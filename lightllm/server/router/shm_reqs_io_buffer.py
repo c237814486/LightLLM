@@ -6,9 +6,7 @@ from lightllm.utils.envs_utils import get_env_start_args
 from lightllm.utils.envs_utils import get_unique_server_name
 from lightllm.utils.log_utils import init_logger
 
-LIGHTLLM_REQS_BUFFER_BYTE_SIZE = int(
-    os.getenv("LIGHTLLM_REQS_BUFFER_BYTE_SIZE", 64 * 1024 * 1024)
-)  # 默认64M buf
+LIGHTLLM_REQS_BUFFER_BYTE_SIZE = int(os.getenv("LIGHTLLM_REQS_BUFFER_BYTE_SIZE", 64 * 1024 * 1024))  # 默认64M buf
 
 logger = init_logger(__name__)
 
@@ -17,9 +15,7 @@ class ShmReqsIOBuffer:
     def __init__(self):
         self.args = get_env_start_args()
         self.name = f"{get_unique_server_name()}_ShmReqsBufferParams"
-        self.lock = AtomicShmLock(
-            lock_name=f"{get_unique_server_name()}_ShmReqsBufferParams_atomlock"
-        )
+        self.lock = AtomicShmLock(lock_name=f"{get_unique_server_name()}_ShmReqsBufferParams_atomlock")
         self._create_or_link_shm()
         self.node_world_size = self.args.tp // self.args.nnodes
 
@@ -57,27 +53,19 @@ class ShmReqsIOBuffer:
 
     def _create_or_link_shm(self):
         try:
-            shm = shared_memory.SharedMemory(
-                name=self.name, create=True, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE
-            )
+            shm = shared_memory.SharedMemory(name=self.name, create=True, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE)
         except:
-            shm = shared_memory.SharedMemory(
-                name=self.name, create=False, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE
-            )
+            shm = shared_memory.SharedMemory(name=self.name, create=False, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE)
 
         if shm.size != LIGHTLLM_REQS_BUFFER_BYTE_SIZE:
             logger.warning(f"size not same, unlink shm {self.name} and create again")
             shm.close()
             shm.unlink()
             try:
-                shm = shared_memory.SharedMemory(
-                    name=self.name, create=True, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE
-                )
+                shm = shared_memory.SharedMemory(name=self.name, create=True, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE)
                 logger.info(f"create shm {self.name}")
             except:
-                shm = shared_memory.SharedMemory(
-                    name=self.name, create=False, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE
-                )
+                shm = shared_memory.SharedMemory(name=self.name, create=False, size=LIGHTLLM_REQS_BUFFER_BYTE_SIZE)
                 logger.info(f"link shm {self.name}")
 
         self.shm = shm

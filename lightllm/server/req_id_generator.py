@@ -19,23 +19,15 @@ class ReqIDGenerator:
         from lightllm.utils.envs_utils import get_unique_server_name, get_env_start_args
 
         self.args = get_env_start_args()
-        self.use_config_server = (
-            self.args.config_server_host
-            and self.args.config_server_port
-            and self.args.run_mode == "pd_master"
-        )
-        self.current_id = ShmArray(
-            f"{get_unique_server_name()}_req_id_gen", (2,), dtype=np.int64
-        )
+        self.use_config_server = self.args.config_server_host and self.args.config_server_port and self.args.run_mode == "pd_master"
+        self.current_id = ShmArray(f"{get_unique_server_name()}_req_id_gen", (2,), dtype=np.int64)
         self.current_id.create_shm()
         self.current_id.arr[0] = 0
         self.current_id.arr[1] = 0
         self.lock = AtomicShmLock(f"{get_unique_server_name()}_req_id_gen_lock")
 
     def _check_and_set_new_id_range(self):
-        need_update_range = (
-            self.current_id.arr[0] + MAX_BEST_OF >= self.current_id.arr[1]
-        )
+        need_update_range = self.current_id.arr[0] + MAX_BEST_OF >= self.current_id.arr[1]
         if need_update_range:
             if not self.use_config_server:
                 self.current_id.arr[0] = MAX_BEST_OF
@@ -50,19 +42,12 @@ class ReqIDGenerator:
                             id_range = response.json()
                             logger.info(f"get new id range {id_range}")
                             # 保证id满足倍乘关系
-                            self.current_id.arr[0] = (
-                                id_range["start_id"] // MAX_BEST_OF + 1
-                            ) * MAX_BEST_OF
+                            self.current_id.arr[0] = (id_range["start_id"] // MAX_BEST_OF + 1) * MAX_BEST_OF
                             self.current_id.arr[1] = id_range["end_id"]
-                            assert (
-                                self.current_id.arr[0] + MAX_BEST_OF
-                                < self.current_id.arr[1]
-                            ), f"get id range error {self.current_id.arr[0]} {self.current_id.arr[1]}"
+                            assert self.current_id.arr[0] + MAX_BEST_OF < self.current_id.arr[1], f"get id range error {self.current_id.arr[0]} {self.current_id.arr[1]}"
                             return
                         else:
-                            raise RuntimeError(
-                                f"Failed to fetch ID range from config server: {response.status_code}"
-                            )
+                            raise RuntimeError(f"Failed to fetch ID range from config server: {response.status_code}")
                     except BaseException as e:
                         logger.exception(str(e))
                         time.sleep(3)

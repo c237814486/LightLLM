@@ -15,9 +15,7 @@ def custom_cat(tensors):
     assert tensors[0].is_cuda and len(tensors[0].shape) == 1
     sizes = [t.shape[0] for t in tensors]
     dest_size = sum(sizes)
-    out_tensor = torch.empty(
-        (dest_size,), dtype=tensors[0].dtype, device="cpu", pin_memory=True
-    )
+    out_tensor = torch.empty((dest_size,), dtype=tensors[0].dtype, device="cpu", pin_memory=True)
 
     start_loc = 0
     for t, size in zip(tensors, sizes):
@@ -37,10 +35,7 @@ def torch_cat_3(tensors: List[torch.Tensor], dim=0):
     dim = dim % ref.ndim
 
     out = torch.empty(
-        [
-            sum(t.size(dim) for t in tensors) if i == dim else ref.size(i)
-            for i in range(ref.ndim)
-        ],
+        [sum(t.size(dim) for t in tensors) if i == dim else ref.size(i) for i in range(ref.ndim)],
         dtype=ref.dtype,
         device=ref.device,
     )

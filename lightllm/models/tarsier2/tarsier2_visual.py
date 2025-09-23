@@ -21,14 +21,10 @@ from lightllm.models.qwen2_vl.vision_process import Qwen2VLImageProcessor, resiz
 
 def add_split_tokens(image_features, image_newline_embed, image_new_embed):
     num_images, num_image_patches, embed_dim = image_features.shape
-    num_height_patches, num_width_patches = int(math.sqrt(num_image_patches)), int(
-        math.sqrt(num_image_patches)
-    )
+    num_height_patches, num_width_patches = int(math.sqrt(num_image_patches)), int(math.sqrt(num_image_patches))
 
     # add image_newline
-    image_features = image_features.view(
-        num_images, num_height_patches, num_width_patches, embed_dim
-    )
+    image_features = image_features.view(num_images, num_height_patches, num_width_patches, embed_dim)
     image_features = torch.cat(
         [
             image_features,
@@ -40,9 +36,7 @@ def add_split_tokens(image_features, image_newline_embed, image_new_embed):
     image_features = image_features.view(num_images, num_image_patches, embed_dim)
 
     # add image_new
-    image_features = torch.cat(
-        [image_features, image_new_embed.expand((num_images, 1, embed_dim))], dim=1
-    )
+    image_features = torch.cat([image_features, image_new_embed.expand((num_images, 1, embed_dim))], dim=1)
 
     return image_features
 
@@ -62,9 +56,7 @@ class PixelShuffleMultiModalProjector(nn.Module):
 
         self.mlp = nn.Sequential(
             nn.LayerNorm(vit_hidden_size * int(1 / self.downsample_ratio) ** 2),
-            nn.Linear(
-                vit_hidden_size * int(1 / self.downsample_ratio) ** 2, llm_hidden_size
-            ),
+            nn.Linear(vit_hidden_size * int(1 / self.downsample_ratio) ** 2, llm_hidden_size),
             nn.GELU(),
             nn.Linear(llm_hidden_size, llm_hidden_size),
         )
@@ -85,18 +77,14 @@ class PixelShuffleMultiModalProjector(nn.Module):
         elif self.vision_feature_select_strategy == "full":
             selected_image_feature = selected_image_feature
         else:
-            raise ValueError(
-                f"Unexpected select feature strategy: {self.vision_feature_select_strategy}"
-            )
+            raise ValueError(f"Unexpected select feature strategy: {self.vision_feature_select_strategy}")
 
         image_features = self.pixel_shuffle(selected_image_feature)
         hidden_states = self.mlp(image_features)
 
         image_newline_embed = input_embeddings(self.image_newline_idx).squeeze()
         image_new_embed = input_embeddings(self.image_new_idx).squeeze()
-        hidden_states = add_split_tokens(
-            hidden_states, image_newline_embed, image_new_embed
-        )
+        hidden_states = add_split_tokens(hidden_states, image_newline_embed, image_new_embed)
 
         return hidden_states
 
@@ -158,9 +146,7 @@ class LlavaMultiModalProjector(nn.Module):
         elif self.vision_feature_select_strategy == "full":
             selected_image_feature = selected_image_feature
         else:
-            raise ValueError(
-                f"Unexpected select feature strategy: {self.vision_feature_select_strategy}"
-            )
+            raise ValueError(f"Unexpected select feature strategy: {self.vision_feature_select_strategy}")
 
         hidden_states = self.linear_1(selected_image_feature)
         hidden_states = self.act(hidden_states)
@@ -168,9 +154,7 @@ class LlavaMultiModalProjector(nn.Module):
 
         image_newline_embed = input_embeddings(self.image_newline_idx).squeeze()
         image_new_embed = input_embeddings(self.image_new_idx).squeeze()
-        hidden_states = add_split_tokens(
-            hidden_states, image_newline_embed, image_new_embed
-        )
+        hidden_states = add_split_tokens(hidden_states, image_newline_embed, image_new_embed)
         return hidden_states
 
 
@@ -233,9 +217,7 @@ class TarsierVisionTransformerPretrainedModel(nn.Module):
                 pixel_values = pixel_values.type(self.vision_tower.get_dtype())
                 image_features = self.vision_tower(pixel_values, image_grid_thw)
             else:
-                image_outputs = self.vision_tower(
-                    pixel_values, output_hidden_states=True
-                )
+                image_outputs = self.vision_tower(pixel_values, output_hidden_states=True)
                 image_features = self.multi_modal_projector(
                     image_outputs.hidden_states,
                     self.get_input_embeddings(),
@@ -249,9 +231,7 @@ class TarsierVisionTransformerPretrainedModel(nn.Module):
             processor_config_dict = json.load(f)
         self.processor = Qwen2VLImageProcessor(**processor_config_dict)
 
-        bin_weight_files = [
-            file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")
-        ]
+        bin_weight_files = [file_ for file_ in os.listdir(weight_dir) if file_.endswith(".bin")]
         if bin_weight_files:
             weight_dict = {}
             for file_ in bin_weight_files:
@@ -260,11 +240,7 @@ class TarsierVisionTransformerPretrainedModel(nn.Module):
                     if "vision_tower" in k:
                         weight_dict[k] = v
         else:
-            hf_weight_files = [
-                file_
-                for file_ in os.listdir(weight_dir)
-                if file_.endswith(".safetensors")
-            ]
+            hf_weight_files = [file_ for file_ in os.listdir(weight_dir) if file_.endswith(".safetensors")]
             weight_dict = {}
             for file_ in hf_weight_files:
                 f = safe_open(os.path.join(weight_dir, file_), "pt", "cpu")
@@ -287,19 +263,15 @@ class TarsierVisionTransformerPretrainedModel(nn.Module):
                 image_data = read_shm(get_shm_name_data(img.uuid))
                 image_data = Image.open(BytesIO(image_data))
                 image_data = resize_image(image_data)
-                pixel_values, image_grid_thw = self.processor.preprocess(
-                    image=image_data
-                )
+                pixel_values, image_grid_thw = self.processor.preprocess(image=image_data)
                 pixel_values = pixel_values.to(dtype=torch.bfloat16)
                 img_tensors.append(pixel_values)
                 img_grids.append(image_grid_thw)
             else:
-                raise Exception(
-                    "Unsupport input types: {} for {}".format(type(img), img)
-                )
+                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
 
             # must devide merge_length
-            cur_num = img_tensors[-1].shape[0] // (self.merge_size**2)
+            cur_num = img_tensors[-1].shape[0] // (self.merge_size ** 2)
 
             valid_ids.append([valid_id, valid_id + cur_num])
             valid_id += cur_num
@@ -313,8 +285,6 @@ class TarsierVisionTransformerPretrainedModel(nn.Module):
         pixel_values = imgs.cuda()
         image_grid_thw = grid_thw.cuda()
 
-        all_img_embeds = self.forward(
-            pixel_values=pixel_values, image_grid_thw=image_grid_thw
-        )
+        all_img_embeds = self.forward(pixel_values=pixel_values, image_grid_thw=image_grid_thw)
 
         return all_img_embeds, uuids, valid_ids

@@ -52,9 +52,7 @@ class VisualModelRpcServer(rpyc.Service):
         self.cache_port = kvargs["cache_port"]
         weight_dir = kvargs["weight_dir"]
         self.vit_rank_id = kvargs["vit_rank_id"]
-        self.cache_client = rpyc.connect(
-            "localhost", self.cache_port, config={"allow_pickle": True}
-        )
+        self.cache_client = rpyc.connect("localhost", self.cache_port, config={"allow_pickle": True})
         self.data_type = kvargs["data_type"]
 
         init_vision_distributed_env(kvargs)
@@ -70,31 +68,13 @@ class VisualModelRpcServer(rpyc.Service):
             }
             self.model_type = model_cfg["model_type"]
             if self.model_type == "qwen":
-                self.model = (
-                    QWenVisionTransformer(**model_cfg["visual"]).eval().bfloat16()
-                )
+                self.model = QWenVisionTransformer(**model_cfg["visual"]).eval().bfloat16()
             elif self.model_type == "qwen2_vl":
-                self.model = (
-                    Qwen2VisionTransformerPretrainedModel(
-                        kvargs, **model_cfg["vision_config"]
-                    )
-                    .eval()
-                    .bfloat16()
-                )
+                self.model = Qwen2VisionTransformerPretrainedModel(kvargs, **model_cfg["vision_config"]).eval().bfloat16()
             elif self.model_type == "qwen2_5_vl":
-                self.model = (
-                    Qwen2_5_VisionTransformerPretrainedModel(
-                        kvargs, **model_cfg["vision_config"]
-                    )
-                    .eval()
-                    .bfloat16()
-                )
+                self.model = Qwen2_5_VisionTransformerPretrainedModel(kvargs, **model_cfg["vision_config"]).eval().bfloat16()
             elif model_cfg["architectures"][0] == "TarsierForConditionalGeneration":
-                self.model = (
-                    TarsierVisionTransformerPretrainedModel(**model_cfg)
-                    .eval()
-                    .bfloat16()
-                )
+                self.model = TarsierVisionTransformerPretrainedModel(**model_cfg).eval().bfloat16()
             elif self.model_type == "llava":
                 self.model = LlavaVisionModel()
             elif self.model_type == "llavaqwen2":
@@ -198,9 +178,7 @@ def _init_env(port, device_id):
     # 注册graceful 退出的处理
     graceful_registry(inspect.currentframe().f_code.co_name)
 
-    t = ThreadedServer(
-        VisualModelRpcServer(), port=port, protocol_config={"allow_pickle": True}
-    )
+    t = ThreadedServer(VisualModelRpcServer(), port=port, protocol_config={"allow_pickle": True})
     t.start()
     return
 

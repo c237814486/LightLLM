@@ -530,12 +530,8 @@ def matmul_kernel(
     for k in range(0, tl.cdiv(K, BLOCK_SIZE_K * SPLIT_K)):
         # Load the next block of A and B, generate a mask by checking the K dimension.
         # If it is out of bounds, set it to 0.
-        a = tl.load(
-            a_ptrs, mask=offs_k[None, :] < K - k * BLOCK_SIZE_K * SPLIT_K, other=0.0
-        )
-        b = tl.load(
-            b_ptrs, mask=offs_k[:, None] < K - k * BLOCK_SIZE_K * SPLIT_K, other=0.0
-        )
+        a = tl.load(a_ptrs, mask=offs_k[None, :] < K - k * BLOCK_SIZE_K * SPLIT_K, other=0.0)
+        b = tl.load(b_ptrs, mask=offs_k[:, None] < K - k * BLOCK_SIZE_K * SPLIT_K, other=0.0)
         # We accumulate along the K dimension.
         accumulator += tl.dot(a, b)
         # Advance the ptrs to the next K block.
@@ -543,9 +539,7 @@ def matmul_kernel(
         b_ptrs += BLOCK_SIZE_K * SPLIT_K * stride_bk
     # You can fuse arbitrary activation functions here
     # while the accumulator is still in FP32!
-    c = (accumulator.to(tl.float32) * a_scale[:, None] * b_scale[None, :]).to(
-        c_ptr.dtype.element_ty
-    )
+    c = (accumulator.to(tl.float32) * a_scale[:, None] * b_scale[None, :]).to(c_ptr.dtype.element_ty)
     # -----------------------------------------------------------
     # Write back the block of the output matrix C with masks.
     offs_cm = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
@@ -666,11 +660,7 @@ def test_int8(M, K, N):
     triton_time = t2 - qt2
     triton_tflops = 2 * M * N * K * 1e-12 / (triton_time / iters)
     quant_bandwith = 2 * M * K * 1e-9 / (quant_time / iters)
-    print(
-        "Triton time cost: {} (tflops {}) + quant: {} (bandwidth {})".format(
-            triton_time, triton_tflops, quant_time, quant_bandwith
-        )
-    )
+    print("Triton time cost: {} (tflops {}) + quant: {} (bandwidth {})".format(triton_time, triton_tflops, quant_time, quant_bandwith))
     for _ in range(10):
         torch_output = torch.matmul(a, b)
     torch.cuda.synchronize()
@@ -689,8 +679,7 @@ def test_int8(M, K, N):
 @triton.testing.perf_report(
     triton.testing.Benchmark(
         x_names=["M"],  # Argument names to use as an x-axis for the plot
-        x_vals=[32, 64, 128, 256]
-        + [512 * i * 2 for i in range(1, 17)],  # Different possible values for `x_name`
+        x_vals=[32, 64, 128, 256] + [512 * i * 2 for i in range(1, 17)],  # Different possible values for `x_name`
         line_arg="provider",  # Argument name whose value corresponds to a different line in the plot
         # Possible values for `line_arg`
         line_vals=["cublas", "triton-i8", "triton-quant-i8", "quant-perrow"],
@@ -710,52 +699,24 @@ def benchmark(M, provider):
     if provider == "cublas":
         a = torch.randn((M, K), device="cuda", dtype=torch.float16)
         b = torch.randn((K, N), device="cuda", dtype=torch.float16)
-        ms, min_ms, max_ms = triton.testing.do_bench(
-            lambda: torch.matmul(a, b), quantiles=quantiles
-        )
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.matmul(a, b), quantiles=quantiles)
         perf = lambda ms: 2 * M * N * K * 1e-12 / (ms * 1e-3)
     if provider == "triton-i8":
-        a = (
-            torch.randn((M, K), device="cuda", dtype=torch.float16)
-            .to(torch.int8)
-            .contiguous()
-        )
-        b = (
-            torch.randn((K, N), device="cuda", dtype=torch.float16)
-            .to(torch.int8)
-            .contiguous()
-        )
+        a = torch.randn((M, K), device="cuda", dtype=torch.float16).to(torch.int8).contiguous()
+        b = torch.randn((K, N), device="cuda", dtype=torch.float16).to(torch.int8).contiguous()
         int_a, a_scale = quantize_int8(a, axis=1)
         int_b, b_scale = quantize_int8(b, axis=0)
-        ms, min_ms, max_ms = triton.testing.do_bench(
-            lambda: matmul_int8(int_a, a_scale, int_b, b_scale), quantiles=quantiles
-        )
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: matmul_int8(int_a, a_scale, int_b, b_scale), quantiles=quantiles)
         perf = lambda ms: 2 * M * N * K * 1e-12 / (ms * 1e-3)
     if provider == "triton-quant-i8":
-        a = (
-            torch.randn((M, K), device="cuda", dtype=torch.float16)
-            .to(torch.int8)
-            .contiguous()
-        )
-        b = (
-            torch.randn((K, N), device="cuda", dtype=torch.float16)
-            .to(torch.int8)
-            .contiguous()
-        )
+        a = torch.randn((M, K), device="cuda", dtype=torch.float16).to(torch.int8).contiguous()
+        b = torch.randn((K, N), device="cuda", dtype=torch.float16).to(torch.int8).contiguous()
         int_b, b_scale = quantize_int8(b, axis=0)
-        ms, min_ms, max_ms = triton.testing.do_bench(
-            lambda: matmul_quantize_int8(a, int_b, b_scale), quantiles=quantiles
-        )
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: matmul_quantize_int8(a, int_b, b_scale), quantiles=quantiles)
         perf = lambda ms: 2 * M * N * K * 1e-12 / (ms * 1e-3)
     if provider == "quant-perrow":
-        a = (
-            torch.randn((M, K), device="cuda", dtype=torch.float16)
-            .to(torch.int8)
-            .contiguous()
-        )
-        ms, min_ms, max_ms = triton.testing.do_bench(
-            lambda: quantize_int8_perrow(a), quantiles=quantiles
-        )
+        a = torch.randn((M, K), device="cuda", dtype=torch.float16).to(torch.int8).contiguous()
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: quantize_int8_perrow(a), quantiles=quantiles)
         perf = lambda ms: 2 * M * K * 1e-9 / (ms * 1e-3)
     return perf(ms), perf(min_ms), perf(max_ms)
 

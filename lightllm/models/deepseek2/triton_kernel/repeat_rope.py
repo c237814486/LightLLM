@@ -33,23 +33,14 @@ def _repeat_rope_tensor(
                 other=0,
             )
             tl.store(
-                out_ptr
-                + out_stride_0 * cur_index
-                + out_stride_1 * offs_head[:, None]
-                + offs_d[None, :],
+                out_ptr + out_stride_0 * cur_index + out_stride_1 * offs_head[:, None] + offs_d[None, :],
                 in_tensor[None, :],
-                mask=(offs_head[:, None] < copy_head_num)
-                & (offs_d[None, :] < head_dim),
+                mask=(offs_head[:, None] < copy_head_num) & (offs_d[None, :] < head_dim),
             )
         else:
-            in_tensor = tl.load(
-                in_ptr + in_stride_0 * cur_index + in_stride_1 * 0 + offs_d
-            )
+            in_tensor = tl.load(in_ptr + in_stride_0 * cur_index + in_stride_1 * 0 + offs_d)
             tl.store(
-                out_ptr
-                + out_stride_0 * cur_index
-                + out_stride_1 * offs_head[:, None]
-                + offs_d[None, :],
+                out_ptr + out_stride_0 * cur_index + out_stride_1 * offs_head[:, None] + offs_d[None, :],
                 in_tensor[None, :],
             )
     return

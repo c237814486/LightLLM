@@ -35,13 +35,9 @@ class UnquantizedCOLMMWeight(MMWeightTpl):
         self.has_bias = bias_name is not None
 
     def _slice_weight(self, tensor):
-        assert (
-            tensor.shape[1] % self.tp_world_size_ == 0
-        ), f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
+        assert tensor.shape[1] % self.tp_world_size_ == 0, f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
         tp_size = tensor.shape[1] // self.tp_world_size_
-        return tensor[:, tp_size * self.tp_rank_ : tp_size * (self.tp_rank_ + 1)].to(
-            self.data_type_
-        )
+        return tensor[:, tp_size * self.tp_rank_ : tp_size * (self.tp_rank_ + 1)].to(self.data_type_)
 
     def _slice_bias(self, bias):
         """
@@ -65,24 +61,18 @@ class W8A8B128COLMMWeight(MMWeightTpl):
         self.bias_name = bias_name
         self.has_bias = bias_name is not None
 
-        self.weight_scale_name, self.act_scale_name = generate_scale_name(
-            weight_name, quant_method.weight_scale_suffix, quant_method.act_scale_suffix
-        )
+        self.weight_scale_name, self.act_scale_name = generate_scale_name(weight_name, quant_method.weight_scale_suffix, quant_method.act_scale_suffix)
         self.weight_scale: Optional[torch.Tensor] = None
         self.block_size = self.quant_method.block_size
         self.quantized_weight = True
 
     def _slice_weight(self, tensor):
-        assert (
-            tensor.shape[1] % self.tp_world_size_ == 0
-        ), f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
+        assert tensor.shape[1] % self.tp_world_size_ == 0, f"tp slice error {tensor.shape[1]} % {self.tp_world_size_}"
         tp_size = tensor.shape[1] // self.tp_world_size_
         return tensor[:, tp_size * self.tp_rank_ : tp_size * (self.tp_rank_ + 1)]
 
     def _slice_weight_scale(self, weight_scale: torch.Tensor):
-        assert (
-            weight_scale.shape[1] % self.tp_world_size_ == 0
-        ), f"tp slice error {weight_scale.shape[1]} % {self.tp_world_size_}"
+        assert weight_scale.shape[1] % self.tp_world_size_ == 0, f"tp slice error {weight_scale.shape[1]} % {self.tp_world_size_}"
         tp_size = weight_scale.shape[1] // self.tp_world_size_
         scale_start = tp_size * self.tp_rank_
         scale_end = tp_size * (self.tp_rank_ + 1)

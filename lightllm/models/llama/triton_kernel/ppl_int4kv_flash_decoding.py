@@ -40,7 +40,7 @@ def token_decode_attention_flash_decoding(
         BLOCK_SEQ,
         mid_o,
         mid_o_logexpsum,
-        1.0 / (head_dim**0.5),
+        1.0 / (head_dim ** 0.5),
         q.view(calcu_shape1),
         cache_k,
         cache_k_scale,

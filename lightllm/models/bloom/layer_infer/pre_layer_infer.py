@@ -22,9 +22,7 @@ class BloomPreLayerInfer(PreLayerInferTpl):
         self.vob_end_id_ = tp_vocab_size_ * (self.tp_rank_ + 1)
         return
 
-    def _norm(
-        self, input, infer_state, layer_weight: BloomPreAndPostLayerWeight
-    ) -> torch.Tensor:
+    def _norm(self, input, infer_state, layer_weight: BloomPreAndPostLayerWeight) -> torch.Tensor:
         return layernorm_forward(
             input,
             layer_weight.pre_norm_weight_,

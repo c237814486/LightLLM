@@ -101,9 +101,7 @@ class AOW8A16QuantizationMethod(AOBaseQuantizationMethod):
 class AOFP8W8A16QuantizationMethod(AOBaseQuantizationMethod):
     def __init__(self):
         super().__init__()
-        is_cuda_8_9 = (
-            torch.cuda.is_available() and torch.cuda.get_device_capability() >= (8, 9)
-        )
+        is_cuda_8_9 = torch.cuda.is_available() and torch.cuda.get_device_capability() >= (8, 9)
         assert is_cuda_8_9, "FP8 requires GPU with compute capability >= 8.9"
         self.quant_func = float8_weight_only()
 

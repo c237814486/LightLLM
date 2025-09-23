@@ -27,9 +27,7 @@ class SharedArray:
                 shm = shared_memory.SharedMemory(name=name, create=True, size=dest_size)
                 logger.info(f"create shm {name}")
             except Exception as e:
-                shm = shared_memory.SharedMemory(
-                    name=name, create=False, size=dest_size
-                )
+                shm = shared_memory.SharedMemory(name=name, create=False, size=dest_size)
                 logger.info(f"error {str(e)} to link shm {name}")
 
         self.shm = shm  # SharedMemory 对象一定要被持有，否则会被释放

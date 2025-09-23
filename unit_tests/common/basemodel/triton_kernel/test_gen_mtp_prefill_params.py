@@ -22,9 +22,7 @@ def test_gen_mtp_new_input_ids_1():
     b_seq_len = torch.tensor([3, 3, 3]).int().cuda()
     b_ready_cache_len = torch.tensor([1, 1, 1]).int().cuda()
     expected_output = torch.tensor([2, 10, 4, 11, 6, 12]).int().cuda()
-    new_input_ids = gen_mtp_new_input_ids(
-        input_ids, b_next_token_ids, b_seq_len, b_ready_cache_len=b_ready_cache_len
-    )
+    new_input_ids = gen_mtp_new_input_ids(input_ids, b_next_token_ids, b_seq_len, b_ready_cache_len=b_ready_cache_len)
     assert torch.equal(new_input_ids, expected_output)
 
 

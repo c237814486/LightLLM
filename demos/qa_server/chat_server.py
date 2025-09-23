@@ -44,9 +44,7 @@ def chat():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="demo")
-    parser.add_argument(
-        "--llm_url", type=str, default="http://localhost:8017/generate", help="llm url"
-    )
+    parser.add_argument("--llm_url", type=str, default="http://localhost:8017/generate", help="llm url")
     parser.add_argument("--port", type=int, default=8088, help="port")
     args = parser.parse_args()
     app.run(debug=True, port=args.port)

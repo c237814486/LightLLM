@@ -20,9 +20,7 @@ def _gen_mtp_new_input_ids(
 
     for iter_start_index in tl.range(start_index + 1, end_index, BLOCK, num_stages=3):
         input_offs = iter_start_index + offs
-        t_input_ids = tl.load(
-            old_input_ids_ptr + input_offs, mask=input_offs < end_index, other=0
-        )
+        t_input_ids = tl.load(old_input_ids_ptr + input_offs, mask=input_offs < end_index, other=0)
         tl.store(
             new_input_ids_ptr + input_offs - 1,
             t_input_ids,

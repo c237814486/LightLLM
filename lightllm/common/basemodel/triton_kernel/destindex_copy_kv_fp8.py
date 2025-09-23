@@ -28,18 +28,8 @@ def _fwd_kernel_destindex_copy_kv_per_head_fp8(
 
     dest_index = tl.load(Dest_loc + cur_index).to(tl.int64)
 
-    k_ptrs = (
-        K
-        + cur_index * stride_k_bs
-        + stride_k_h * offs_h[:, None]
-        + stride_k_d * offs_d[None, :]
-    )
-    o_ptrs = (
-        Out
-        + dest_index * stride_o_bs
-        + stride_o_h * offs_h[:, None]
-        + stride_o_d * offs_d[None, :]
-    )
+    k_ptrs = K + cur_index * stride_k_bs + stride_k_h * offs_h[:, None] + stride_k_d * offs_d[None, :]
+    o_ptrs = Out + dest_index * stride_o_bs + stride_o_h * offs_h[:, None] + stride_o_d * offs_d[None, :]
 
     # to fp8
     scale_ptrs = scale + offs_h
@@ -101,8 +91,7 @@ if __name__ == "__main__":
     destindex_copy_kv_fp8(kv, dest_loc, scale, out.view(torch.float8_e4m3fn))
 
     assert torch.allclose(
-        out[:, :, :HEAD_DIM][dest_loc].view(torch.float8_e4m3fn).float()
-        * scale.view(H, 1).expand(NUM, H, 1),
+        out[:, :, :HEAD_DIM][dest_loc].view(torch.float8_e4m3fn).float() * scale.view(H, 1).expand(NUM, H, 1),
         kv.float(),
         atol=1e-5,
         rtol=1e-1,

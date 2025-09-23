@@ -60,9 +60,7 @@ class RouterManager:
         self.radix_cache_client = None
 
         # 共享变量，用于存储router端调度分析得到的机器负载信息
-        self.shared_token_load = TokenLoad(
-            f"{get_unique_server_name()}_shared_token_load", self.dp_size_in_node
-        )
+        self.shared_token_load = TokenLoad(f"{get_unique_server_name()}_shared_token_load", self.dp_size_in_node)
         for dp_index in range(self.dp_size_in_node):
             self.shared_token_load.set_estimated_peak_token_count(0, dp_index)
             self.shared_token_load.set_frozened_token_count(0, dp_index)
@@ -76,9 +74,7 @@ class RouterManager:
         self.recv_from_httpserver.bind(f"{args.zmq_mode}127.0.0.1:{router_port}")
 
         self.send_to_detokenization = context.socket(zmq.PUSH)
-        self.send_to_detokenization.connect(
-            f"{args.zmq_mode}127.0.0.1:{detokenization_port}"
-        )
+        self.send_to_detokenization.connect(f"{args.zmq_mode}127.0.0.1:{detokenization_port}")
 
         if self.is_multinode_tp:
             self.mulitnode_group = dist.init_process_group(
@@ -107,17 +103,13 @@ class RouterManager:
         self.model_rpc_servers = []
         # 用于 kv move 管理进程 和 推理进程进行task信息的交互。
         self.info_queue: mp.Queue = mp.Queue()
-        self.mem_queues: List[torch.multiprocessing.Queue] = [
-            torch.multiprocessing.Queue() for _ in range(self.node_world_size)
-        ]
+        self.mem_queues: List[torch.multiprocessing.Queue] = [torch.multiprocessing.Queue() for _ in range(self.node_world_size)]
         self.rpc_event = multiprocessing.Event()
         self.rpc_finished_event = multiprocessing.Event()
 
         assert (self.world_size % self.nnodes) == 0
         node_world_size = self.world_size // self.nnodes
-        for rank_id in range(
-            self.node_rank * node_world_size, (self.node_rank + 1) * node_world_size
-        ):
+        for rank_id in range(self.node_rank * node_world_size, (self.node_rank + 1) * node_world_size):
             rpc_model = await start_model_process(
                 args=self.args,
                 rank=rank_id,
@@ -172,9 +164,7 @@ class RouterManager:
         await self.model_rpc_client.init_model(kvargs=kvargs)
 
         if self.max_total_token_num is None:
-            self.max_total_token_num = (
-                await self.model_rpc_client.get_max_total_token_num()
-            )
+            self.max_total_token_num = await self.model_rpc_client.get_max_total_token_num()
             self.args.max_total_token_num = self.max_total_token_num
         if not self.args.disable_dynamic_prompt_cache:
             self.radix_cache_client = RadixCacheReadOnlyClient(
@@ -192,9 +182,7 @@ class RouterManager:
                 start_prefill_kv_move_manager_process,
             )
 
-            start_prefill_kv_move_manager_process(
-                self.args, self.info_queue, self.mem_queues
-            )
+            start_prefill_kv_move_manager_process(self.args, self.info_queue, self.mem_queues)
 
         if self.args.run_mode == "decode":
             # 启动 decode kv move 管理进程
@@ -202,9 +190,7 @@ class RouterManager:
                 start_decode_kv_move_manager_process,
             )
 
-            start_decode_kv_move_manager_process(
-                self.args, self.info_queue, self.mem_queues
-            )
+            start_decode_kv_move_manager_process(self.args, self.info_queue, self.mem_queues)
 
         return
 
@@ -226,25 +212,12 @@ class RouterManager:
             if self.running_batch is not None:
                 if counter_count % 100 == 0:
                     for dp_index in range(self.dp_size_in_node):
-                        token_ratio1 = (
-                            self.get_used_tokens(dp_index) / self.max_total_token_num
-                        )
-                        token_ratio2 = (
-                            self.max_total_token_num
-                            - self.read_only_statics_mem_manager.get_unrefed_token_num(
-                                dp_index
-                            )
-                        ) / self.max_total_token_num
+                        token_ratio1 = self.get_used_tokens(dp_index) / self.max_total_token_num
+                        token_ratio2 = (self.max_total_token_num - self.read_only_statics_mem_manager.get_unrefed_token_num(dp_index)) / self.max_total_token_num
                         d_i = dp_index
-                        frozen_token_num = (
-                            self.shared_token_load.get_frozened_token_count(d_i)
-                        )
-                        estimated_peak_token_count = (
-                            self.shared_token_load.get_estimated_peak_token_count(d_i)
-                        )
-                        paused_req_num = self._get_paused_req_num_in_dp_index(
-                            dp_index=d_i
-                        )
+                        frozen_token_num = self.shared_token_load.get_frozened_token_count(d_i)
+                        estimated_peak_token_count = self.shared_token_load.get_estimated_peak_token_count(d_i)
+                        paused_req_num = self._get_paused_req_num_in_dp_index(dp_index=d_i)
                         logger.debug(
                             f"dp_i {d_i} current batch size: {len(self.running_batch.reqs)} \n"
                             f"dp_i {d_i} paused req num: {paused_req_num} \n"
@@ -253,28 +226,14 @@ class RouterManager:
                             f"dp_i {d_i} token used ratio: {token_ratio1} not contain prompt cache tree unrefed token\n"
                             f"dp_i {d_i} token used ratio: {token_ratio2} contain prompt cache tree unrefed token"
                         )
-                        self.metric_client.gauge_set(
-                            "lightllm_batch_pause_size", paused_req_num
-                        )
+                        self.metric_client.gauge_set("lightllm_batch_pause_size", paused_req_num)
                 # pd decode mode need to update token_load more frequently
-                self.req_queue.update_token_load(
-                    self.running_batch, force_update=self.is_pd_decode_mode
-                )
-                self.metric_client.gauge_set(
-                    "lightllm_batch_current_size", len(self.running_batch.reqs)
-                )
-                self.metric_client.gauge_set(
-                    "lightllm_queue_size", self.req_queue.get_wait_req_num()
-                )
+                self.req_queue.update_token_load(self.running_batch, force_update=self.is_pd_decode_mode)
+                self.metric_client.gauge_set("lightllm_batch_current_size", len(self.running_batch.reqs))
+                self.metric_client.gauge_set("lightllm_queue_size", self.req_queue.get_wait_req_num())
                 self.metric_client.gauge_set(
                     "lightllm_batch_current_max_tokens",
-                    int(
-                        sum(
-                            self.shared_token_load.get_dynamic_max_load(d_i)
-                            for d_i in range(self.dp_size_in_node)
-                        )
-                        * self.max_total_token_num
-                    ),
+                    int(sum(self.shared_token_load.get_dynamic_max_load(d_i) for d_i in range(self.dp_size_in_node)) * self.max_total_token_num),
                 )
             else:
                 self.req_queue.update_token_load(self.running_batch, force_update=True)
@@ -282,26 +241,14 @@ class RouterManager:
                     self.metric_client.gauge_set("lightllm_batch_current_size", 0.0)
                     self.metric_client.gauge_set("lightllm_batch_pause_size", 0.0)
                     self.metric_client.gauge_set("lightllm_queue_size", 0.0)
-                    self.metric_client.gauge_set(
-                        "lightllm_batch_current_max_tokens", 0.0
-                    )
+                    self.metric_client.gauge_set("lightllm_batch_current_max_tokens", 0.0)
                     # 60s print once
                     if log_time_ready("frozen_info", 60):
                         for dp_i in range(self.dp_size_in_node):
-                            frozen_token_num = (
-                                self.shared_token_load.get_frozened_token_count(dp_i)
-                            )
-                            estimated_peak_token_count = (
-                                self.shared_token_load.get_estimated_peak_token_count(
-                                    dp_i
-                                )
-                            )
-                            logger.debug(
-                                f"dp_i {dp_i} frozen token num: {frozen_token_num} \n"
-                            )
-                            logger.debug(
-                                f"dp_i {dp_i} estimated_peak_token_count: {estimated_peak_token_count} \n"
-                            )
+                            frozen_token_num = self.shared_token_load.get_frozened_token_count(dp_i)
+                            estimated_peak_token_count = self.shared_token_load.get_estimated_peak_token_count(dp_i)
+                            logger.debug(f"dp_i {dp_i} frozen token num: {frozen_token_num} \n")
+                            logger.debug(f"dp_i {dp_i} estimated_peak_token_count: {estimated_peak_token_count} \n")
 
             await asyncio.sleep(self._get_schedule_time_interval())
 
@@ -392,16 +339,9 @@ class RouterManager:
 
     def get_used_tokens(self, dp_index):
         if not self.args.disable_dynamic_prompt_cache:
-            return (
-                self.max_total_token_num
-                - self.read_only_statics_mem_manager.get_unrefed_token_num(dp_index)
-                - self.radix_cache_client.get_unrefed_tokens_num(dp_index)
-            )
+            return self.max_total_token_num - self.read_only_statics_mem_manager.get_unrefed_token_num(dp_index) - self.radix_cache_client.get_unrefed_tokens_num(dp_index)
         else:
-            return (
-                self.max_total_token_num
-                - self.read_only_statics_mem_manager.get_unrefed_token_num(dp_index)
-            )
+            return self.max_total_token_num - self.read_only_statics_mem_manager.get_unrefed_token_num(dp_index)
 
     def _add_req(self, group_req_indexes: GroupReqIndexes):
         req_group = []
@@ -411,23 +351,15 @@ class RouterManager:
             req.start_time = group_req_indexes.time_mark
             req_group.append(req)
 
-            logger.info(
-                f"router recive req id {req.request_id} cost time {time.time() - req.start_time} s"
-            )
+            logger.info(f"router recive req id {req.request_id} cost time {time.time() - req.start_time} s")
         self.req_queue.extend(req_group)
-        self.send_to_detokenization.send_pyobj(
-            group_req_indexes, protocol=pickle.HIGHEST_PROTOCOL
-        )
+        self.send_to_detokenization.send_pyobj(group_req_indexes, protocol=pickle.HIGHEST_PROTOCOL)
         return
 
     def _generate_new_batch(self):
         # 调度的时候需要考虑当前运行的batch，和调度了但是暂时还没有推理的部分请求。
-        new_batch = self.req_queue.generate_new_batch(
-            Batch.merge_two_batch(self.running_batch, self.schedule_new_batch)
-        )
-        self.schedule_new_batch = Batch.merge_two_batch(
-            self.schedule_new_batch, new_batch
-        )
+        new_batch = self.req_queue.generate_new_batch(Batch.merge_two_batch(self.running_batch, self.schedule_new_batch))
+        self.schedule_new_batch = Batch.merge_two_batch(self.schedule_new_batch, new_batch)
         return
 
     def _multinode_tp_generate_new_batch(self):
@@ -436,26 +368,18 @@ class RouterManager:
 
             # 调度的时候需要考虑当前运行的batch，和调度了但是暂时还没有推理的部分请求。
             if self.is_multinode_tp_master:
-                new_batch = self.req_queue.generate_new_batch(
-                    Batch.merge_two_batch(self.running_batch, self.schedule_new_batch)
-                )
+                new_batch = self.req_queue.generate_new_batch(Batch.merge_two_batch(self.running_batch, self.schedule_new_batch))
                 if new_batch is not None:
                     req_ids = [req.request_id for req in new_batch.reqs]
                 else:
                     req_ids = []
-                dist.broadcast_object_list(
-                    [len(req_ids)], src=0, group=self.mulitnode_group
-                )
+                dist.broadcast_object_list([len(req_ids)], src=0, group=self.mulitnode_group)
                 if len(req_ids) == 0:
                     new_batch = None
                 else:
-                    dist.broadcast_object_list(
-                        req_ids, src=0, group=self.mulitnode_group
-                    )
+                    dist.broadcast_object_list(req_ids, src=0, group=self.mulitnode_group)
                     req_id_select_mark = [1 for _ in range(len(req_ids))]
-                    req_id_select_mark = torch.tensor(
-                        req_id_select_mark, dtype=torch.int32, device="cpu"
-                    )
+                    req_id_select_mark = torch.tensor(req_id_select_mark, dtype=torch.int32, device="cpu")
                     dist.all_reduce(
                         req_id_select_mark,
                         op=dist.ReduceOp.MIN,
@@ -466,9 +390,7 @@ class RouterManager:
                         if select == 0:
                             req = new_batch.pop_req(req_id)
                             back_req_list.append(req)
-                    self.req_queue.waiting_req_list = (
-                        back_req_list + self.req_queue.waiting_req_list
-                    )
+                    self.req_queue.waiting_req_list = back_req_list + self.req_queue.waiting_req_list
                     if new_batch.is_clear():
                         new_batch = None
             else:
@@ -479,18 +401,12 @@ class RouterManager:
                     new_batch = None
                 else:
                     req_ids = [None for _ in range(req_num)]
-                    dist.broadcast_object_list(
-                        req_ids, src=0, group=self.mulitnode_group
-                    )
-                    all_req_id_set = set(
-                        [req.request_id for req in self.req_queue.waiting_req_list]
-                    )
+                    dist.broadcast_object_list(req_ids, src=0, group=self.mulitnode_group)
+                    all_req_id_set = set([req.request_id for req in self.req_queue.waiting_req_list])
                     req_id_select_mark = []
                     for req_id in req_ids:
                         req_id_select_mark.append(1 if req_id in all_req_id_set else 0)
-                    req_id_select_mark = torch.tensor(
-                        req_id_select_mark, dtype=torch.int32, device="cpu"
-                    )
+                    req_id_select_mark = torch.tensor(req_id_select_mark, dtype=torch.int32, device="cpu")
                     dist.all_reduce(
                         req_id_select_mark,
                         op=dist.ReduceOp.MIN,
@@ -510,15 +426,11 @@ class RouterManager:
                     for req in select_reqs:
                         self.req_queue.waiting_req_list.remove(req)
                     if select_reqs:
-                        new_batch = Batch(
-                            -1, reqs=select_reqs, dp_size_in_node=self.dp_size_in_node
-                        )
+                        new_batch = Batch(-1, reqs=select_reqs, dp_size_in_node=self.dp_size_in_node)
                     else:
                         new_batch = None
 
-            self.schedule_new_batch = Batch.merge_two_batch(
-                self.schedule_new_batch, new_batch
-            )
+            self.schedule_new_batch = Batch.merge_two_batch(self.schedule_new_batch, new_batch)
 
             dist.barrier(group=self.mulitnode_group)
         except Exception as e:
@@ -533,9 +445,7 @@ class RouterManager:
         try:
             # 一次最多从 zmq 中取 recv_max_count 个请求，防止 zmq 队列中请求数量过多导致阻塞了主循环。
             for _ in range(self.recv_max_count):
-                recv_req: GroupReqIndexes = self.recv_from_httpserver.recv_pyobj(
-                    zmq.NOBLOCK
-                )
+                recv_req: GroupReqIndexes = self.recv_from_httpserver.recv_pyobj(zmq.NOBLOCK)
                 if isinstance(recv_req, GroupReqIndexes):
                     self._add_req(recv_req)
                 else:
@@ -559,9 +469,7 @@ class RouterManager:
         return
 
 
-def start_router_process(
-    args, router_port, detokenization_port, metric_port, pipe_writer
-):
+def start_router_process(args, router_port, detokenization_port, metric_port, pipe_writer):
     # 注册 graceful 退出的处理
     graceful_registry(inspect.currentframe().f_code.co_name)
     start_parent_check_thread()

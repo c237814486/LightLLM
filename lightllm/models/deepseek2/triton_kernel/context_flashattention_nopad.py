@@ -62,21 +62,11 @@ def _fwd_kernel(
     offs_d = tl.arange(0, BLOCK_DMODEL)
     offs_rope_d = tl.arange(0, BLOCK_ROPE_DMODEL)
     offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
-    off_q = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_bs
-        + cur_head * stride_q_h
-        + offs_d[None, :] * stride_q_d
-    )
-    off_q_rope = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_rope_bs
-        + cur_head * stride_q_rope_h
-        + offs_rope_d[None, :] * stride_q_rope_d
-    )
+    off_q = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_bs + cur_head * stride_q_h + offs_d[None, :] * stride_q_d
+    off_q_rope = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_rope_bs + cur_head * stride_q_rope_h + offs_rope_d[None, :] * stride_q_rope_d
 
     q = tl.load(Q_nope + off_q, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
-    q_rope = tl.load(
-        Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0
-    )
+    q_rope = tl.load(Q_rope + off_q_rope, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
 
     # initialize pointer to m and l
     m_i = tl.zeros([BLOCK_M], dtype=tl.float32) - float("inf")
@@ -84,30 +74,18 @@ def _fwd_kernel(
     acc = tl.zeros([BLOCK_M, BLOCK_DMODEL], dtype=tl.float32)
 
     block_mask = tl.where(block_start_loc < cur_batch_seq_len, 1, 0)
-    block_end_loc = tl.minimum(
-        (start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len
-    )
+    block_end_loc = tl.minimum((start_m + 1) * BLOCK_M + prompt_cache_len, cur_batch_seq_len + prompt_cache_len)
 
     for start_n in range(0, block_mask * block_end_loc, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)
         # -- compute qk ----
         kv_loc = tl.load(
-            Req_to_tokens
-            + stride_req_to_tokens_b * cur_batch_req_idx
-            + stride_req_to_tokens_s * (start_n + offs_n),
+            Req_to_tokens + stride_req_to_tokens_b * cur_batch_req_idx + stride_req_to_tokens_s * (start_n + offs_n),
             mask=(start_n + offs_n) < block_end_loc,
             other=0,
         ).to(tl.int64)
-        off_kv = (
-            kv_loc[None, :] * stride_kv_bs
-            + cur_kv_head * stride_kv_h
-            + offs_d[:, None] * stride_kv_d
-        )
-        off_kv_rope = (
-            kv_loc[None, :] * stride_kv_rope_bs
-            + cur_kv_head * stride_kv_rope_h
-            + offs_rope_d[:, None] * stride_kv_rope_d
-        )
+        off_kv = kv_loc[None, :] * stride_kv_bs + cur_kv_head * stride_kv_h + offs_d[:, None] * stride_kv_d
+        off_kv_rope = kv_loc[None, :] * stride_kv_rope_bs + cur_kv_head * stride_kv_rope_h + offs_rope_d[:, None] * stride_kv_rope_d
         kv = tl.load(
             KV_nope + off_kv,
             mask=(start_n + offs_n[None, :]) < block_end_loc,
@@ -155,11 +133,7 @@ def _fwd_kernel(
         l_i = l_i_new
         m_i = m_i_new
     # initialize pointers to output
-    off_o = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_obs
-        + cur_head * stride_oh
-        + offs_d[None, :] * stride_od
-    )
+    off_o = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_obs + cur_head * stride_oh + offs_d[None, :] * stride_od
     out_ptrs = Out + off_o
     tl.store(out_ptrs, acc, mask=offs_m[:, None] < cur_batch_seq_len)
     return
@@ -296,31 +270,13 @@ def _fwd_kernel_no_prompt_cache(
     offs_d = tl.arange(0, BLOCK_DMODEL)
     offs_rope_d = tl.arange(0, BLOCK_ROPE_DMODEL)
     offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
-    off_q = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_bs
-        + cur_head * stride_q_h
-        + offs_d[None, :] * stride_q_d
-    )
-    off_rope_q = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_rope_bs
-        + cur_head * stride_q_rope_h
-        + offs_rope_d[None, :] * stride_q_rope_d
-    )
-    off_kv = (
-        offs_n[None, :] * stride_kv_bs
-        + cur_kv_head * stride_kv_h
-        + offs_d[:, None] * stride_kv_d
-    )
-    off_rope_kv = (
-        offs_n[None, :] * stride_kv_rope_bs
-        + cur_kv_head * stride_kv_rope_h
-        + offs_rope_d[:, None] * stride_kv_rope_d
-    )
+    off_q = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_bs + cur_head * stride_q_h + offs_d[None, :] * stride_q_d
+    off_rope_q = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_q_rope_bs + cur_head * stride_q_rope_h + offs_rope_d[None, :] * stride_q_rope_d
+    off_kv = offs_n[None, :] * stride_kv_bs + cur_kv_head * stride_kv_h + offs_d[:, None] * stride_kv_d
+    off_rope_kv = offs_n[None, :] * stride_kv_rope_bs + cur_kv_head * stride_kv_rope_h + offs_rope_d[:, None] * stride_kv_rope_d
 
     q = tl.load(Q_nope + off_q, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
-    q_rope = tl.load(
-        Q_rope + off_rope_q, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0
-    )
+    q_rope = tl.load(Q_rope + off_rope_q, mask=offs_m[:, None] < cur_batch_seq_len, other=0.0)
 
     kv_ptrs = KV_nope + off_kv
     kv_rope_ptrs = KV_rope + off_rope_kv
@@ -376,11 +332,7 @@ def _fwd_kernel_no_prompt_cache(
         l_i = l_i_new
         m_i = m_i_new
     # initialize pointers to output
-    off_o = (
-        (cur_batch_in_all_start_index + offs_m[:, None]) * stride_obs
-        + cur_head * stride_oh
-        + offs_d[None, :] * stride_od
-    )
+    off_o = (cur_batch_in_all_start_index + offs_m[:, None]) * stride_obs + cur_head * stride_oh + offs_d[None, :] * stride_od
     out_ptrs = Out + off_o
     tl.store(out_ptrs, acc, mask=offs_m[:, None] < cur_batch_seq_len)
     return
@@ -461,12 +413,7 @@ def torch_att(q, q_rope, kv, kv_rope, bs, seqlen, num_head, q_head_dim, rope_hea
     xk = torch.cat([kv, kv_rope], dim=2).view(bs, seqlen, 1, -1)
     xv = kv.view(bs, seqlen, 1, -1)
 
-    mask = (
-        torch.tril(torch.ones(seqlen, seqlen), diagonal=0)
-        .unsqueeze(0)
-        .unsqueeze(0)
-        .cuda()
-    )
+    mask = torch.tril(torch.ones(seqlen, seqlen), diagonal=0).unsqueeze(0).unsqueeze(0).cuda()
     mask[mask == 0.0] = -100000000.0
     mask = mask.repeat(bs, num_head, 1, 1)
     keys = xk
@@ -475,16 +422,9 @@ def torch_att(q, q_rope, kv, kv_rope, bs, seqlen, num_head, q_head_dim, rope_hea
     keys = keys.transpose(1, 2)
     values = values.transpose(1, 2)
     # print(xq.shape, keys.transpose(2, 3).shape)
-    scores = torch.matmul(xq, keys.transpose(2, 3)) / math.sqrt(
-        q_head_dim + rope_head_dim
-    )
+    scores = torch.matmul(xq, keys.transpose(2, 3)) / math.sqrt(q_head_dim + rope_head_dim)
     scores = F.softmax(scores.float() + mask, dim=-1).type_as(xq)
-    output = (
-        torch.matmul(scores, values)
-        .transpose(1, 2)
-        .contiguous()
-        .reshape(-1, num_head, q_head_dim)
-    )
+    output = torch.matmul(scores, values).transpose(1, 2).contiguous().reshape(-1, num_head, q_head_dim)
     return output
 
 
@@ -495,26 +435,14 @@ def test():
     Z, H, N_CTX, D_HEAD, ROPE_HEAD = 1, 6, 500, 128, 64
     dtype = torch.float16
     Z = 1
-    q = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
-        mean=0.3, std=0.2
-    )
-    q_rope = torch.empty((Z * N_CTX, H, ROPE_HEAD), dtype=dtype, device="cuda").normal_(
-        mean=0.3, std=0.2
-    )
+    q = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
+    q_rope = torch.empty((Z * N_CTX, H, ROPE_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
 
-    kv = torch.empty((Z * N_CTX, 1, D_HEAD), dtype=dtype, device="cuda").normal_(
-        mean=0.3, std=0.2
-    )
-    kv_rope = torch.empty(
-        (Z * N_CTX, 1, ROPE_HEAD), dtype=dtype, device="cuda"
-    ).normal_(mean=0.3, std=0.2)
+    kv = torch.empty((Z * N_CTX, 1, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
+    kv_rope = torch.empty((Z * N_CTX, 1, ROPE_HEAD), dtype=dtype, device="cuda").normal_(mean=0.3, std=0.2)
 
-    o = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
-        mean=0.7, std=0.2
-    )
-    o1 = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(
-        mean=0.7, std=0.2
-    )
+    o = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.7, std=0.2)
+    o1 = torch.empty((Z * N_CTX, H, D_HEAD), dtype=dtype, device="cuda").normal_(mean=0.7, std=0.2)
 
     req_to_token_indexs = torch.zeros((10, Z * N_CTX), dtype=torch.int32, device="cuda")
     max_input_len = N_CTX
@@ -528,15 +456,11 @@ def test():
 
     b_seq_len[0] = N_CTX
     b_req_idx[0] = 0
-    req_to_token_indexs[0][: prompt_cache_len + N_CTX] = torch.tensor(
-        np.arange(prompt_cache_len + N_CTX), dtype=torch.int32
-    ).cuda()
+    req_to_token_indexs[0][: prompt_cache_len + N_CTX] = torch.tensor(np.arange(prompt_cache_len + N_CTX), dtype=torch.int32).cuda()
 
     torch_out = torch_att(q, q_rope, kv, kv_rope, Z, N_CTX, H, D_HEAD, ROPE_HEAD)
 
-    context_attention_fwd_no_prompt_cache(
-        q, q_rope, kv, kv_rope, o, b_start_loc, b_seq_len, max_input_len, D_HEAD
-    )
+    context_attention_fwd_no_prompt_cache(q, q_rope, kv, kv_rope, o, b_start_loc, b_seq_len, max_input_len, D_HEAD)
 
     context_attention_fwd(
         q,

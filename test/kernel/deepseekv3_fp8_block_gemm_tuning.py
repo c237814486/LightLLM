@@ -41,21 +41,13 @@ def test_fp8_block_gemm(
 
     input_tuples = []
     for _ in range(test_count):
-        A = (
-            torch.randn((M, K), dtype=torch.float32).cuda().to(torch.float8_e4m3fn)
-        )  # Activation
-        B = (
-            torch.randn((K, N), dtype=torch.float32).cuda().to(torch.float8_e4m3fn)
-        )  # Weight
+        A = torch.randn((M, K), dtype=torch.float32).cuda().to(torch.float8_e4m3fn)  # Activation
+        B = torch.randn((K, N), dtype=torch.float32).cuda().to(torch.float8_e4m3fn)  # Weight
         Ascale = torch.ones((M, (K + block_size - 1) // block_size)).cuda()
-        Bscale = torch.ones(
-            ((K + block_size - 1) // block_size, (N + block_size - 1) // block_size)
-        ).cuda()
+        Bscale = torch.ones(((K + block_size - 1) // block_size, (N + block_size - 1) // block_size)).cuda()
         C = torch.randn((M, N), dtype=dtype).cuda()  # weight
         input_tuples.append((A, B, Ascale, Bscale, C))
-    w8a8_block_fp8_matmul(
-        A, B, Ascale, Bscale, C, (block_size, block_size), dtype, **run_config
-    )
+    w8a8_block_fp8_matmul(A, B, Ascale, Bscale, C, (block_size, block_size), dtype, **run_config)
 
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):

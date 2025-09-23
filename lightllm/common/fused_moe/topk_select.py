@@ -43,9 +43,7 @@ def fused_topk(
         return softmax_topk(gating_output, topk, renorm=renormalize)
     M, _ = hidden_states.shape
 
-    topk_weights = torch.empty(
-        M, topk, dtype=torch.float32, device=hidden_states.device
-    )
+    topk_weights = torch.empty(M, topk, dtype=torch.float32, device=hidden_states.device)
     topk_ids = torch.empty(M, topk, dtype=torch.int32, device=hidden_states.device)
 
     sgl_ops.topk_softmax(
@@ -78,19 +76,11 @@ def grouped_topk(
         scores = scores + correction_bias
 
     num_token = scores.shape[0]
-    group_scores = (
-        scores.view(num_token, num_expert_group, -1).max(dim=-1).values
-    )  # [n, n_group]
-    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
-        1
-    ]  # [n, top_k_group]
+    group_scores = scores.view(num_token, num_expert_group, -1).max(dim=-1).values  # [n, n_group]
+    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[1]  # [n, top_k_group]
     group_mask = torch.zeros_like(group_scores)  # [n, n_group]
     group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
-    score_mask = (
-        group_mask.unsqueeze(-1)
-        .expand(num_token, num_expert_group, scores.shape[-1] // num_expert_group)
-        .reshape(num_token, -1)
-    )  # [n, e]
+    score_mask = group_mask.unsqueeze(-1).expand(num_token, num_expert_group, scores.shape[-1] // num_expert_group).reshape(num_token, -1)  # [n, e]
     tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
     _, topk_ids = torch.topk(tmp_scores, k=topk, dim=-1, sorted=False)
     topk_weights = old_scores.gather(1, topk_ids)
@@ -115,21 +105,11 @@ def biased_grouped_topk(
     scores = gating_output.sigmoid()
     num_token = scores.shape[0]
     scores_for_choice = scores.view(num_token, -1) + correction_bias.unsqueeze(0)
-    group_scores = (
-        scores_for_choice.view(num_token, num_expert_group, -1)
-        .topk(2, dim=-1)[0]
-        .sum(dim=-1)
-    )  # [n, n_group]
-    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
-        1
-    ]  # [n, top_k_group]
+    group_scores = scores_for_choice.view(num_token, num_expert_group, -1).topk(2, dim=-1)[0].sum(dim=-1)  # [n, n_group]
+    group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[1]  # [n, top_k_group]
     group_mask = torch.zeros_like(group_scores)  # [n, n_group]
     group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
-    score_mask = (
-        group_mask.unsqueeze(-1)
-        .expand(num_token, num_expert_group, scores.shape[-1] // num_expert_group)
-        .reshape(num_token, -1)
-    )  # [n, e]
+    score_mask = group_mask.unsqueeze(-1).expand(num_token, num_expert_group, scores.shape[-1] // num_expert_group).reshape(num_token, -1)  # [n, e]
     tmp_scores = scores_for_choice.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
     _, topk_ids = torch.topk(tmp_scores, k=topk, dim=-1, sorted=False)
     topk_weights = scores.gather(1, topk_ids)
@@ -155,18 +135,10 @@ def cuda_grouped_topk(
     assert light_ops is not None, "lightllm_kernel is not installed."
 
     num_tokens = gating_output.shape[0]
-    topk_weights = torch.empty(
-        num_tokens, topk, device=hidden_states.device, dtype=torch.float32
-    )
-    topk_indices = torch.empty(
-        num_tokens, topk, device=hidden_states.device, dtype=torch.int32
-    )
-    token_expert_indices = torch.empty(
-        num_tokens, topk_group, device=hidden_states.device, dtype=torch.int32
-    )
-    group_scores = torch.empty(
-        num_tokens, num_expert_group, device=hidden_states.device, dtype=torch.float32
-    )
+    topk_weights = torch.empty(num_tokens, topk, device=hidden_states.device, dtype=torch.float32)
+    topk_indices = torch.empty(num_tokens, topk, device=hidden_states.device, dtype=torch.int32)
+    token_expert_indices = torch.empty(num_tokens, topk_group, device=hidden_states.device, dtype=torch.int32)
+    group_scores = torch.empty(num_tokens, num_expert_group, device=hidden_states.device, dtype=torch.float32)
     if correction_bias is None:
         correction_bias = torch.zeros_like(gating_output, dtype=torch.float32)
     light_ops.grouped_topk(

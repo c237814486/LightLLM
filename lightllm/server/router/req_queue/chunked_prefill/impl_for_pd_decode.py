@@ -14,11 +14,7 @@ class QueueForPDDecode(BaseQueue):
 
     def _init_cache_list(self, current_batch: Batch, is_busy):
         if current_batch is not None:
-            self.cache_len_list = [
-                req.get_tuple_tokens(is_busy, self.router_max_new_token_len)
-                for req in current_batch.reqs
-                if req.sample_params.suggested_dp_index == self.dp_index
-            ]
+            self.cache_len_list = [req.get_tuple_tokens(is_busy, self.router_max_new_token_len) for req in current_batch.reqs if req.sample_params.suggested_dp_index == self.dp_index]
         else:
             self.cache_len_list = []
         return
@@ -50,14 +46,10 @@ class QueueForPDDecode(BaseQueue):
                 break
         new_batch = None
         if len(can_run_list) != 0:
-            new_batch = Batch(
-                uuid.uuid4().int, can_run_list, dp_size_in_node=self.dp_size_in_node
-            )
+            new_batch = Batch(uuid.uuid4().int, can_run_list, dp_size_in_node=self.dp_size_in_node)
         for req in abort_req_list:
             self.router.shm_req_manager.put_back_req_obj(req)
-        self.waiting_req_list = self.waiting_req_list[
-            len(can_run_list) + aborted_count :
-        ]
+        self.waiting_req_list = self.waiting_req_list[len(can_run_list) + aborted_count :]
         return new_batch
 
     def _calcu_batch_token_load_batch_not_none(self, current_batch: Batch):
@@ -69,19 +61,11 @@ class QueueForPDDecode(BaseQueue):
             has_run_len_array = np.array([e[0] for e in self.cache_len_list])
             cum_run_len_array = np.cumsum(has_run_len_array)
             size_array = np.arange(1, len(self.cache_len_list) + 1, 1)
-            need_max_token_num = (
-                left_out_len_array * size_array + cum_run_len_array
-            ).max()
+            need_max_token_num = (left_out_len_array * size_array + cum_run_len_array).max()
         else:
             need_max_token_num = 0
         with g_router_lock.obj:
             return (
                 need_max_token_num,
-                (
-                    need_max_token_num
-                    + self.router.shared_token_load.get_frozened_token_count(
-                        self.dp_index
-                    )
-                )
-                / self.max_total_tokens,
+                (need_max_token_num + self.router.shared_token_load.get_frozened_token_count(self.dp_index)) / self.max_total_tokens,
             )

@@ -39,10 +39,7 @@ def _fwd_kernel_token_att2(
     cur_batch_in_all_start_index = tl.load(B_Start_Loc + cur_batch)
     cur_batch_req_idx = tl.load(B_req_idx + cur_batch)
 
-    v_loc_off = (
-        cur_batch_req_idx * stride_req_to_tokens_b
-        + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
-    )
+    v_loc_off = cur_batch_req_idx * stride_req_to_tokens_b + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
     p_offs = cur_head * stride_ph + (cur_batch_in_all_start_index + offs_n) * stride_pbs
     v_offs = cur_kv_head * stride_vh + offs_d[None, :] * stride_vd
 
@@ -150,10 +147,7 @@ def _fwd_kernel_token_att2_int8v(
     cur_batch_in_all_start_index = tl.load(B_Start_Loc + cur_batch)
     cur_batch_req_idx = tl.load(B_req_idx + cur_batch)
 
-    v_loc_off = (
-        cur_batch_req_idx * stride_req_to_tokens_b
-        + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
-    )
+    v_loc_off = cur_batch_req_idx * stride_req_to_tokens_b + (cur_batch_start_index + offs_n) * stride_req_to_tokens_s
     p_offs = cur_head * stride_ph + (cur_batch_in_all_start_index + offs_n) * stride_pbs
     v_offs = cur_kv_head * stride_vh + offs_d[None, :] * stride_vd
     vs_offs = cur_kv_head * stride_vsh

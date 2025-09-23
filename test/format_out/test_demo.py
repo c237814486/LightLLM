@@ -5,9 +5,7 @@ from pydantic import BaseModel
 from enum import Enum
 from typing import List
 
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
 from format_out.impl import ChatSession
@@ -58,9 +56,7 @@ class Result(BaseModel):
     answer: str
 
 
-json_ans = chat_session.gen_json_object(
-    Result, max_new_tokens=300, prefix_regex=r"[\s]{0,20}"
-)
+json_ans = chat_session.gen_json_object(Result, max_new_tokens=300, prefix_regex=r"[\s]{0,20}")
 print(json_ans)
 formatted_json = json.dumps(json.loads(json_ans), indent=4, ensure_ascii=False)
 print(formatted_json)
@@ -75,9 +71,7 @@ chat_session.add_prompt("解方程 x + 3x+ 1 =0?")
 chat_session.add_prompt(user_end)
 chat_session.add_prompt(assistant_start)
 
-json_ans = chat_session.gen_json_object(
-    Result, max_new_tokens=300, prefix_regex=r"[\s]{0,20}"
-)
+json_ans = chat_session.gen_json_object(Result, max_new_tokens=300, prefix_regex=r"[\s]{0,20}")
 print(json_ans)
 formatted_json = json.dumps(json.loads(json_ans), indent=4, ensure_ascii=False)
 print(formatted_json)

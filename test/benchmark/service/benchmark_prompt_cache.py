@@ -114,9 +114,7 @@ def conclusion_and_show(results, prefill_token_num, decode_token_num):
                 error_count += 1
             else:
                 first_token_latency.append(tokens[0]["latency"] * 1000)  # ms
-                per_token_latency.extend(
-                    [e["latency"] * 1000 for e in tokens[1:]]
-                )  # ms
+                per_token_latency.extend([e["latency"] * 1000 for e in tokens[1:]])  # ms
                 output_total_tokens += len(tokens)
 
     total_time = total_end_time - total_start_time
@@ -125,9 +123,7 @@ def conclusion_and_show(results, prefill_token_num, decode_token_num):
     summary["total_decode_tokens"] = decode_token_num
     summary["prefill_throughput(tokens/s)"] = round(prefill_token_num / total_time, 2)
     summary["decode_throughput(tokens/s)"] = round(decode_token_num / total_time, 2)
-    summary["total_throughput(tokens/s)"] = round(
-        (prefill_token_num + decode_token_num) / total_time, 2
-    )
+    summary["total_throughput(tokens/s)"] = round((prefill_token_num + decode_token_num) / total_time, 2)
     summary["total_count"] = len(results)
     summary["error_count"] = error_count
     summary["output_total_tokens"] = output_total_tokens
@@ -153,10 +149,7 @@ def run(args):
     num_turns = args.num_turns
     num_users = args.num_users
 
-    result_file = (
-        f"{model_name}_{num_workers}_{first_input_len}_"
-        f"{subsequent_input_len}_{output_len}_{num_turns}_{num_users}.pickle"
-    )
+    result_file = f"{model_name}_{num_workers}_{first_input_len}_" f"{subsequent_input_len}_{output_len}_{num_turns}_{num_users}.pickle"
     result_path = os.path.join(args.result_dir, result_file)
 
     print("=" * 100)
@@ -179,10 +172,7 @@ def run(args):
             with open(result_path, "wb") as file:
                 pickle.dump(results, file)
 
-    prefill_token_num = (
-        first_input_len * num_turns
-        + subsequent_input_len * ((num_turns - 1) * num_turns // 2)
-    ) * num_users
+    prefill_token_num = (first_input_len * num_turns + subsequent_input_len * ((num_turns - 1) * num_turns // 2)) * num_users
     decode_token_num = output_len * num_turns * num_users
     summary = conclusion_and_show(results, prefill_token_num, decode_token_num)
     if args.print:
@@ -199,12 +189,8 @@ if __name__ == "__main__":
         default="http://localhost:8080",
         help="server model_url",
     )
-    parser.add_argument(
-        "--model_name", type=str, default="model", help="for result file name"
-    )
-    parser.add_argument(
-        "--num_workers", type=int, default=5, help="number of concurrent requests"
-    )
+    parser.add_argument("--model_name", type=str, default="model", help="for result file name")
+    parser.add_argument("--num_workers", type=int, default=5, help="number of concurrent requests")
     parser.add_argument(
         "--first_input_len",
         type=int,
@@ -218,13 +204,9 @@ if __name__ == "__main__":
         help="input length of subsequent conversations",
     )
     parser.add_argument("--output_len", type=int, default=128)
-    parser.add_argument(
-        "--num_turns", type=int, default=10, help="number of dialogue turns per user"
-    )
+    parser.add_argument("--num_turns", type=int, default=10, help="number of dialogue turns per user")
     parser.add_argument("--num_users", type=int, default=10, help="number of users")
-    parser.add_argument(
-        "--result_dir", type=str, default="./results", help="directory to save results"
-    )
+    parser.add_argument("--result_dir", type=str, default="./results", help="directory to save results")
     parser.add_argument("--print", type=bool, default=True, help="print result")
     parser.add_argument("--cache", type=bool, default=True, help="cache result")
     parser.add_argument("--use_cache", type=bool, default=True)

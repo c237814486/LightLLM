@@ -81,9 +81,7 @@ def _is_complete_json(input_str: str) -> bool:
 class StreamingParseResult:
     """Result of streaming incremental parsing."""
 
-    def __init__(
-        self, normal_text: str = "", calls: Optional[List[ToolCallItem]] = None
-    ):
+    def __init__(self, normal_text: str = "", calls: Optional[List[ToolCallItem]] = None):
         self.normal_text = normal_text
         self.calls = calls or []
 
@@ -98,16 +96,12 @@ class BaseFormatDetector:
         self.prev_tool_call_arr: List[Dict] = []
         self.current_tool_id: int = -1
         self.current_tool_name_sent: bool = False
-        self.streamed_args_for_tool: List[str] = (
-            []
-        )  # map what has been streamed for each tool so far to a list
+        self.streamed_args_for_tool: List[str] = []  # map what has been streamed for each tool so far to a list
         self.bot_token = ""
         self.eot_token = ""
 
     def parse_base_json(self, action: Any, tools: List[Function]) -> List[ToolCallItem]:
-        tool_indices = {
-            tool.function.name: i for i, tool in enumerate(tools) if tool.function.name
-        }
+        tool_indices = {tool.function.name: i for i, tool in enumerate(tools) if tool.function.name}
         if not isinstance(action, list):
             name = action.get("name")
             if not name or name not in tool_indices:
@@ -150,9 +144,7 @@ class BaseFormatDetector:
         action = json.loads(text)
         return self.parse_base_json(action, tools)
 
-    def parse_streaming_increment(
-        self, new_text: str, tools: List[Function]
-    ) -> StreamingParseResult:
+    def parse_streaming_increment(self, new_text: str, tools: List[Function]) -> StreamingParseResult:
         """
         Streaming incremental parsing with tool validation.
         """
@@ -167,29 +159,17 @@ class BaseFormatDetector:
 
         # Build tool indices if not already built
         if not hasattr(self, "_tool_indices"):
-            self._tool_indices = {
-                tool.function.name: i
-                for i, tool in enumerate(tools)
-                if tool.function and tool.function.name
-            }
+            self._tool_indices = {tool.function.name: i for i, tool in enumerate(tools) if tool.function and tool.function.name}
 
         flags = Allow.ALL if self.current_tool_name_sent else Allow.ALL & ~Allow.STR
         try:
             tool_call_arr = []
             is_complete = []
             try:
-                start_idx = (
-                    len(self.bot_token)
-                    if current_text.startswith(self.bot_token)
-                    else 0
-                )
+                start_idx = len(self.bot_token) if current_text.startswith(self.bot_token) else 0
                 while start_idx < len(current_text):
-                    (obj, end_idx) = _partial_json_loads(
-                        current_text[start_idx:], flags
-                    )
-                    is_complete.append(
-                        _is_complete_json(current_text[start_idx : start_idx + end_idx])
-                    )
+                    (obj, end_idx) = _partial_json_loads(current_text[start_idx:], flags)
+                    is_complete.append(_is_complete_json(current_text[start_idx : start_idx + end_idx]))
                     start_idx += end_idx + len("; ")
 
                     # Validate tool name if present
@@ -204,9 +184,7 @@ class BaseFormatDetector:
 
                     # Handle parameters/arguments consistency
                     if "parameters" in obj:
-                        assert (
-                            "arguments" not in obj
-                        ), "model generated both parameters and arguments"
+                        assert "arguments" not in obj, "model generated both parameters and arguments"
                         obj["arguments"] = obj["parameters"]
                     tool_call_arr.append(obj)
 
@@ -216,9 +194,7 @@ class BaseFormatDetector:
             if len(tool_call_arr) == 0:
                 return StreamingParseResult()
 
-            current_tool_call: Dict = (
-                tool_call_arr[self.current_tool_id] if len(tool_call_arr) > 0 else {}
-            )
+            current_tool_call: Dict = tool_call_arr[self.current_tool_id] if len(tool_call_arr) > 0 else {}
 
             # Handle new tool in array
             if len(tool_call_arr) > 0 and len(tool_call_arr) > self.current_tool_id + 1:
@@ -238,9 +214,7 @@ class BaseFormatDetector:
                                 )
                             ],
                         )
-                        self.streamed_args_for_tool[
-                            self.current_tool_id
-                        ] += argument_diff
+                        self.streamed_args_for_tool[self.current_tool_id] += argument_diff
                     else:
                         res = StreamingParseResult()
                 else:
@@ -276,9 +250,7 @@ class BaseFormatDetector:
                 if cur_arguments:
                     sent = len(self.streamed_args_for_tool[self.current_tool_id])
                     cur_args_json = json.dumps(cur_arguments)
-                    prev_arguments = self.prev_tool_call_arr[self.current_tool_id].get(
-                        "arguments"
-                    )
+                    prev_arguments = self.prev_tool_call_arr[self.current_tool_id].get("arguments")
 
                     argument_diff = None
                     if is_complete[self.current_tool_id]:
@@ -305,9 +277,7 @@ class BaseFormatDetector:
                             ],
                         )
                         if not is_complete[self.current_tool_id]:
-                            self.streamed_args_for_tool[
-                                self.current_tool_id
-                            ] += argument_diff
+                            self.streamed_args_for_tool[self.current_tool_id] += argument_diff
 
             self.prev_tool_call_arr = tool_call_arr
             return res
@@ -524,16 +494,12 @@ class FunctionCallParser:
         """
         Non-streaming call: one-time parsing
         """
-        full_normal_text, calls = self.multi_format_parser.parse_once(
-            full_text, self.tools
-        )
+        full_normal_text, calls = self.multi_format_parser.parse_once(full_text, self.tools)
         return full_normal_text, calls
 
     def parse_stream_chunk(self, chunk_text: str):
         """
         Streaming call: incremental parsing
         """
-        normal_text, calls = self.multi_format_parser.parse_streaming_increment(
-            chunk_text, self.tools
-        )
+        normal_text, calls = self.multi_format_parser.parse_streaming_increment(chunk_text, self.tools)
         return normal_text, calls

@@ -23,9 +23,7 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
         self.use_qk_norm_ = self.network_config_.get("use_qk_norm", False)
         return
 
-    def _att_norm(
-        self, input, infer_state: InferStateInfo, layer_weight
-    ) -> torch.Tensor:
+    def _att_norm(self, input, infer_state: InferStateInfo, layer_weight) -> torch.Tensor:
         raise Exception("need to impl")
 
     def _q_norm(self, input, infer_state: InferStateInfo, layer_weight) -> torch.Tensor:
@@ -34,9 +32,7 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
     def _k_norm(self, input, infer_state: InferStateInfo, layer_weight) -> torch.Tensor:
         raise Exception("need to impl")
 
-    def _bind_norm(
-        self, input, infer_state: InferStateInfo, layer_weight
-    ) -> torch.Tensor:
+    def _bind_norm(self, input, infer_state: InferStateInfo, layer_weight) -> torch.Tensor:
         self._att_norm = partial(TransformerLayerCohereInferTpl._q_norm, self)
         self._q_norm = partial(TransformerLayerCohereInferTpl._k_norm, self)
         self._k_norm = partial(TransformerLayerCohereInferTpl._att_norm, self)
@@ -47,24 +43,18 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
     def _bind_rotary_emb_fwd(self):
         raise Exception("need to impl")
 
-    def _get_qkv(
-        self, input, cache_kv, infer_state: InferStateInfo, layer_weight
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _get_qkv(self, input, cache_kv, infer_state: InferStateInfo, layer_weight) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         q = torch.mm(input.view(-1, self.embed_dim_), layer_weight.q_weight_)
         torch.mm(
             input.view(-1, self.embed_dim_),
             layer_weight.kv_weight_,
-            out=cache_kv.view(
-                -1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_
-            ),
+            out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),
         )
         if self.use_qk_norm_:
             q = q.view(-1, self.tp_q_head_num_, self.head_dim_)
             k = cache_kv[:, 0 : self.tp_k_head_num_, :]
             q = self._q_norm(q, infer_state, layer_weight)
-            cache_kv[:, 0 : self.tp_k_head_num_, :] = self._k_norm(
-                k, infer_state, layer_weight
-            )
+            cache_kv[:, 0 : self.tp_k_head_num_, :] = self._k_norm(k, infer_state, layer_weight)
         self._rotary_emb_fwd(
             q.view(-1, self.tp_q_head_num_, self.head_dim_),
             cache_kv[:, 0 : self.tp_k_head_num_, :],
@@ -73,14 +63,10 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
         )
         return q, cache_kv
 
-    def _context_attention_kernel(
-        self, q, kv, infer_state: InferStateInfo, layer_weight, out=None
-    ) -> torch.Tensor:
+    def _context_attention_kernel(self, q, kv, infer_state: InferStateInfo, layer_weight, out=None) -> torch.Tensor:
         raise Exception("need to impl")
 
-    def _token_attention_kernel(
-        self, q, infer_state: InferStateInfo, layer_weight, out=None
-    ) -> torch.Tensor:
+    def _token_attention_kernel(self, q, infer_state: InferStateInfo, layer_weight, out=None) -> torch.Tensor:
         raise Exception("need to impl")
 
     def _get_o(self, input, infer_state: InferStateInfo, layer_weight) -> torch.Tensor:
@@ -89,9 +75,7 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
     def _ffn(self, input, infer_state: InferStateInfo, layer_weight) -> torch.Tensor:
         raise Exception("need to impl")
 
-    def _context_attention(
-        self, input_embding, infer_state: InferStateInfo, layer_weight
-    ):
+    def _context_attention(self, input_embding, infer_state: InferStateInfo, layer_weight):
         cache_kv = self._pre_cache_kv(infer_state, layer_weight)
         q, cache_kv = self._get_qkv(input_embding, cache_kv, infer_state, layer_weight)
         self._post_cache_kv(cache_kv, infer_state, layer_weight)
@@ -99,9 +83,7 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
         q = None
         o = self._get_o(o, infer_state, layer_weight)
         if self.tp_world_size_ > 1:
-            all_reduce(
-                o, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False
-            )
+            all_reduce(o, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False)
         infer_state._attn_out = o
         return
 
@@ -117,9 +99,7 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
         infer_state._ffn_out = ffn_out
         return
 
-    def _token_attention(
-        self, input_embding, infer_state: InferStateInfo, layer_weight
-    ):
+    def _token_attention(self, input_embding, infer_state: InferStateInfo, layer_weight):
         cache_kv = self._pre_cache_kv(infer_state, layer_weight)
         q, cache_kv = self._get_qkv(input_embding, cache_kv, infer_state, layer_weight)
         self._post_cache_kv(cache_kv, infer_state, layer_weight)
@@ -127,9 +107,7 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
         q = None
         o = self._get_o(o, infer_state, layer_weight)
         if self.tp_world_size_ > 1:
-            all_reduce(
-                o, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False
-            )
+            all_reduce(o, group=infer_state.dist_group, op=dist.ReduceOp.SUM, async_op=False)
         infer_state._attn_out = o
         return
 
@@ -152,14 +130,9 @@ class TransformerLayerCohereInferTpl(TransformerLayerInferTpl):
         # assert emb_addr != attn_out_addr
         # assert emb_addr != ffn_addr
         # assert attn_out_addr != ffn_addr
-        input_embdings.add_(
-            infer_state._attn_out.view(-1, self.embed_dim_)
-            + infer_state._ffn_out.view(-1, self.embed_dim_)
-        )
+        input_embdings.add_(infer_state._attn_out.view(-1, self.embed_dim_) + infer_state._ffn_out.view(-1, self.embed_dim_))
 
-    def context_forward(
-        self, input_embdings, infer_state: InferStateInfo, layer_weight
-    ):
+    def context_forward(self, input_embdings, infer_state: InferStateInfo, layer_weight):
         input1 = self._att_norm(input_embdings, infer_state, layer_weight)
         self._context_attention(input1, infer_state, layer_weight=layer_weight)
         self._context_ffn(input1, infer_state, layer_weight)

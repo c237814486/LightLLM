@@ -61,9 +61,7 @@ class OutlinesConstraintBackend(ChunkedPrefillBackend):
 
     def _decode_mask_callback(self, run_reqs: List[InferReq], logits: torch.Tensor):
         self._init_guide_infos(run_reqs)
-        all_has_no_constraint = all(
-            [not e.sampling_param.has_constraint_setting() for e in run_reqs]
-        )
+        all_has_no_constraint = all([not e.sampling_param.has_constraint_setting() for e in run_reqs])
         if not all_has_no_constraint:
             mask = torch.ones_like(logits, dtype=torch.bool)
             for i, run_obj in enumerate(run_reqs):
@@ -86,9 +84,7 @@ class OutlinesConstraintBackend(ChunkedPrefillBackend):
         if req_obj.sampling_param.regular_constraint is not None:
             sample_params = req_obj.sampling_param
             regex_guide = sample_params.regex_guide
-            sample_params.fsm_current_state = regex_guide.get_next_state(
-                sample_params.fsm_current_state, next_token_id
-            )
+            sample_params.fsm_current_state = regex_guide.get_next_state(sample_params.fsm_current_state, next_token_id)
             if sample_params.fsm_current_state == -1:
                 req_obj.finish_status.set_status(FinishStatus.FINISHED_STOP)
         return
@@ -101,9 +97,7 @@ class OutlinesConstraintBackend(ChunkedPrefillBackend):
             sample_params = run_obj.sampling_param
             if sample_params.regular_constraint is not None:
                 regex_guide: RegexGuide = sample_params.regex_guide
-                ok_token_id_list = regex_guide.get_next_instruction(
-                    sample_params.fsm_current_state
-                ).tokens
+                ok_token_id_list = regex_guide.get_next_instruction(sample_params.fsm_current_state).tokens
                 mask[i, ok_token_id_list] = False
             elif sample_params.allowed_token_ids is not None:
                 mask[i, sample_params.allowed_token_ids] = False
@@ -120,6 +114,4 @@ class OutlinesConstraintBackend(ChunkedPrefillBackend):
             sample_params = run_obj.sampling_param
             if sample_params.regular_constraint is not None:
                 if not hasattr(sample_params, "regex_guide"):
-                    sample_params.regex_guide = self.get_cached_regex_guide(
-                        sample_params.regular_constraint
-                    )
+                    sample_params.regex_guide = self.get_cached_regex_guide(sample_params.regular_constraint)

@@ -237,20 +237,13 @@ def matmul4_kernel(
     offs_am = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
     offs_bn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
     offs_k = tl.arange(0, BLOCK_SIZE_K)
-    a_ptrs = a_ptr + (
-        offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak
-    )  # (BLOCK_SIZE_M, BLOCK_SIZE_K)
+    a_ptrs = a_ptr + (offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)  # (BLOCK_SIZE_M, BLOCK_SIZE_K)
     a_mask = offs_am[:, None] < M
     # b_ptrs is set up such that it repeats elements along the K axis 8 times
-    b_ptrs = b_ptr + (
-        (offs_k[:, None] // infearure_per_bits) * stride_bk
-        + offs_bn[None, :] * stride_bn
-    )  # (BLOCK_SIZE_K, BLOCK_SIZE_N)
+    b_ptrs = b_ptr + ((offs_k[:, None] // infearure_per_bits) * stride_bk + offs_bn[None, :] * stride_bn)  # (BLOCK_SIZE_K, BLOCK_SIZE_N)
     scales_ptrs = scales_ptr + offs_bn * stride_scales_n  # (BLOCK_SIZE_N,)
     # zeros_ptrs is set up such that it repeats elements along the N axis 8 times
-    zeros_ptrs = zeros_ptr + (
-        (offs_bn // infearure_per_bits) * stride_zeros_n
-    )  # (BLOCK_SIZE_N,)
+    zeros_ptrs = zeros_ptr + ((offs_bn // infearure_per_bits) * stride_zeros_n)  # (BLOCK_SIZE_N,)
     # shifter is used to extract the 4 bits of each element in the 32-bit word from B and zeros
     shifter = (offs_k % infearure_per_bits) * bits
     zeros_shifter = (offs_bn % infearure_per_bits) * bits
@@ -258,9 +251,7 @@ def matmul4_kernel(
     if NO_GROUPS:
         # Fetch scales and zeros; these are per-outfeature and thus reused in the inner loop
         scales = tl.load(scales_ptrs)  # (BLOCK_SIZE_N,)
-        zeros = tl.load(
-            zeros_ptrs
-        )  # (BLOCK_SIZE_N,), each element is repeated 8 times, int32
+        zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_N,), each element is repeated 8 times, int32
         # Unpack zeros
         zeros = (zeros >> zeros_shifter) & 0xF  # (BLOCK_SIZE_N,) int32
         # zeros = (zeros + 1) * scales  # (BLOCK_SIZE_N,) float16
@@ -278,9 +269,7 @@ def matmul4_kernel(
             ptr = scales_ptrs + g_id * stride_scales_g
             scales = tl.load(ptr)  # (BLOCK_SIZE_N,)
             ptr = zeros_ptrs + g_id * stride_zeros_g  # (BLOCK_SIZE_N,)
-            zeros = tl.load(
-                ptr
-            )  # (BLOCK_SIZE_N,), each element is repeated 8 times, int32
+            zeros = tl.load(ptr)  # (BLOCK_SIZE_N,), each element is repeated 8 times, int32
             # Unpack zeros
             zeros = (zeros >> zeros_shifter) & 0xF  # (BLOCK_SIZE_N,) int32
             zeros = (zeros) * scales  # (BLOCK_SIZE_N,) float16
@@ -323,9 +312,7 @@ def matmul_dequantize_int4_gptq(
 
     Returns C of shape (..., N) float16
     """
-    assert x.shape[-1] == (
-        qweight.shape[0] * 8
-    ), "A must be a multiple of 8 in the last dimension"
+    assert x.shape[-1] == (qweight.shape[0] * 8), "A must be a multiple of 8 in the last dimension"
     assert x.is_contiguous(), "A must be contiguous"
 
     M, K = x.shape
@@ -344,9 +331,7 @@ def matmul_dequantize_int4_gptq(
     else:
         inplace = True
 
-    grid = lambda META: (
-        triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"]),
-    )
+    grid = lambda META: (triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"]),)
     matmul4_kernel[grid](
         x,
         qweight,
@@ -835,19 +820,9 @@ def matmul_kernel(
     for k in range(0, tl.cdiv(K, BLOCK_SIZE_K * SPLIT_K)):
         # Load the next block of A and B.
         # [BLOCK_K, BLOCK_N] but repeated group_size times in K
-        bs_ptrs = (
-            bs_ptr
-            + ((offs_k[:, None] + k * BLOCK_SIZE_K * SPLIT_K) // group_size)
-            * stride_bsk
-            + offs_bn[None, :] * stride_bsn
-        )
+        bs_ptrs = bs_ptr + ((offs_k[:, None] + k * BLOCK_SIZE_K * SPLIT_K) // group_size) * stride_bsk + offs_bn[None, :] * stride_bsn
         # [BLOCK_K, BLOCK_N] but repeated in K and N
-        bzp_ptrs = (
-            bzp_ptr
-            + ((offs_k[:, None] + k * BLOCK_SIZE_K * SPLIT_K) // group_size)
-            * stride_bzpk
-            + (offs_bn[None, :] // 8) * stride_bzpn
-        )
+        bzp_ptrs = bzp_ptr + ((offs_k[:, None] + k * BLOCK_SIZE_K * SPLIT_K) // group_size) * stride_bzpk + (offs_bn[None, :] // 8) * stride_bzpn
         b_shift_bits = (offs_k[:, None] % 8) * 4  # assert BLOCK_SIZE_K % 8 == 0
         bzp_shift_bits = (offs_bn[None, :] % 8) * 4
         a = tl.load(a_ptrs)
@@ -861,9 +836,7 @@ def matmul_kernel(
         accumulator += tl.dot(a, b.to(a.dtype))
         # Advance the ptrs to the next K block.
         a_ptrs += BLOCK_SIZE_K * SPLIT_K * stride_ak
-        b_ptrs += (
-            BLOCK_SIZE_K * SPLIT_K * stride_bk // 8
-        )  # assert BLOCK_SIZE_K % 8 == 0
+        b_ptrs += BLOCK_SIZE_K * SPLIT_K * stride_bk // 8  # assert BLOCK_SIZE_K % 8 == 0
     # You can fuse arbitrary activation functions here
     # while the accumulator is still in FP32!
     c = accumulator.to(c_ptr.dtype.element_ty)
@@ -924,30 +897,14 @@ def matmul_dequantize_int4_s2(
 
 @triton.autotune(
     configs=[
-        triton.Config(
-            {"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 64}, num_stages=4, num_warps=4
-        ),
-        triton.Config(
-            {"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4
-        ),
-        triton.Config(
-            {"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2
-        ),
-        triton.Config(
-            {"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 64}, num_stages=5, num_warps=2
-        ),
-        triton.Config(
-            {"BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4
-        ),
-        triton.Config(
-            {"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4
-        ),
-        triton.Config(
-            {"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2
-        ),
-        triton.Config(
-            {"BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2
-        ),
+        triton.Config({"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 64}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2),
+        triton.Config({"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 64}, num_stages=5, num_warps=2),
+        triton.Config({"BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2),
+        triton.Config({"BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2),
     ],
     key=["K", "N"],
 )
@@ -984,12 +941,8 @@ def dequantize_kernel(
     offs_n = n_block_idx * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
     fpb_offs = offs_k[:, None] * stride_fpbk + offs_n[None, :] * stride_fpbn
     b_offs = (offs_k[:, None] // 8) * stride_bk + offs_n[None, :] * stride_bn
-    bzp_offs = (offs_k[:, None] // group_size) * stride_bzpk + (
-        offs_n[None, :] // 8
-    ) * stride_bzpn
-    bs_offs = (offs_k[:, None] // group_size) * stride_bsk + offs_n[
-        None, :
-    ] * stride_bsn
+    bzp_offs = (offs_k[:, None] // group_size) * stride_bzpk + (offs_n[None, :] // 8) * stride_bzpn
+    bs_offs = (offs_k[:, None] // group_size) * stride_bsk + offs_n[None, :] * stride_bsn
     n_mask = offs_n[None, :] < N
     k_mask = offs_k[:, None] < K
     mask = n_mask & k_mask
@@ -1064,15 +1017,11 @@ def quantize_int4(weight, group_size=128, tp_rank=0):
     weight_min = weight.amin(-1, keepdim=True)
     weight_min = torch.where(weight_min > 0, 0, weight_min)
     weight_range = weight_max - weight_min
-    scale = weight_range / (2**4 - 1)
+    scale = weight_range / (2 ** 4 - 1)
     zero_point = (-weight_min / scale).round().clamp(0, 15).to(torch.int32)
-    weight = (
-        (weight / scale + zero_point).round().clamp(0, 15).to(torch.int32).view(h1, h2)
-    )
+    weight = (weight / scale + zero_point).round().clamp(0, 15).to(torch.int32).view(h1, h2)
     int_weight = torch.empty(h1, h2 // 8).to(torch.int32).to(weight.device)
-    int_zero_point = (
-        torch.zeros(h1 // 8, h2 // group_size).to(torch.int32).to(weight.device)
-    )
+    int_zero_point = torch.zeros(h1 // 8, h2 // group_size).to(torch.int32).to(weight.device)
     zero_point = zero_point.view(h1, -1)
     scale = scale.view(h1, -1)
     # pack 8 int4 in an int32 number.
@@ -1129,10 +1078,7 @@ def unpack_int4(weight, scale, zp):
         for i in range(8):
             fp_zero_point[pack * 8 + i, :] = (zp[pack, :] >> (i * 4)) & 0xF
     for g in range(group_num):
-        fp_weight[:, g * group_size : (g + 1) * group_size] = (
-            fp_weight[:, g * group_size : (g + 1) * group_size]
-            - fp_zero_point[:, g].unsqueeze(1)
-        ) * scale[:, g].unsqueeze(1)
+        fp_weight[:, g * group_size : (g + 1) * group_size] = (fp_weight[:, g * group_size : (g + 1) * group_size] - fp_zero_point[:, g].unsqueeze(1)) * scale[:, g].unsqueeze(1)
     return fp_weight.transpose(1, 0)
 
 
@@ -1174,16 +1120,12 @@ def test_correct_int4_s1(M=32, K=4096, N=4096):
     b = torch.randn((K, N), device="cuda", dtype=torch.float16)
     int_b, b_scale, b_zero_point, _ = quantize_int4(b, group_size=group_size)
     cos = torch.nn.CosineSimilarity(0)
-    fp_weight = dequantize_int4(
-        int_b, b_scale, b_zero_point, a.device, a.dtype, group_size
-    )
+    fp_weight = dequantize_int4(int_b, b_scale, b_zero_point, a.device, a.dtype, group_size)
     print(
         "Quantize cos",
         cos(fp_weight.flatten().to(torch.float32), b.flatten().to(torch.float32)),
     )
-    triton_output = matmul_dequantize_int4_s1(
-        a, int_b, b_scale, b_zero_point, group_size
-    )
+    triton_output = matmul_dequantize_int4_s1(a, int_b, b_scale, b_zero_point, group_size)
     torch_output = torch.matmul(a, b)
     print(f"triton_output={triton_output}")
     print(f"torch_output={torch_output}")
@@ -1207,9 +1149,7 @@ def test_correct_int4_s2(M=32, K=4096, N=4096):
         "Quantize cos",
         cos(fp_weight.flatten().to(torch.float32), b.flatten().to(torch.float32)),
     )
-    triton_output = matmul_dequantize_int4_s2(
-        a, int_b, b_scale, b_zero_point, group_size
-    )
+    triton_output = matmul_dequantize_int4_s2(a, int_b, b_scale, b_zero_point, group_size)
     torch_output = torch.matmul(a, b)
     print(f"triton_output={triton_output}")
     print(f"torch_output={torch_output}")
@@ -1233,9 +1173,7 @@ def test_correct_int4_gptq(M=32, K=4096, N=4096):
         "Quantize cos",
         cos(fp_weight.flatten().to(torch.float32), b.flatten().to(torch.float32)),
     )
-    triton_output = matmul_dequantize_int4_gptq(
-        a, int_b, b_scale, b_zero_point, group_size
-    )
+    triton_output = matmul_dequantize_int4_gptq(a, int_b, b_scale, b_zero_point, group_size)
     torch_output = torch.matmul(a, b)
     print(f"triton_output={triton_output}")
     print(f"torch_output={torch_output}")
@@ -1251,8 +1189,7 @@ def test_correct_int4_gptq(M=32, K=4096, N=4096):
 @triton.testing.perf_report(
     triton.testing.Benchmark(
         x_names=["M"],  # Argument names to use as an x-axis for the plot
-        x_vals=[4, 8, 16, 32, 64, 128]
-        + [128 * i for i in range(2, 33, 2)],  # Different possible values for `x_name`
+        x_vals=[4, 8, 16, 32, 64, 128] + [128 * i for i in range(2, 33, 2)],  # Different possible values for `x_name`
         line_arg="provider",  # Argument name whose value corresponds to a different line in the plot
         # Possible values for `line_arg`
         line_vals=["cublas", "triton-s1", "dequantize", "triton-s2", "triton-gptq"],
@@ -1278,9 +1215,7 @@ def benchmark(M, provider):
     b = torch.randn((K, N), device="cuda", dtype=torch.float16)
     quantiles = [0.5, 0.2, 0.8]
     if provider == "cublas":
-        ms, min_ms, max_ms = triton.testing.do_bench(
-            lambda: torch.matmul(a, b), quantiles=quantiles
-        )
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.matmul(a, b), quantiles=quantiles)
         perf = lambda ms: 2 * M * N * K * 1e-12 / (ms * 1e-3)
     if provider == "triton-s1":
         intb, b_scale, bzp, _ = quantize_int4(b, group_size=64)

@@ -29,9 +29,7 @@ class MoeSumReduceKernelConfig(KernelConfigs):
         finded_config = cls.get_the_config(key_params)
 
         if finded_config:
-            config = finded_config[
-                min(finded_config.keys(), key=lambda x: abs(int(x) - M))
-            ]
+            config = finded_config[min(finded_config.keys(), key=lambda x: abs(int(x) - M))]
             return config
         else:
             config = {

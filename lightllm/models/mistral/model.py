@@ -70,22 +70,11 @@ class MistralTpPartModel(TpPartBaseModel):
         if "max_sequence_length" in self.config:
             max_seq_len = self.config["max_sequence_length"]
         else:
-            max_position_embeddings = self.config.get(
-                "max_position_embeddings", 2048 if base <= 10000.0 + 1e-5 else 16384
-            )
+            max_position_embeddings = self.config.get("max_position_embeddings", 2048 if base <= 10000.0 + 1e-5 else 16384)
             max_seq_len = max_position_embeddings * rope_scaling_factor
 
-        inv_freq = 1.0 / (
-            base
-            ** (
-                torch.arange(0, self.head_dim_, 2, device="cpu", dtype=torch.float32)
-                / self.head_dim_
-            )
-        )
-        t = (
-            torch.arange(max_seq_len + 1024 * 64, device="cpu", dtype=torch.float32)
-            / rope_scaling_factor
-        )
+        inv_freq = 1.0 / (base ** (torch.arange(0, self.head_dim_, 2, device="cpu", dtype=torch.float32) / self.head_dim_))
+        t = torch.arange(max_seq_len + 1024 * 64, device="cpu", dtype=torch.float32) / rope_scaling_factor
         freqs = torch.outer(t, inv_freq)
 
         self._cos_cached = torch.cos(freqs).to(self.data_type).cuda()

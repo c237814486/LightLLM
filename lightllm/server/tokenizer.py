@@ -61,23 +61,16 @@ def get_tokenizer(
         # return tokenizer
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs
-        )
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs)
     except TypeError as e:
         # The LLaMA tokenizer causes a protobuf error in some environments, using slow mode.
         # you can try pip install protobuf==3.20.0 to try repair
         logger.warning(f"load fast tokenizer fail: {str(e)}")
         kwargs["use_fast"] = False
-        tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs
-        )
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=trust_remote_code, *args, **kwargs)
 
     if not isinstance(tokenizer, PreTrainedTokenizerFast):
-        logger.info(
-            "Using a slow tokenizer. This might cause a significant "
-            "slowdown. Consider using a fast tokenizer instead."
-        )
+        logger.info("Using a slow tokenizer. This might cause a significant " "slowdown. Consider using a fast tokenizer instead.")
 
     model_cfg, _ = PretrainedConfig.get_config_dict(tokenizer_name)
     model_type = model_cfg.get("model_type", "")
@@ -85,9 +78,7 @@ def get_tokenizer(
         from ..models.qwen2_vl.vision_process import Qwen2VLImageProcessor
 
         image_processor = Qwen2VLImageProcessor.from_pretrained(tokenizer_name)
-        tokenizer = Tarsier2Tokenizer(
-            tokenizer=tokenizer, image_processor=image_processor, model_cfg=model_cfg
-        )
+        tokenizer = Tarsier2Tokenizer(tokenizer=tokenizer, image_processor=image_processor, model_cfg=model_cfg)
     elif model_type == "llava" or model_type == "internlmxcomposer2":
         tokenizer = LlavaTokenizer(tokenizer, model_cfg)
     elif model_type == "qwen" and "visual" in model_cfg:

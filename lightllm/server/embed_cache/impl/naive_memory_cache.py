@@ -37,18 +37,14 @@ class InMemoryCache:
         self.lock = threading.Lock()
         self.token_id_range_start = 0
         self.token_id_range_end = 0
-        self.use_config_server = (
-            self.args.config_server_host and self.args.config_server_port
-        )
+        self.use_config_server = self.args.config_server_host and self.args.config_server_port
 
     def _check_and_set_new_id_range(self, alloced_token_num):
-        need_update_range = (
-            self.token_id_range_start + alloced_token_num >= self.token_id_range_end
-        )
+        need_update_range = self.token_id_range_start + alloced_token_num >= self.token_id_range_end
         if need_update_range:
             if not self.use_config_server:
                 self.token_id_range_start = 100000000
-                self.token_id_range_end = 2**63 - 1
+                self.token_id_range_end = 2 ** 63 - 1
             else:
                 while True:
                     try:
@@ -60,15 +56,10 @@ class InMemoryCache:
                             logger.info(f"get new multimodal id range {id_range}")
                             self.token_id_range_start = id_range["start_id"]
                             self.token_id_range_end = id_range["end_id"]
-                            assert (
-                                self.token_id_range_start + alloced_token_num
-                                < self.token_id_range_end
-                            ), f"get multimodal id range error {self.token_id_range_start} {self.token_id_range_end}"
+                            assert self.token_id_range_start + alloced_token_num < self.token_id_range_end, f"get multimodal id range error {self.token_id_range_start} {self.token_id_range_end}"
                             return
                         else:
-                            raise RuntimeError(
-                                f"Failed to fetch ID range from config server: {response.status_code}"
-                            )
+                            raise RuntimeError(f"Failed to fetch ID range from config server: {response.status_code}")
                     except BaseException as e:
                         logger.exception(str(e))
                         time.sleep(3)
@@ -92,9 +83,7 @@ class InMemoryCache:
                 if deleted >= max_delete:
                     break
 
-    def alloc(
-        self, md5sum_list: list[str], token_num_list: list[int]
-    ) -> Optional[list[dict]]:
+    def alloc(self, md5sum_list: list[str], token_num_list: list[int]) -> Optional[list[dict]]:
         now = time.time()
         with self.lock:
             new_md5s = [m for m in md5sum_list if m not in self._md5_to_record]
@@ -129,9 +118,7 @@ class InMemoryCache:
                     self._records[uid_int] = rec
                     self._md5_to_record[md5sum] = rec
                     self.occupied += 1
-                results.append(
-                    {"id": rec.id, "token_id": rec.token_id, "token_num": rec.token_num}
-                )
+                results.append({"id": rec.id, "token_id": rec.token_id, "token_num": rec.token_num})
         return results
 
     def release(self, ids: list[int]) -> None:
@@ -144,17 +131,11 @@ class InMemoryCache:
             self._records[id_].data = True
 
     def get_items_data(self, ids: list[int]) -> list[Optional[bool]]:
-        return [
-            self._records.get(id_).data if id_ in self._records else False
-            for id_ in ids
-        ]
+        return [self._records.get(id_).data if id_ in self._records else False for id_ in ids]
 
     def set_items_embed(self, ids: list[int]) -> None:
         for id_ in ids:
             self._records[id_].embed = True
 
     def get_items_embed(self, ids: list[int]) -> list[Optional[bool]]:
-        return [
-            self._records.get(id_).embed if id_ in self._records else False
-            for id_ in ids
-        ]
+        return [self._records.get(id_).embed if id_ in self._records else False for id_ in ids]

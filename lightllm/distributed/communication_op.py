@@ -69,27 +69,17 @@ class CustomProcessGroup:
         self.device_group = create_new_group_for_current_dp("nccl")
 
     def init_custom_reduce(self) -> None:
-        if (
-            not HAS_SGL_KERNEL
-            or not has_nvlink()
-            or self.dp_world_size not in [2, 4, 6, 8]
-        ):
+        if not HAS_SGL_KERNEL or not has_nvlink() or self.dp_world_size not in [2, 4, 6, 8]:
             return
         args = get_env_start_args()
         if args.disable_custom_allreduce:
             return
         cpu_group = create_new_group_for_current_dp("gloo")
         self.custom_reduce = CustomAllreduce(cpu_group, torch.cuda.current_device())
-        logger.info(
-            "Enable Custom ALLReduce. You can disable it by settting --disable_custom_allreduce."
-        )
+        logger.info("Enable Custom ALLReduce. You can disable it by settting --disable_custom_allreduce.")
 
     def init_custom_gather(self) -> None:
-        if (
-            not HAS_LIGHTLLM_KERNEL
-            or not has_nvlink()
-            or self.dp_world_size not in [2, 4, 6, 8]
-        ):
+        if not HAS_LIGHTLLM_KERNEL or not has_nvlink() or self.dp_world_size not in [2, 4, 6, 8]:
             return
 
         args = get_env_start_args()
@@ -98,45 +88,27 @@ class CustomProcessGroup:
 
         cpu_group = create_new_group_for_current_dp("gloo")
         self.custom_gather = CustomAllgather(cpu_group, torch.cuda.current_device())
-        logger.info(
-            "Enable Custom ALLGather.  You can disable it by settting --disable_custom_allgather"
-        )
+        logger.info("Enable Custom ALLGather.  You can disable it by settting --disable_custom_allgather")
 
     def all_reduce(self, input_: torch.Tensor) -> None:
-        if self.custom_reduce is not None and self.custom_reduce.should_custom_ar(
-            input_
-        ):
+        if self.custom_reduce is not None and self.custom_reduce.should_custom_ar(input_):
             input_.data = self.custom_reduce.custom_all_reduce(input_)
             return
         else:
             return dist.all_reduce(input_, group=self.device_group)
 
-    def all_gather_into_tensor(
-        self, output_: torch.Tensor, input_: torch.Tensor, async_op: bool = False
-    ) -> None:
-        if self.custom_gather is not None and self.custom_gather.should_custom_ar(
-            input_
-        ):
+    def all_gather_into_tensor(self, output_: torch.Tensor, input_: torch.Tensor, async_op: bool = False) -> None:
+        if self.custom_gather is not None and self.custom_gather.should_custom_ar(input_):
             self.custom_gather.custom_all_gather(output_, input_)
             return
         else:
-            return dist.all_gather_into_tensor(
-                output_, input_, group=self.device_group, async_op=async_op
-            )
+            return dist.all_gather_into_tensor(output_, input_, group=self.device_group, async_op=async_op)
 
 
 @contextmanager
 def lightllm_capture_graph(group: CustomProcessGroup = None):
-    with (
-        group.custom_reduce.capture()
-        if group and group.custom_reduce
-        else nullcontext()
-    ):
-        with (
-            group.custom_gather.capture()
-            if group and group.custom_gather
-            else nullcontext()
-        ):
+    with (group.custom_reduce.capture() if group and group.custom_reduce else nullcontext()):
+        with (group.custom_gather.capture() if group and group.custom_gather else nullcontext()):
             yield
 
 
@@ -176,9 +148,7 @@ class DistributeGroupManager:
                 num_max_dispatch_tokens_per_rank,
                 hidden_size,
             )
-            self.ll_num_experts = (
-                n_routed_experts + get_redundancy_expert_num() * global_world_size
-            )
+            self.ll_num_experts = n_routed_experts + get_redundancy_expert_num() * global_world_size
             num_rdma_bytes = deep_ep.Buffer.get_low_latency_rdma_size_hint(
                 self.ll_num_tokens,
                 self.ll_hidden,
@@ -190,9 +160,7 @@ class DistributeGroupManager:
             int(1e9),
             num_rdma_bytes,
             low_latency_mode=low_latency_mode,
-            num_qps_per_rank=(
-                self.ll_num_experts // global_world_size if low_latency_mode else 1
-            ),
+            num_qps_per_rank=(self.ll_num_experts // global_world_size if low_latency_mode else 1),
         )
 
     def clear_deepep_buffer(self):
@@ -200,9 +168,7 @@ class DistributeGroupManager:
         prefill 之后需要clean 一下，ep buffer 才能正常执行 decode。
         """
         if hasattr(self, "ep_buffer") and self.ep_buffer is not None:
-            self.ep_buffer.clean_low_latency_buffer(
-                self.ll_num_tokens, self.ll_hidden, self.ll_num_experts
-            )
+            self.ep_buffer.clean_low_latency_buffer(self.ll_num_tokens, self.ll_hidden, self.ll_num_experts)
 
 
 def all_reduce(
@@ -251,13 +217,9 @@ def reduce_scatter_tensor(
 ):
     # 目前还没有定制算子实现。
     if isinstance(group, CustomProcessGroup):
-        return dist.reduce_scatter_tensor(
-            output, input, op=op, group=group.device_group, async_op=async_op
-        )
+        return dist.reduce_scatter_tensor(output, input, op=op, group=group.device_group, async_op=async_op)
     else:
-        return dist.reduce_scatter_tensor(
-            output, input, op=op, group=group, async_op=async_op
-        )
+        return dist.reduce_scatter_tensor(output, input, op=op, group=group, async_op=async_op)
 
 
 dist_group_manager = DistributeGroupManager()

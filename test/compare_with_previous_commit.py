@@ -22,9 +22,7 @@ import shutil
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tp", type=int, required=True, help="Number of GPUs to use.")
-    parser.add_argument(
-        "--model_dir", type=str, required=True, help="Directory of the model."
-    )
+    parser.add_argument("--model_dir", type=str, required=True, help="Directory of the model.")
     parser.add_argument(
         "--compare_commit_id",
         type=str,
@@ -84,15 +82,9 @@ def send_prompts(prompts, output_file):
         }
 
         try:
-            r = requests.post(
-                "http://localhost:8080/generate", json=request_data, timeout=10
-            )
+            r = requests.post("http://localhost:8080/generate", json=request_data, timeout=10)
             response_json = json.loads(r.text)
-            generated_text = (
-                response_json["generated_text"][0]
-                if "generated_text" in response_json
-                else "No generated_text."
-            )
+            generated_text = response_json["generated_text"][0] if "generated_text" in response_json else "No generated_text."
         except Exception as e:
             generated_text = f"ERROR: {str(e)}"
 
@@ -100,21 +92,15 @@ def send_prompts(prompts, output_file):
             f.write(f"===== prompt: {prompt} =====\n")
             f.write(f"{generated_text}\n\n")
 
-        print(
-            f"===================Ouput saved in {output_file}==========================="
-        )
+        print(f"===================Ouput saved in {output_file}===========================")
 
 
 def compare_files(file1, file2, diff_output_file="diff.txt"):
-    with open(file1, "r", encoding="utf-8") as f1, open(
-        file2, "r", encoding="utf-8"
-    ) as f2:
+    with open(file1, "r", encoding="utf-8") as f1, open(file2, "r", encoding="utf-8") as f2:
         lines1 = f1.readlines()
         lines2 = f2.readlines()
 
-    diff = difflib.unified_diff(
-        lines1, lines2, fromfile=file1, tofile=file2, lineterm=""
-    )
+    diff = difflib.unified_diff(lines1, lines2, fromfile=file1, tofile=file2, lineterm="")
 
     diff_list = list(diff)
     if not diff_list:
@@ -189,15 +175,9 @@ def main():
         # Copy the current script to /tmp to ensure it exists in the baseline commit
         shutil.copy(script_path, tmp_script)
         # Save current commit id
-        current_commit = (
-            subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
-        )
+        current_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
         # Save current branch name (if any)
-        current_branch = (
-            subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-            .decode()
-            .strip()
-        )
+        current_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
         # Stash any local changes
         subprocess.run(["git", "stash"])
         # Checkout the baseline commit

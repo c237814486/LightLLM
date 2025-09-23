@@ -43,10 +43,7 @@ def test_gen_prefill_params_basic():
     b_seq_len_numpy = b_seq_len.cpu().numpy()
     true_position_ids = torch.from_numpy(
         np.concatenate(
-            [
-                np.arange(b_ready_cache_len_numpy[i], b_seq_len_numpy[i])
-                for i in range(len(b_seq_len_numpy))
-            ],
+            [np.arange(b_ready_cache_len_numpy[i], b_seq_len_numpy[i]) for i in range(len(b_seq_len_numpy))],
             axis=0,
         )
     ).cuda()

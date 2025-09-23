@@ -38,9 +38,7 @@ class Qwen2TpPartModel(LlamaTpPartModel):
         # Dealing with head_dim_!=n_embed // num_attention_heads scenarios, such as mistral 13B
         head_dim_ = self.config["n_embed"] // self.config["num_attention_heads"]
         self.head_dim_ = self.config.get("head_dim", head_dim_)
-        self.tp_k_head_num_ = max(
-            self.config["num_key_value_heads"] // self.tp_world_size_, 1
-        )
+        self.tp_k_head_num_ = max(self.config["num_key_value_heads"] // self.tp_world_size_, 1)
         self.tp_v_head_num_ = self.tp_k_head_num_
         self.layers_num = self.config["n_layer"]
         self.vocab_size = self.config["vocab_size"]
@@ -49,9 +47,7 @@ class Qwen2TpPartModel(LlamaTpPartModel):
     def _init_mem_manager(self):
         head_dim_ = self.config["hidden_size"] // self.config["num_attention_heads"]
         head_dim_ = self.config.get("head_dim", head_dim_)
-        tp_k_head_num_ = max(
-            self.config["num_key_value_heads"] // self.tp_world_size_, 1
-        )
+        tp_k_head_num_ = max(self.config["num_key_value_heads"] // self.tp_world_size_, 1)
         self.mem_manager = select_mem_manager_class(self.mode)(
             self.max_total_token_num,
             dtype=self.data_type,

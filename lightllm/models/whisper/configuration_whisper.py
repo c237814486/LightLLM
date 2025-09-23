@@ -253,9 +253,7 @@ class WhisperConfig(PretrainedConfig):
         self.decoder_layerdrop = decoder_layerdrop
         self.use_cache = use_cache
         self.num_hidden_layers = encoder_layers
-        self.scale_embedding = (
-            scale_embedding  # scale factor will be sqrt(d_model) if True
-        )
+        self.scale_embedding = scale_embedding  # scale factor will be sqrt(d_model) if True
         self.max_source_positions = max_source_positions
         self.max_target_positions = max_target_positions
 
@@ -331,9 +329,7 @@ class WhisperOnnxConfig(OnnxSeq2SeqConfigWithPast):
         encoder_sequence_length = encoder_inputs["input_features"].shape[2]
         seq_length = encoder_sequence_length // 2 if self.use_past else seq_length
 
-        decoder_inputs = super().generate_dummy_inputs(
-            preprocessor.tokenizer, batch_size, seq_length, is_pair, framework
-        )
+        decoder_inputs = super().generate_dummy_inputs(preprocessor.tokenizer, batch_size, seq_length, is_pair, framework)
 
         dummy_inputs["input_features"] = encoder_inputs.pop("input_features")
         dummy_inputs["decoder_input_ids"] = decoder_inputs.pop("decoder_input_ids")

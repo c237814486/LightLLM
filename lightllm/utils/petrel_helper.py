@@ -71,9 +71,7 @@ class PetrelHelper(object):
         if "s3://" not in path:
             pk_res = pk.load(open(path, mode))
         else:
-            pk_res = pk.loads(
-                PetrelHelper._petrel_helper.load_data(path, ceph_read=False)
-            )
+            pk_res = pk.loads(PetrelHelper._petrel_helper.load_data(path, ceph_read=False))
         return pk_res
 
     @staticmethod
@@ -81,9 +79,7 @@ class PetrelHelper(object):
         if "s3://" not in path:
             js = json.load(open(path, mode))
         else:
-            js = json.loads(
-                PetrelHelper._petrel_helper.load_data(path, ceph_read=False)
-            )
+            js = json.loads(PetrelHelper._petrel_helper.load_data(path, ceph_read=False))
         return js
 
     @staticmethod
@@ -91,9 +87,7 @@ class PetrelHelper(object):
         if "s3://" not in path:
             js = json.load(open(path, mode))
         else:
-            js = json.loads(
-                PetrelHelper._petrel_helper.load_data(path, ceph_read=False)
-            )
+            js = json.loads(PetrelHelper._petrel_helper.load_data(path, ceph_read=False))
 
         with open(local_path, "w") as f:
             json.dump(js, f)
@@ -206,9 +200,7 @@ def s3_model_prepare(ceph_file_path: str):
     json_files = PetrelHelper.list(ceph_file_path, extension="json")
     tokenizer_model = PetrelHelper.list(ceph_file_path, extension="model")
 
-    if tokenizer_model and (
-        not os.path.exists(os.path.join(ceph_file_path, tokenizer_model[0]))
-    ):
+    if tokenizer_model and (not os.path.exists(os.path.join(ceph_file_path, tokenizer_model[0]))):
         PetrelHelper.download_file(
             os.path.join(ceph_file_path, tokenizer_model[0]),
             os.path.join(ceph_file_path, tokenizer_model[0]),

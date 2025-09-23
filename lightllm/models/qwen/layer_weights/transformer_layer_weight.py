@@ -15,9 +15,7 @@ class QwenTransformerLayerWeight(LlamaTransformerLayerWeight):
         if qkv_weight_name in weights:
             qkv_weight_ = weights[qkv_weight_name]
             split_size = qkv_weight_.shape[0] // 3
-            q_weight_, k_weight_, v_weight_ = torch.split(
-                qkv_weight_, split_size, dim=0
-            )
+            q_weight_, k_weight_, v_weight_ = torch.split(qkv_weight_, split_size, dim=0)
             weights[self._q_weight_name] = q_weight_
             weights[self._k_weight_name] = k_weight_
             weights[self._v_weight_name] = v_weight_

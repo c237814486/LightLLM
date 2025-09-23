@@ -9,9 +9,7 @@ from ..base_backend import ModeBackend
 class DPControlState:
     def __init__(self, backend: ModeBackend):
         self.backend = backend
-        self.is_aggressive_schedule = (
-            not get_env_start_args().disable_aggressive_schedule
-        )
+        self.is_aggressive_schedule = not get_env_start_args().disable_aggressive_schedule
 
         # 非激进调度参数
         self.decode_max_step = max(0, get_env_start_args().router_max_wait_tokens)
@@ -97,9 +95,7 @@ class DPControlState:
                 if self.dp_prefill_wait_step > self.dp_prefill_wait_max_step:
                     # prefill 一次允许进行几次 decode 操作。
                     self.left_decode_num = self.decode_max_step
-                    self.dp_prefill_wait_step = max(
-                        0, (self.dp_prefill_wait_step - self.decode_max_step)
-                    )
+                    self.dp_prefill_wait_step = max(0, (self.dp_prefill_wait_step - self.decode_max_step))
                     return RunWay.PREFILL
 
             if max_decode_num > 0:

@@ -36,16 +36,13 @@ def generate_alibi(n_head, dtype=torch.float16):
         def get_slopes_power_of_2(n):
             start = 2 ** (-(2 ** -(math.log2(n) - 3)))
             ratio = start
-            return [start * ratio**i for i in range(n)]
+            return [start * ratio ** i for i in range(n)]
 
         if math.log2(n).is_integer():
             return get_slopes_power_of_2(n)
         else:
             closest_power_of_2 = 2 ** math.floor(math.log2(n))
-            return (
-                get_slopes_power_of_2(closest_power_of_2)
-                + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
-            )
+            return get_slopes_power_of_2(closest_power_of_2) + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
 
     slopes = torch.Tensor(get_slopes(n_head))
     head_alibi = slopes.to(dtype)
@@ -62,18 +59,12 @@ class BloomTransformerLayerWeight(LlamaTransformerLayerWeight):
         self.n_head = self.network_config_["num_attention_heads"]
         self.n_inter = self.network_config_["n_embed"] * 4
         self.n_kv_head = self.network_config_["num_attention_heads"]
-        self.head_dim = self.network_config_.get(
-            "head_dim", self.n_embed // self.n_head
-        )
+        self.head_dim = self.network_config_.get("head_dim", self.n_embed // self.n_head)
         # 计算生成alibi
         assert self.n_head % self.tp_world_size_ == 0
         tp_head_num = self.n_head // self.tp_world_size_
         tmp_alibi = generate_alibi(self.n_head, dtype=torch.float32)
-        self.tp_alibi = (
-            tmp_alibi[self.tp_rank_ * tp_head_num : (self.tp_rank_ + 1) * tp_head_num]
-            .contiguous()
-            .cuda()
-        )
+        self.tp_alibi = tmp_alibi[self.tp_rank_ * tp_head_num : (self.tp_rank_ + 1) * tp_head_num].contiguous().cuda()
 
     def _init_weight_names(self):
         self._q_weight_name = f"h.{self.layer_num_}.self_attention.q_proj.weight"
@@ -92,26 +83,16 @@ class BloomTransformerLayerWeight(LlamaTransformerLayerWeight):
 
         self._att_norm_weight_name = f"h.{self.layer_num_}.input_layernorm.weight"
         self._att_norm_bias_name = f"h.{self.layer_num_}.input_layernorm.bias"
-        self._ffn_norm_weight_name = (
-            f"h.{self.layer_num_}.post_attention_layernorm.weight"
-        )
+        self._ffn_norm_weight_name = f"h.{self.layer_num_}.post_attention_layernorm.weight"
         self._ffn_norm_bias_name = f"h.{self.layer_num_}.post_attention_layernorm.bias"
 
     def _preprocess_weight(self, weights):
         qkv_weight_name = f"h.{self.layer_num_}.self_attention.query_key_value.weight"
         if qkv_weight_name in weights:
-            att_qkv_dense_weight = weights[qkv_weight_name].reshape(
-                self.n_head, 3, -1, self.n_embed
-            )
-            weights[self._q_weight_name] = att_qkv_dense_weight[:, 0, :, :].reshape(
-                -1, self.n_embed
-            )
-            weights[self._k_weight_name] = att_qkv_dense_weight[:, 1, :, :].reshape(
-                -1, self.n_embed
-            )
-            weights[self._v_weight_name] = att_qkv_dense_weight[:, 2, :, :].reshape(
-                -1, self.n_embed
-            )
+            att_qkv_dense_weight = weights[qkv_weight_name].reshape(self.n_head, 3, -1, self.n_embed)
+            weights[self._q_weight_name] = att_qkv_dense_weight[:, 0, :, :].reshape(-1, self.n_embed)
+            weights[self._k_weight_name] = att_qkv_dense_weight[:, 1, :, :].reshape(-1, self.n_embed)
+            weights[self._v_weight_name] = att_qkv_dense_weight[:, 2, :, :].reshape(-1, self.n_embed)
             del weights[qkv_weight_name]
 
         qkv_bias_name = f"h.{self.layer_num_}.self_attention.query_key_value.bias"

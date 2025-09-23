@@ -71,20 +71,10 @@ def _fwd_kernel_flash_decode_stage1_padding(
                 head_mask = cur_q_head_range < head_num
 
             cur_batch_start_index = block_seq * loop_seq_block_index
-            cur_batch_end_index = tl.minimum(
-                cur_batch_seq_len, cur_batch_start_index + block_seq
-            )
+            cur_batch_end_index = tl.minimum(cur_batch_seq_len, cur_batch_start_index + block_seq)
 
-            off_q = (
-                cur_batch * stride_q_bs
-                + cur_q_head_range[:, None] * stride_q_h
-                + offs_d[None, :]
-            )
-            off_rope_q = (
-                cur_batch * stride_q_rope_bs
-                + cur_q_head_range[:, None] * stride_q_rope_h
-                + offs_rope_d[None, :]
-            )
+            off_q = cur_batch * stride_q_bs + cur_q_head_range[:, None] * stride_q_h + offs_d[None, :]
+            off_rope_q = cur_batch * stride_q_rope_bs + cur_q_head_range[:, None] * stride_q_rope_h + offs_rope_d[None, :]
             if NEED_HEAD_MASK:
                 q = tl.load(
                     Q_nope + off_q,
@@ -118,9 +108,7 @@ def _fwd_kernel_flash_decode_stage1_padding(
                 kv = tl.load(KV_nope + off_kv, mask=seq_n_mask[None, :], other=0.0)
                 att_value = tl.dot(q, kv)
                 off_rope_kv = kv_loc[None, :] * stride_kv_rope_bs + offs_rope_d[:, None]
-                rope_kv = tl.load(
-                    KV_rope + off_rope_kv, mask=seq_n_mask[None, :], other=0.0
-                )
+                rope_kv = tl.load(KV_rope + off_rope_kv, mask=seq_n_mask[None, :], other=0.0)
                 att_value += tl.dot(q_rope, rope_kv)
 
                 att_value *= sm_scale
@@ -137,16 +125,8 @@ def _fwd_kernel_flash_decode_stage1_padding(
                 sum_exp = sum_exp * logic_scale + tl.sum(exp_logic, axis=1)
                 max_logic = new_max_logic
 
-            off_mid_o = (
-                cur_q_head_range[:, None] * stride_mid_oh
-                + (out_batch_start_index + loop_seq_block_index) * stride_mid_os
-                + offs_d[None, :]
-            )
-            off_mid_o_logexpsum = (
-                cur_q_head_range * stride_mid_o_eh
-                + out_batch_start_index
-                + loop_seq_block_index
-            )
+            off_mid_o = cur_q_head_range[:, None] * stride_mid_oh + (out_batch_start_index + loop_seq_block_index) * stride_mid_os + offs_d[None, :]
+            off_mid_o_logexpsum = cur_q_head_range * stride_mid_o_eh + out_batch_start_index + loop_seq_block_index
             if NEED_HEAD_MASK:
                 tl.store(
                     Mid_O + off_mid_o,

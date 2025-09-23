@@ -22,19 +22,11 @@ from lightllm.models.llama.triton_kernel.silu_and_mul import silu_and_mul_fwd
 class CohereTransformerLayerInfer(TransformerLayerCohereInferTpl):
     def __init__(self, layer_num, network_config, mode):
         super().__init__(layer_num, network_config, mode)
-        self.tp_q_head_num_ = (
-            network_config["num_attention_heads"] // self.tp_world_size_
-        )
-        self.tp_k_head_num_ = (
-            network_config["num_key_value_heads"] // self.tp_world_size_
-        )
-        self.tp_v_head_num_ = (
-            network_config["num_key_value_heads"] // self.tp_world_size_
-        )
+        self.tp_q_head_num_ = network_config["num_attention_heads"] // self.tp_world_size_
+        self.tp_k_head_num_ = network_config["num_key_value_heads"] // self.tp_world_size_
+        self.tp_v_head_num_ = network_config["num_key_value_heads"] // self.tp_world_size_
         self.tp_o_head_num_ = self.tp_q_head_num_
-        self.head_dim_ = (
-            network_config["hidden_size"] // network_config["num_attention_heads"]
-        )
+        self.head_dim_ = network_config["hidden_size"] // network_config["num_attention_heads"]
         self.embed_dim_ = network_config["hidden_size"]
         self.eps_ = self.network_config_["layer_norm_eps"]
         self.use_qk_norm_ = network_config.get("use_qk_norm", False)
@@ -54,9 +46,7 @@ class CohereTransformerLayerInfer(TransformerLayerCohereInferTpl):
         )
 
     def _bind_rotary_emb_fwd(self):
-        self._rotary_emb_fwd = partial(
-            CohereTransformerLayerInfer._rotary_emb_fwd, self
-        )
+        self._rotary_emb_fwd = partial(CohereTransformerLayerInfer._rotary_emb_fwd, self)
 
     def _att_norm(self, input, infer_state, layer_weight: CohereTransformerLayerWeight):
         return layernorm_forward(
@@ -99,9 +89,7 @@ class CohereTransformerLayerInfer(TransformerLayerCohereInferTpl):
     ) -> torch.Tensor:
         input = input.view(-1, self.embed_dim_)
         up_gate_out = layer_weight.gate_up_proj.mm(input)
-        ffn1_out = self.alloc_tensor(
-            (input.size(0), up_gate_out.size(1) // 2), input.dtype
-        )
+        ffn1_out = self.alloc_tensor((input.size(0), up_gate_out.size(1) // 2), input.dtype)
         silu_and_mul_fwd(up_gate_out, ffn1_out)
         input = None
         up_gate_out = None

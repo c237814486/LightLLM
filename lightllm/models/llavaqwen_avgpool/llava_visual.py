@@ -48,9 +48,7 @@ def my_CLIPVisionEmbeddings_init(self, config: "CLIPVisionConfig"):
 
     if isinstance(self.image_size, int):
         self.image_size = {"width": self.image_size, "height": self.image_size}
-    self.num_patches = (self.image_size["width"] // self.patch_size) * (
-        self.image_size["height"] // self.patch_size
-    )  # btnkij
+    self.num_patches = (self.image_size["width"] // self.patch_size) * (self.image_size["height"] // self.patch_size)  # btnkij
     self.num_positions = self.num_patches + 1
     self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
     self.register_buffer(
@@ -60,22 +58,16 @@ def my_CLIPVisionEmbeddings_init(self, config: "CLIPVisionConfig"):
     )
 
 
-def fix_embedding_forward(
-    self, pixel_values: torch.FloatTensor, interpolate_pos_encoding=False
-) -> torch.Tensor:
+def fix_embedding_forward(self, pixel_values: torch.FloatTensor, interpolate_pos_encoding=False) -> torch.Tensor:
     batch_size, _, height, width = pixel_values.shape
     target_dtype = self.patch_embedding.weight.dtype
-    patch_embeds = self.patch_embedding(
-        pixel_values.to(dtype=target_dtype)
-    )  # shape = [*, width, grid, grid]
+    patch_embeds = self.patch_embedding(pixel_values.to(dtype=target_dtype))  # shape = [*, width, grid, grid]
     patch_embeds = patch_embeds.flatten(2).transpose(1, 2)
 
     class_embeds = self.class_embedding.expand(batch_size, 1, -1)
     embeddings = torch.cat([class_embeds, patch_embeds], dim=1)
     if interpolate_pos_encoding:
-        embeddings = embeddings + self.interpolate_pos_encoding(
-            embeddings, height, width
-        )
+        embeddings = embeddings + self.interpolate_pos_encoding(embeddings, height, width)
     else:
         embeddings = embeddings + self.position_embedding(self.position_ids)
     return embeddings
@@ -130,13 +122,9 @@ def my_CLIPAttention_forward(
     return attn_output, attn_weights_reshaped
 
 
-transformers.models.clip.modeling_clip.CLIPVisionEmbeddings.__init__ = (
-    my_CLIPVisionEmbeddings_init
-)
+transformers.models.clip.modeling_clip.CLIPVisionEmbeddings.__init__ = my_CLIPVisionEmbeddings_init
 transformers.models.clip.modeling_clip.CLIPAttention.forward = my_CLIPAttention_forward
-transformers.models.clip.modeling_clip.CLIPVisionEmbeddings.forward = (
-    fix_embedding_forward
-)
+transformers.models.clip.modeling_clip.CLIPVisionEmbeddings.forward = fix_embedding_forward
 
 
 class LlavaAvgpoolVisionModel:
@@ -173,32 +161,20 @@ class LlavaAvgpoolVisionModel:
 
         if "siglip" in vision_path.lower():
             # self.image_processor = SiglipImageProcessor.from_pretrained(vision_path)
-            self.image_processor = OpimizedCLIPImageProcessor.from_pretrained(
-                vision_path
-            )
-            self.vision_tower = SiglipVisionModel.from_pretrained(
-                vision_path
-            ).half()  # 精度
+            self.image_processor = OpimizedCLIPImageProcessor.from_pretrained(vision_path)
+            self.vision_tower = SiglipVisionModel.from_pretrained(vision_path).half()  # 精度
 
         elif "clip" in vision_path.lower():
             # self.image_processor = CLIPImageProcessor.from_pretrained(vision_path)
 
-            self.image_processor = OpimizedCLIPImageProcessor.from_pretrained(
-                vision_path
-            )
+            self.image_processor = OpimizedCLIPImageProcessor.from_pretrained(vision_path)
             self.vision_tower = CLIPVisionModel.from_pretrained(vision_path).half()
 
-        assert (
-            isinstance(config["proj_output_size"], dict)
-            and len(config["proj_output_size"]) == 2
-        )
+        assert isinstance(config["proj_output_size"], dict) and len(config["proj_output_size"]) == 2
         config["mm_hidden_size"] = self.vision_tower.config.hidden_size
 
         self.mm_projector = PoolPojector(config)
-        self.token_num = int(
-            config["proj_output_size"]["width"] * config["proj_output_size"]["height"]
-            + 1
-        )
+        self.token_num = int(config["proj_output_size"]["width"] * config["proj_output_size"]["height"] + 1)
         # load projector weights
         self.projector_weights = {}
         self.vision_model_weights = {}
@@ -207,13 +183,9 @@ class LlavaAvgpoolVisionModel:
                 d = safe_open(os.path.join(weight_dir, f), "pt", "cpu")
                 for k in d.keys():
                     if "model.mm_projector" in k:
-                        self.projector_weights[k.replace("model.mm_projector.", "")] = (
-                            d.get_tensor(k)
-                        )
+                        self.projector_weights[k.replace("model.mm_projector.", "")] = d.get_tensor(k)
                     elif "model.vision_tower.vision_tower" in k:
-                        self.vision_model_weights[
-                            k.replace("model.vision_tower.vision_tower.", "")
-                        ] = d.get_tensor(k)
+                        self.vision_model_weights[k.replace("model.vision_tower.vision_tower.", "")] = d.get_tensor(k)
 
         self.mm_projector.load_state_dict(self.projector_weights)
         self.vision_tower.load_state_dict(self.vision_model_weights)
@@ -278,9 +250,7 @@ class LlavaAvgpoolVisionModel:
 
     # @calculate_cpu_time_sync(show=True)
     def process_image(self, image_data):
-        t = self.image_processor.preprocess(image_data, return_tensors="pt")[
-            "pixel_values"
-        ]
+        t = self.image_processor.preprocess(image_data, return_tensors="pt")["pixel_values"]
         return t
 
     # @calculate_cpu_time_sync(show=True)
@@ -299,9 +269,7 @@ class LlavaAvgpoolVisionModel:
                 image_data = Image.open(BytesIO(image_data)).convert("RGB")
                 batch_images.append(image_data)
             else:
-                raise Exception(
-                    "Unsupport input types: {} for {}".format(type(item), item)
-                )
+                raise Exception("Unsupport input types: {} for {}".format(type(item), item))
 
         img_tensors = self.process_image(batch_images)
         cur_num = img_tensors.shape[0]
@@ -316,7 +284,6 @@ class LlavaAvgpoolVisionModel:
 
 
 class FLOPCounter:
-
     def __init__(self, model):
         self.model = model
 
@@ -324,9 +291,7 @@ class FLOPCounter:
         try:
             from thop import profile
 
-            flops, params = profile(
-                self.model, inputs=(input_tensor.clone(),), verbose=False
-            )
+            flops, params = profile(self.model, inputs=(input_tensor.clone(),), verbose=False)
 
             print(f"✓ thop - FLOPs: {flops/1e9:.2f} GFLOPs, Params: {params/1e6:.2f}M")
             return flops
@@ -384,9 +349,7 @@ if __name__ == "__main__":
             batch_flops = total_flops * bs
             flops_per_second = batch_flops * test_runs / total_time
             efficiency = flops_per_second / 1e12  # TFLOP/s
-            print(
-                f"Batch {bs}: {avg_time:.2f}ms, {throughput:.2f}img/s, {efficiency:.2f}TFLOP/s"
-            )
+            print(f"Batch {bs}: {avg_time:.2f}ms, {throughput:.2f}img/s, {efficiency:.2f}TFLOP/s")
         return avg_time, throughput, total_flops
 
     # 存储性能测试结果
@@ -401,13 +364,9 @@ if __name__ == "__main__":
                 image = Image.fromarray(fake_img)
                 images.append(image)
             print(f"testing bs:{bs}")
-            t = pt_model.image_processor.preprocess(images, return_tensors="pt")[
-                "pixel_values"
-            ]
+            t = pt_model.image_processor.preprocess(images, return_tensors="pt")["pixel_values"]
 
-            avg_pt, throughput1, flops = run_test(
-                pt_model, t, bs, warmup_runs, test_runs
-            )
+            avg_pt, throughput1, flops = run_test(pt_model, t, bs, warmup_runs, test_runs)
 
             # avg_trt, throughput2 = run_test(trt_model, t, bs, warmup_runs, test_runs)
 
@@ -426,17 +385,11 @@ if __name__ == "__main__":
         # 打印性能测试报告
         print("\n性能测试报告:")
         print("=" * 80)
-        print(
-            f"{'批次大小':^15} | {'平均推理时间(PT/TRT)(ms)':^20} | {'吞吐量(PT/TRT)(img/s)':^15} | FLOPS"
-        )
+        print(f"{'批次大小':^15} | {'平均推理时间(PT/TRT)(ms)':^20} | {'吞吐量(PT/TRT)(img/s)':^15} | FLOPS")
         print("-" * 80)
 
         for result in results:
-            print(
-                f"{result['batch_size']:^15} | "
-                f"{result['avg_time_pt']:^10.2f}| "
-                f"{result['throughput_pt']:^7.2f}| "
-            )
+            print(f"{result['batch_size']:^15} | " f"{result['avg_time_pt']:^10.2f}| " f"{result['throughput_pt']:^7.2f}| ")
 
         print("=" * 80)
 

@@ -14,17 +14,9 @@ class NormWeight(BaseWeightTpl):
 
     def load_hf_weights(self, weights):
         if self.weight_name in weights:
-            self.weight = (
-                weights[self.weight_name]
-                .to(self.data_type_)
-                .cuda(get_current_device_id())
-            )
+            self.weight = weights[self.weight_name].to(self.data_type_).cuda(get_current_device_id())
         if self.bias_name in weights:
-            self.bias = (
-                weights[self.bias_name]
-                .to(self.data_type_)
-                .cuda(get_current_device_id())
-            )
+            self.bias = weights[self.bias_name].to(self.data_type_).cuda(get_current_device_id())
 
     def verify_load(self):
         load_ok = True
@@ -42,11 +34,7 @@ class GEMMANormWeight(NormWeight):
 
     def load_hf_weights(self, weights):
         if self.weight_name in weights:
-            self.weight = (
-                (weights[self.weight_name] + 1)
-                .to(self.data_type_)
-                .cuda(get_current_device_id())
-            )
+            self.weight = (weights[self.weight_name] + 1).to(self.data_type_).cuda(get_current_device_id())
 
 
 class TpNormWeight(NormWeight):
@@ -59,14 +47,6 @@ class TpNormWeight(NormWeight):
         end = self.split_n_embed * (self.tp_rank_ + 1)
 
         if self.weight_name in weights:
-            self.weight = (
-                weights[self.weight_name][start:end]
-                .to(self.data_type_)
-                .cuda(get_current_device_id())
-            )
+            self.weight = weights[self.weight_name][start:end].to(self.data_type_).cuda(get_current_device_id())
         if self.bias_name in weights:
-            self.bias = (
-                weights[self.bias_name][start:end]
-                .to(self.data_type_)
-                .cuda(get_current_device_id())
-            )
+            self.bias = weights[self.bias_name][start:end].to(self.data_type_).cuda(get_current_device_id())

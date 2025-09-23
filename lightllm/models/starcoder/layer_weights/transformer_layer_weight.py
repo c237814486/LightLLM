@@ -21,19 +21,14 @@ class StarcoderTransformerLayerWeight(LlamaTransformerLayerWeight):
 
     def load_hf_weights(self, weights):
         n_embed = self.network_config_["hidden_size"]
-        head_dim = (
-            self.network_config_["hidden_size"]
-            // self.network_config_["num_attention_heads"]
-        )
+        head_dim = self.network_config_["hidden_size"] // self.network_config_["num_attention_heads"]
 
         qkv_weight_name = f"transformer.h.{self.layer_num_}.attn.c_attn.weight"
         if qkv_weight_name in weights:
             qkv_weight = weights[qkv_weight_name]
             weights[self._q_weight_name] = qkv_weight[:, :n_embed]
             weights[self._k_weight_name] = qkv_weight[:, n_embed : n_embed + head_dim]
-            weights[self._v_weight_name] = qkv_weight[
-                :, n_embed + head_dim : n_embed + 2 * head_dim
-            ]
+            weights[self._v_weight_name] = qkv_weight[:, n_embed + head_dim : n_embed + 2 * head_dim]
             del weights[qkv_weight_name]
 
         qkv_bias_name = f"transformer.h.{self.layer_num_}.attn.c_attn.bias"
@@ -41,9 +36,7 @@ class StarcoderTransformerLayerWeight(LlamaTransformerLayerWeight):
             qkv_bias = weights[qkv_bias_name]
             weights[self._q_bias_name] = qkv_bias[:, :n_embed]
             weights[self._k_bias_name] = qkv_bias[:, n_embed : n_embed + head_dim]
-            weights[self._v_bias_name] = qkv_bias[
-                :, n_embed + head_dim : n_embed + 2 * head_dim
-            ]
+            weights[self._v_bias_name] = qkv_bias[:, n_embed + head_dim : n_embed + 2 * head_dim]
             del weights[qkv_bias_name]
         super().load_hf_weights(weights)
 

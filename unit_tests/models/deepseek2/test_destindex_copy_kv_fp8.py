@@ -18,15 +18,7 @@ if torch.cuda.is_available():
 
 @pytest.mark.parametrize(
     "batch, seqlen, heads, nope_head, rope_head, copy_len",
-    [
-        (a, b, c, d, e, f)
-        for a in [1, 16, 32, 128, 512]
-        for b in [1024, 2048]
-        for c in [1]
-        for d in [512]
-        for e in [64]
-        for f in [10, 20, 100, 1024]
-    ],
+    [(a, b, c, d, e, f) for a in [1, 16, 32, 128, 512] for b in [1024, 2048] for c in [1] for d in [512] for e in [64] for f in [10, 20, 100, 1024]],
 )
 def test_destindex_copy_kv_fp8(batch, seqlen, heads, nope_head, rope_head, copy_len):
     B, N_CTX, H, NOPE_HEAD, ROPE_HEAD, COPY_LEN = (
@@ -41,9 +33,7 @@ def test_destindex_copy_kv_fp8(batch, seqlen, heads, nope_head, rope_head, copy_
     NUM = COPY_LEN
     dest_loc = torch.arange(NUM).cuda()
     kv = torch.randn((len(dest_loc), H, NOPE_HEAD + ROPE_HEAD), dtype=dtype).cuda()
-    out = torch.zeros(
-        (B * N_CTX, H, NOPE_HEAD + ROPE_HEAD + 2), dtype=torch.uint8
-    ).cuda()
+    out = torch.zeros((B * N_CTX, H, NOPE_HEAD + ROPE_HEAD + 2), dtype=torch.uint8).cuda()
 
     fp8_type = torch.float8_e4m3fn
     kv_nope = kv[:, :, :NOPE_HEAD]

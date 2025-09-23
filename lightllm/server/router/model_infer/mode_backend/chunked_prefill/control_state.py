@@ -6,9 +6,7 @@ from lightllm.server.router.model_infer.infer_batch import InferReq
 
 class ControlState:
     def __init__(self):
-        self.is_aggressive_schedule = (
-            not get_env_start_args().disable_aggressive_schedule
-        )
+        self.is_aggressive_schedule = not get_env_start_args().disable_aggressive_schedule
 
         # 非激进调度参数
         self.decode_max_step = max(1, get_env_start_args().router_max_wait_tokens)
@@ -16,18 +14,14 @@ class ControlState:
 
         self.step_count = 0
 
-    def select_run_way(
-        self, prefill_reqs: List[InferReq], decode_reqs: List[InferReq]
-    ) -> "RunWay":
+    def select_run_way(self, prefill_reqs: List[InferReq], decode_reqs: List[InferReq]) -> "RunWay":
         """
         判断决策运行方式：
         返回值: RunWay
         """
         self.step_count += 1
         if self.is_aggressive_schedule:
-            return self._agressive_way(
-                prefill_reqs=prefill_reqs, decode_reqs=decode_reqs
-            )
+            return self._agressive_way(prefill_reqs=prefill_reqs, decode_reqs=decode_reqs)
         else:
             return self._normal_way(prefill_reqs=prefill_reqs, decode_reqs=decode_reqs)
 

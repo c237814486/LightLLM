@@ -79,18 +79,10 @@ class FusedMoeWeightEP(BaseWeight):
         self.global_rank_ = get_global_rank()
         self.redundancy_expert_num = get_redundancy_expert_num()
         self.redundancy_expert_ids = get_redundancy_expert_ids(layer_num)
-        logger.info(
-            f"global_rank {self.global_rank_} layerindex {layer_num} redundancy_expertids: {self.redundancy_expert_ids}"
-        )
-        self.redundancy_expert_ids_tensor = torch.tensor(
-            self.redundancy_expert_ids, dtype=torch.int64, device="cuda"
-        )
-        self.routed_expert_counter_tensor = torch.zeros(
-            (self.n_routed_experts,), dtype=torch.int64, device="cuda"
-        )
-        self.total_expert_num_contain_redundancy = (
-            self.n_routed_experts + self.redundancy_expert_num * global_world_size
-        )
+        logger.info(f"global_rank {self.global_rank_} layerindex {layer_num} redundancy_expertids: {self.redundancy_expert_ids}")
+        self.redundancy_expert_ids_tensor = torch.tensor(self.redundancy_expert_ids, dtype=torch.int64, device="cuda")
+        self.routed_expert_counter_tensor = torch.zeros((self.n_routed_experts,), dtype=torch.int64, device="cuda")
+        self.total_expert_num_contain_redundancy = self.n_routed_experts + self.redundancy_expert_num * global_world_size
         assert self.n_routed_experts % global_world_size == 0
         self.ep_n_routed_experts = self.n_routed_experts // global_world_size
         ep_load_expert_num = self.ep_n_routed_experts + self.redundancy_expert_num
@@ -112,18 +104,14 @@ class FusedMoeWeightEP(BaseWeight):
         self.n_group = network_config["n_group"]
         network_config["topk_group"] = network_config.get("topk_group", 0)
         self.topk_group = network_config["topk_group"]
-        network_config["routed_scaling_factor"] = network_config.get(
-            "routed_scaling_factor", 0
-        )
+        network_config["routed_scaling_factor"] = network_config.get("routed_scaling_factor", 0)
         self.routed_scaling_factor = network_config["routed_scaling_factor"]
 
         self.lock = threading.Lock()
         # init buffer
 
         # auto update redundancy expert vars
-        self.auto_update_redundancy_expert: bool = (
-            get_env_start_args().auto_update_redundancy_expert
-        )
+        self.auto_update_redundancy_expert: bool = get_env_start_args().auto_update_redundancy_expert
 
     def experts(
         self,
@@ -207,16 +195,14 @@ class FusedMoeWeightEP(BaseWeight):
 
         topk_idx = topk_idx.to(torch.long)
         num_max_dispatch_tokens_per_rank = get_deepep_num_max_dispatch_tokens_per_rank()
-        recv_x, masked_m, handle, event, hook = (
-            dist_group_manager.ep_buffer.low_latency_dispatch(
-                hidden_states,
-                topk_idx,
-                num_max_dispatch_tokens_per_rank,
-                self.total_expert_num_contain_redundancy,
-                use_fp8=self.use_fp8_w8a8,
-                async_finish=False,
-                return_recv_hook=True,
-            )
+        recv_x, masked_m, handle, event, hook = dist_group_manager.ep_buffer.low_latency_dispatch(
+            hidden_states,
+            topk_idx,
+            num_max_dispatch_tokens_per_rank,
+            self.total_expert_num_contain_redundancy,
+            use_fp8=self.use_fp8_w8a8,
+            async_finish=False,
+            return_recv_hook=True,
         )
         return recv_x, masked_m, topk_idx, topk_weights, handle, hook
 
@@ -251,13 +237,9 @@ class FusedMoeWeightEP(BaseWeight):
         if w1.ndim == 3:
             block_size_k = w1.shape[2] // w1_scale.shape[2]
         assert block_size_k == 128, "block_size_k must be 128"
-        input_scale = torch.empty(
-            (M, K // block_size_k), dtype=torch.float32, device=hidden_states.device
-        )
+        input_scale = torch.empty((M, K // block_size_k), dtype=torch.float32, device=hidden_states.device)
         qinput_tensor = torch.empty((M, K), dtype=w1.dtype, device=hidden_states.device)
-        per_token_group_quant_fp8(
-            hidden_states, block_size_k, qinput_tensor, input_scale
-        )
+        per_token_group_quant_fp8(hidden_states, block_size_k, qinput_tensor, input_scale)
         return topk_weights, topk_idx.to(torch.long), (qinput_tensor, input_scale)
 
     def dispatch(
@@ -269,27 +251,14 @@ class FusedMoeWeightEP(BaseWeight):
     ):
         buffer = dist_group_manager.ep_buffer
         # get_dispatch_layout
-        (
-            num_tokens_per_rank,
-            num_tokens_per_rdma_rank,
-            num_tokens_per_expert,
-            is_token_in_rank,
-            previous_event,
-        ) = buffer.get_dispatch_layout(
+        (num_tokens_per_rank, num_tokens_per_rdma_rank, num_tokens_per_expert, is_token_in_rank, previous_event,) = buffer.get_dispatch_layout(
             topk_idx,
             self.total_expert_num_contain_redundancy,
             previous_event=overlap_event,
             async_finish=True,
             allocate_on_comm_stream=True,
         )
-        (
-            recv_x,
-            recv_topk_idx,
-            recv_topk_weights,
-            num_recv_tokens_per_expert_list,
-            handle,
-            event,
-        ) = buffer.dispatch(
+        (recv_x, recv_topk_idx, recv_topk_weights, num_recv_tokens_per_expert_list, handle, event,) = buffer.dispatch(
             qinput_tensor,
             topk_idx=topk_idx,
             topk_weights=topk_weights,
@@ -324,9 +293,7 @@ class FusedMoeWeightEP(BaseWeight):
     ):
         w1, w1_scale = self.w1
         w2, w2_scale = self.w2
-        return masked_group_gemm(
-            recv_x, masked_m, dtype, w1, w1_scale, w2, w2_scale, expected_m=expected_m
-        )
+        return masked_group_gemm(recv_x, masked_m, dtype, w1, w1_scale, w2, w2_scale, expected_m=expected_m)
 
     def prefilled_group_gemm(
         self,
@@ -383,15 +350,11 @@ class FusedMoeWeightEP(BaseWeight):
             # groupgemm (contiguous layout)
             gemm_out_a = torch.empty((all_tokens, N), device=device, dtype=hidden_dtype)
 
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                input_tensor, (w1, w1_scale), gemm_out_a, m_indices
-            )
+            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(input_tensor, (w1, w1_scale), gemm_out_a, m_indices)
 
             # silu_and_mul_fwd + qaunt
             # TODO fused kernel
-            silu_out = torch.empty(
-                (all_tokens, N // 2), device=device, dtype=hidden_dtype
-            )
+            silu_out = torch.empty((all_tokens, N // 2), device=device, dtype=hidden_dtype)
 
             silu_and_mul_fwd(gemm_out_a.view(-1, N), silu_out)
             qsilu_out, qsilu_out_scale = tma_aligned_quantize(silu_out)
@@ -399,13 +362,9 @@ class FusedMoeWeightEP(BaseWeight):
             # groupgemm (contiguous layout)
             gemm_out_b = torch.empty((all_tokens, K), device=device, dtype=hidden_dtype)
 
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-                (qsilu_out, qsilu_out_scale), (w2, w2_scale), gemm_out_b, m_indices
-            )
+            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous((qsilu_out, qsilu_out_scale), (w2, w2_scale), gemm_out_b, m_indices)
             # gather and local reduce
-            ep_gather(
-                gemm_out_b, recv_topk_idx, recv_topk_weights, output_index, gather_out
-            )
+            ep_gather(gemm_out_b, recv_topk_idx, recv_topk_weights, output_index, gather_out)
 
         return gather_out
 
@@ -416,15 +375,13 @@ class FusedMoeWeightEP(BaseWeight):
         topk_weights: torch.Tensor,
         handle: Any,
     ):
-        combined_x, event_overlap, hook = (
-            dist_group_manager.ep_buffer.low_latency_combine(
-                gemm_out_b,
-                topk_idx,
-                topk_weights,
-                handle,
-                async_finish=False,
-                return_recv_hook=True,
-            )
+        combined_x, event_overlap, hook = dist_group_manager.ep_buffer.low_latency_combine(
+            gemm_out_b,
+            topk_idx,
+            topk_weights,
+            handle,
+            async_finish=False,
+            return_recv_hook=True,
         )
         return combined_x, hook
 
@@ -453,12 +410,7 @@ class FusedMoeWeightEP(BaseWeight):
         if self.quantized_weight:
             self._fuse_weight_scale()
         with self.lock:
-            if (
-                hasattr(self, "experts_up_projs")
-                and None not in self.experts_up_projs
-                and None not in self.experts_gate_projs
-                and None not in self.w2_list
-            ):
+            if hasattr(self, "experts_up_projs") and None not in self.experts_up_projs and None not in self.experts_gate_projs and None not in self.w2_list:
                 gate_out_dim, gate_in_dim = self.experts_gate_projs[0].shape
                 up_out_dim, up_in_dim = self.experts_up_projs[0].shape
                 assert gate_in_dim == up_in_dim
@@ -471,21 +423,15 @@ class FusedMoeWeightEP(BaseWeight):
                     device="cpu",
                 )
 
-                for i_experts in range(
-                    self.ep_n_routed_experts + self.redundancy_expert_num
-                ):
-                    w1[i_experts, 0:gate_out_dim:, :] = self.experts_gate_projs[
-                        i_experts
-                    ]
+                for i_experts in range(self.ep_n_routed_experts + self.redundancy_expert_num):
+                    w1[i_experts, 0:gate_out_dim:, :] = self.experts_gate_projs[i_experts]
                     w1[i_experts, gate_out_dim:, :] = self.experts_up_projs[i_experts]
 
                 inter_shape, hidden_size = (
                     self.w2_list[0].shape[0],
                     self.w2_list[0].shape[1],
                 )
-                w2 = torch._utils._flatten_dense_tensors(self.w2_list).view(
-                    len(self.w2_list), inter_shape, hidden_size
-                )
+                w2 = torch._utils._flatten_dense_tensors(self.w2_list).view(len(self.w2_list), inter_shape, hidden_size)
                 if not self.quantized_weight and self.quant_method is not None:
                     self.w1 = self.quant_method.quantize(w1)
                     self.w2 = self.quant_method.quantize(w2)
@@ -498,12 +444,7 @@ class FusedMoeWeightEP(BaseWeight):
 
     def _fuse_weight_scale(self):
         with self.lock:
-            if (
-                hasattr(self, "experts_up_proj_scales")
-                and None not in self.experts_up_proj_scales
-                and None not in self.experts_gate_proj_scales
-                and None not in self.w2_scale_list
-            ):
+            if hasattr(self, "experts_up_proj_scales") and None not in self.experts_up_proj_scales and None not in self.experts_gate_proj_scales and None not in self.w2_scale_list:
                 gate_out_dim, gate_in_dim = self.experts_gate_proj_scales[0].shape
                 up_out_dim, up_in_dim = self.experts_up_proj_scales[0].shape
                 assert gate_in_dim == up_in_dim
@@ -516,23 +457,15 @@ class FusedMoeWeightEP(BaseWeight):
                     device="cpu",
                 )
 
-                for i_experts in range(
-                    self.ep_n_routed_experts + self.redundancy_expert_num
-                ):
-                    w1_scale[i_experts, 0:gate_out_dim:, :] = (
-                        self.experts_gate_proj_scales[i_experts]
-                    )
-                    w1_scale[i_experts, gate_out_dim:, :] = self.experts_up_proj_scales[
-                        i_experts
-                    ]
+                for i_experts in range(self.ep_n_routed_experts + self.redundancy_expert_num):
+                    w1_scale[i_experts, 0:gate_out_dim:, :] = self.experts_gate_proj_scales[i_experts]
+                    w1_scale[i_experts, gate_out_dim:, :] = self.experts_up_proj_scales[i_experts]
 
                 inter_shape, hidden_size = (
                     self.w2_scale_list[0].shape[0],
                     self.w2_scale_list[0].shape[1],
                 )
-                w2_scale = torch._utils._flatten_dense_tensors(self.w2_scale_list).view(
-                    len(self.w2_scale_list), inter_shape, hidden_size
-                )
+                w2_scale = torch._utils._flatten_dense_tensors(self.w2_scale_list).view(len(self.w2_scale_list), inter_shape, hidden_size)
                 self.w1[1] = self._cuda(w1_scale)
                 self.w2[1] = self._cuda(w2_scale)
                 delattr(self, "w2_scale_list")
@@ -543,9 +476,7 @@ class FusedMoeWeightEP(BaseWeight):
         n_expert_ep = self.ep_n_routed_experts
         # tp to ep here
         if self.e_score_correction_bias_name in weights:
-            self.e_score_correction_bias = self._cuda(
-                weights[self.e_score_correction_bias_name]
-            )
+            self.e_score_correction_bias = self._cuda(weights[self.e_score_correction_bias_name])
 
         for i_experts_ep in range(n_expert_ep):
             i_experts = i_experts_ep + n_expert_ep * self.global_rank_

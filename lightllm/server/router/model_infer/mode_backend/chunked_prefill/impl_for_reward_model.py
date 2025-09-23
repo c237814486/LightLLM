@@ -15,9 +15,7 @@ class RewardModelBackend(ChunkedPrefillBackend):
         self.prefill = self.reward_prefill
         return
 
-    def reward_prefill(
-        self, event_pack: OverlapEventPack, prefill_reqs: List[InferReq]
-    ):
+    def reward_prefill(self, event_pack: OverlapEventPack, prefill_reqs: List[InferReq]):
 
         assert self.disable_chunked_prefill is True
         model_input, run_reqs = prepare_prefill_inputs(
@@ -39,9 +37,7 @@ class RewardModelBackend(ChunkedPrefillBackend):
             req_obj.cur_kv_len = req_obj.get_cur_total_len()
 
             req_obj.cur_output_len += 1
-            req_obj.set_next_gen_token_id(
-                next_token_id, next_token_logprob, output_len=req_obj.cur_output_len
-            )
+            req_obj.set_next_gen_token_id(next_token_id, next_token_logprob, output_len=req_obj.cur_output_len)
             req_obj.update_finish_status(self.eos_id, output_len=req_obj.cur_output_len)
 
             if self.is_master_in_dp:

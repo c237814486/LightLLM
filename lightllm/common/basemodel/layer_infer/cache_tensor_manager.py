@@ -33,9 +33,7 @@ if torch.__version__ >= "2.1.0" and (not _disable_gpu_tensor_cache):
         inner_tensor: torch.Tensor
         shape_key: Tuple[int, torch.dtype]
         storage_weak_ptr: int
-        shape_to_tensor: Dict[Union[torch.Size, Iterable[int]], torch.Tensor] = field(
-            default_factory=dict
-        )
+        shape_to_tensor: Dict[Union[torch.Size, Iterable[int]], torch.Tensor] = field(default_factory=dict)
 
         def __del__(self):
             UntypedStorage._free_weak_ref(self.storage_weak_ptr)
@@ -47,9 +45,7 @@ if torch.__version__ >= "2.1.0" and (not _disable_gpu_tensor_cache):
         def __init__(self, cuda_graph_max_batch_size: int):
             self.cuda_graph_max_batch_size = cuda_graph_max_batch_size
             # Dict[graph_out_key, Dict[microbatch_index, tensor_chache]]
-            self.graph_out_tensor_dict: Dict[int, Dict[int, torch.Tensor]] = (
-                collections.defaultdict(dict)
-            )
+            self.graph_out_tensor_dict: Dict[int, Dict[int, torch.Tensor]] = collections.defaultdict(dict)
             self.managed_total_tensor_bytes = 0
             return
 
@@ -75,30 +71,18 @@ if torch.__version__ >= "2.1.0" and (not _disable_gpu_tensor_cache):
             microbatch_index_to_tensor_cache = self.graph_out_tensor_dict[graph_out_key]
 
             if microbatch_index not in microbatch_index_to_tensor_cache:
-                graph_out_tensor = torch.empty(
-                    (max_size,), dtype=data_type, device=device, requires_grad=False
-                )
-                logger.info(
-                    f"pid {os.getpid()} cuda graph alloc graph out mem {shape} {data_type} {size} {max_size}"
-                )
-                self.managed_total_tensor_bytes += (
-                    graph_out_tensor.element_size() * graph_out_tensor.numel()
-                )
-                logger.info(
-                    f"cuda graph managed_total_tensor_bytes: {self.managed_total_tensor_bytes}"
-                )
+                graph_out_tensor = torch.empty((max_size,), dtype=data_type, device=device, requires_grad=False)
+                logger.info(f"pid {os.getpid()} cuda graph alloc graph out mem {shape} {data_type} {size} {max_size}")
+                self.managed_total_tensor_bytes += graph_out_tensor.element_size() * graph_out_tensor.numel()
+                logger.info(f"cuda graph managed_total_tensor_bytes: {self.managed_total_tensor_bytes}")
                 microbatch_index_to_tensor_cache[microbatch_index] = graph_out_tensor
 
-            return self.graph_out_tensor_dict[graph_out_key][microbatch_index][
-                0:size
-            ].view(shape)
+            return self.graph_out_tensor_dict[graph_out_key][microbatch_index][0:size].view(shape)
 
     class CacheTensorManager:
         def __init__(self):
             self.ptr_to_bufnode: Dict[int, BufNode] = {}
-            self.free_shape_dtype_to_bufs: Dict[Tuple, List[BufNode]] = (
-                collections.defaultdict(list)
-            )
+            self.free_shape_dtype_to_bufs: Dict[Tuple, List[BufNode]] = collections.defaultdict(list)
             self.calcu_shape_cache: Dict[torch.Size, int] = {}
             self.changed_ptr: Set[int] = set()
             from torch._C import _storage_Use_Count as use_count
@@ -125,14 +109,9 @@ if torch.__version__ >= "2.1.0" and (not _disable_gpu_tensor_cache):
             self.is_cuda_graph = is_cuda_graph
             if self.is_cuda_graph:
                 if self.inner_cuda_graph_manager is None:
-                    self.inner_cuda_graph_manager = CudaGraphCacheTensorManager(
-                        cuda_graph_max_batch_size
-                    )
+                    self.inner_cuda_graph_manager = CudaGraphCacheTensorManager(cuda_graph_max_batch_size)
                 else:
-                    assert (
-                        self.inner_cuda_graph_manager.cuda_graph_max_batch_size
-                        == cuda_graph_max_batch_size
-                    )
+                    assert self.inner_cuda_graph_manager.cuda_graph_max_batch_size == cuda_graph_max_batch_size
                 self.cuda_graph_cur_batch_size = cur_batch_size
                 assert cur_batch_size != 0
             self.cache_env_ok = True
@@ -162,9 +141,7 @@ if torch.__version__ >= "2.1.0" and (not _disable_gpu_tensor_cache):
 
             # cache manager 没有被正常使用时
             if not self.cache_env_ok:
-                return torch.empty(
-                    shape, dtype=data_type, device=device, requires_grad=False
-                )
+                return torch.empty(shape, dtype=data_type, device=device, requires_grad=False)
 
             # 是 cuda graph的时候，由cuda graph manager 接管
             if self.is_cuda_graph:
@@ -182,9 +159,7 @@ if torch.__version__ >= "2.1.0" and (not _disable_gpu_tensor_cache):
             for ptr in self.changed_ptr:
                 t_buf_node = self.ptr_to_bufnode[ptr]
                 if self.use_count(ptr) == 1 + len(t_buf_node.shape_to_tensor):
-                    self.free_shape_dtype_to_bufs[t_buf_node.shape_key].append(
-                        t_buf_node
-                    )
+                    self.free_shape_dtype_to_bufs[t_buf_node.shape_key].append(t_buf_node)
             self.changed_ptr.clear()
 
             if shape not in self.calcu_shape_cache:
@@ -206,9 +181,7 @@ if torch.__version__ >= "2.1.0" and (not _disable_gpu_tensor_cache):
                 ans.storage_weak_ptr = buf_node.storage_weak_ptr
                 return ans
 
-            buf_tensor = torch.empty(
-                (size,), dtype=data_type, device=device, requires_grad=False
-            )
+            buf_tensor = torch.empty((size,), dtype=data_type, device=device, requires_grad=False)
             # 用于调试显存占用的重要日志
             # self.managed_total_tensor_bytes +=  buf_tensor.element_size() * buf_tensor.numel()
             # logger.info(f"gpu cache managed_total_tensor_bytes: {self.managed_total_tensor_bytes}")
@@ -249,9 +222,7 @@ else:
             microbatch_index: int = 0,
             graph_out_key: int = 0,
         ) -> torch.Tensor:
-            return torch.empty(
-                shape, dtype=data_type, device=device, requires_grad=False
-            )
+            return torch.empty(shape, dtype=data_type, device=device, requires_grad=False)
 
 
 global g_cache_manager

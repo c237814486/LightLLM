@@ -69,9 +69,7 @@ def get_custom_input_data(data_path, output_len, tokenizer, range_ratio):
     with open(data_path, "r") as f:
         for line in f.readlines():
             data_line = json.loads(line)
-            input_data = tokenizer.apply_chat_template(
-                data_line["messages"], add_generation_prompt=True, tokenize=False
-            )
+            input_data = tokenizer.apply_chat_template(data_line["messages"], add_generation_prompt=True, tokenize=False)
             input_len = len(tokenizer.encode(input_data))
             prompts.append([input_data, input_len])
     output_lens = get_random_length(len(prompts), output_len, range_ratio)
@@ -357,9 +355,7 @@ def main():
     url = args.url
     tokenizer = get_tokenizer(args.tokenizer_path)
     if args.data_path is not None:
-        prompts, max_new_tokens = get_custom_input_data(
-            args.data_path, args.output_len, tokenizer, args.range_ratio
-        )
+        prompts, max_new_tokens = get_custom_input_data(args.data_path, args.output_len, tokenizer, args.range_ratio)
         args.input_num = len(prompts)
     else:
         # qps发送模式发送请求的数量不固定，这里暂定为input_num的10倍
@@ -423,29 +419,21 @@ def main():
             input_lens.append(input_len)
             valid_num += 1
 
-    print(
-        f"\n\nvalid num = {valid_num}; all data num = {len(results)}; valid ratio = {valid_num * 1.0 / len(results)}\n"
-    )
+    print(f"\n\nvalid num = {valid_num}; all data num = {len(results)}; valid ratio = {valid_num * 1.0 / len(results)}\n")
     print(f"Total QPS: {valid_num / (end_time - start_time)}")
     print(f"Sender QPS: {sent_reqs / (end_time - start_time)}")
     print(f"Avg Input Length: {sum(input_lens) / len(input_lens)}")
     print(f"Avg Output Length: {sum(final_output_lens) / len(final_output_lens)}")
-    print(
-        f"Total Throughput: {(sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)} token/s"
-    )
+    print(f"Total Throughput: {(sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)} token/s")
     print(f"Input Throughput: {sum(input_lens) / (end_time - start_time)} token/s")
-    print(
-        f"Output Throughput: {sum(final_output_lens) / (end_time - start_time)} token/s"
-    )
+    print(f"Output Throughput: {sum(final_output_lens) / (end_time - start_time)} token/s")
     print("-" * 10)
     dump_dict["request_num"] = valid_num
     dump_dict["Total QPS"] = valid_num / (end_time - start_time)
     dump_dict["Sender QPS"] = sent_reqs / (end_time - start_time)
     dump_dict["Avg Input Length"] = sum(input_lens) / len(input_lens)
     dump_dict["Avg Output Length"] = sum(final_output_lens) / len(final_output_lens)
-    dump_dict["Total Throughput"] = (sum(input_lens) + sum(final_output_lens)) / (
-        end_time - start_time
-    )
+    dump_dict["Total Throughput"] = (sum(input_lens) + sum(final_output_lens)) / (end_time - start_time)
     dump_dict["Input Throughput"] = sum(input_lens) / (end_time - start_time)
     dump_dict["Output Throughput"] = sum(final_output_lens) / (end_time - start_time)
 

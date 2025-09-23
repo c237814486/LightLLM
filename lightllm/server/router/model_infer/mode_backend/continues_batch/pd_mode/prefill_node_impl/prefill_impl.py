@@ -55,14 +55,10 @@ class ChunckedPrefillForPrefillNode(ChunkedPrefillBackend):
         return
 
     def _pre_handle_finished_reqs(self, finished_reqs):
-        self._prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(
-            finished_reqs=finished_reqs
-        )
+        self._prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(finished_reqs=finished_reqs)
         return
 
-    def _prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(
-        self, finished_reqs: List[InferReq]
-    ):
+    def _prefill_req_frozen_tokens_and_put_to_kvmove_taskqueue(self, finished_reqs: List[InferReq]):
         if len(finished_reqs) == 0:
             return
 
@@ -81,24 +77,10 @@ class ChunckedPrefillForPrefillNode(ChunkedPrefillBackend):
                 req: InferReq = req
                 key = req.get_input_token_ids()[0 : req.cur_kv_len]
                 key = torch.tensor(key, dtype=torch.int64, device="cpu")
-                value = (
-                    self.model.req_manager.req_to_token_indexs[req.req_idx][
-                        : req.cur_kv_len
-                    ]
-                    .detach()
-                    .cpu()
-                )
+                value = self.model.req_manager.req_to_token_indexs[req.req_idx][: req.cur_kv_len].detach().cpu()
                 prefix_len = self.radix_cache.insert(key, value)
-                old_prefix_len = (
-                    0
-                    if req.shared_kv_node is None
-                    else req.shared_kv_node.node_prefix_total_len
-                )
-                self.model.mem_manager.free(
-                    self.model.req_manager.req_to_token_indexs[req.req_idx][
-                        old_prefix_len:prefix_len
-                    ]
-                )
+                old_prefix_len = 0 if req.shared_kv_node is None else req.shared_kv_node.node_prefix_total_len
+                self.model.mem_manager.free(self.model.req_manager.req_to_token_indexs[req.req_idx][old_prefix_len:prefix_len])
                 if req.shared_kv_node is not None:
                     self.radix_cache.dec_node_ref_counter(req.shared_kv_node)
                     req.shared_kv_node = None
@@ -110,19 +92,13 @@ class ChunckedPrefillForPrefillNode(ChunkedPrefillBackend):
                     # 注意兼容纯tp 和 tp dp 混合模式的逻辑
                     if self.is_master_in_dp:
                         g_router_lock.acquire()
-                        self.shared_token_load.add_frozened_token_count(
-                            len(key), self.dp_rank_in_node
-                        )
+                        self.shared_token_load.add_frozened_token_count(len(key), self.dp_rank_in_node)
                         g_router_lock.release()
 
-                    share_node, kv_len, value = self.radix_cache.match_prefix(
-                        key, update_refs=True
-                    )
+                    share_node, kv_len, value = self.radix_cache.match_prefix(key, update_refs=True)
                     assert len(key) == len(value)
                     # 将下面的请求放入到任务队列中, 注意要使用raidx cache 返回的value
-                    decode_node_info = DecodeNodeInfo(
-                        **req.shm_req.sample_params.move_kv_to_decode_node.to_dict()
-                    )
+                    decode_node_info = DecodeNodeInfo(**req.shm_req.sample_params.move_kv_to_decode_node.to_dict())
                     task = KVMoveTask(
                         group_request_id=req.shm_req.group_req_id,
                         input_tokens=key.tolist(),

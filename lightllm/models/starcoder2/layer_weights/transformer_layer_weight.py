@@ -14,9 +14,7 @@ class Starcoder2TransformerLayerWeight(LlamaTransformerLayerWeight):
 
     def _parse_config(self):
         super()._parse_config()
-        self.network_config_["intermediate_size"] = (
-            self.network_config_["hidden_size"] * 4
-        )
+        self.network_config_["intermediate_size"] = self.network_config_["hidden_size"] * 4
 
     def _init_weight_names(self):
         super()._init_weight_names()
@@ -30,12 +28,8 @@ class Starcoder2TransformerLayerWeight(LlamaTransformerLayerWeight):
         self._down_weight_name = f"model.layers.{self.layer_num_}.mlp.c_proj.weight"
         self._down_bias_name = f"model.layers.{self.layer_num_}.mlp.c_proj.bias"
 
-        self._att_norm_bias_name = (
-            f"model.layers.{self.layer_num_}.input_layernorm.bias"
-        )
-        self._ffn_norm_bias_name = (
-            f"model.layers.{self.layer_num_}.post_attention_layernorm.bias"
-        )
+        self._att_norm_bias_name = f"model.layers.{self.layer_num_}.input_layernorm.bias"
+        self._ffn_norm_bias_name = f"model.layers.{self.layer_num_}.post_attention_layernorm.bias"
 
     def _init_ffn(self):
         self.up_proj = ROWMMWeight(

@@ -16,12 +16,7 @@ def is_tesla():
 
 @lru_cache(maxsize=None)
 def is_hopper():
-    return (
-        "H100" in torch.cuda.get_device_name(0)
-        or "H200" in torch.cuda.get_device_name(0)
-        or "H800" in torch.cuda.get_device_name(0)
-        or "Hopper" in torch.cuda.get_device_name(0)
-    )
+    return "H100" in torch.cuda.get_device_name(0) or "H200" in torch.cuda.get_device_name(0) or "H800" in torch.cuda.get_device_name(0) or "Hopper" in torch.cuda.get_device_name(0)
 
 
 @lru_cache(maxsize=None)
@@ -174,9 +169,7 @@ def get_gpu_compute_mode(gpu_index=0):
             "--query-gpu=compute_mode",
             "--format=csv,noheader",
         ]
-        result = subprocess.run(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
         if result.returncode != 0:
             logger.warning(f"Failed to query compute mode: {result.stderr.strip()}")
@@ -232,13 +225,9 @@ def set_sm_limit(percent: int, gpu_index=0):
 
     mode = get_gpu_compute_mode(gpu_index)
     if mode != "Exclusive_Process":
-        logger.warning(
-            f"Cannot set SM limit. GPU {gpu_index} is in '{mode}' mode, not 'Exclusive_Process'."
-        )
+        logger.warning(f"Cannot set SM limit. GPU {gpu_index} is in '{mode}' mode, not 'Exclusive_Process'.")
         return False
 
     os.environ["CUDA_MPS_ACTIVE_THREAD_PERCENTAGE"] = str(percent)
-    logger.info(
-        f"Set CUDA_MPS_ACTIVE_THREAD_PERCENTAGE to {percent}% for GPU {gpu_index}."
-    )
+    logger.info(f"Set CUDA_MPS_ACTIVE_THREAD_PERCENTAGE to {percent}% for GPU {gpu_index}.")
     return True

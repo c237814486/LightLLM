@@ -9,9 +9,7 @@ from lightllm.utils.dist_utils import init_vision_distributed_env
 import argparse
 
 
-def test_model_inference(
-    world_size, weight_dir, quant_type=None, batch_size=1, image_size=448
-):
+def test_model_inference(world_size, weight_dir, quant_type=None, batch_size=1, image_size=448):
     workers = []
     for rank_id in range(world_size):
         kvargs = {
@@ -26,9 +24,7 @@ def test_model_inference(
             "quant_cfg": None,
         }
 
-        proc = multiprocessing.Process(
-            target=tppart_model_infer, args=(kvargs, batch_size, image_size)
-        )
+        proc = multiprocessing.Process(target=tppart_model_infer, args=(kvargs, batch_size, image_size))
         proc.start()
         workers.append(proc)
 
@@ -46,9 +42,7 @@ def tppart_model_infer(model_kvargs, batch_size, image_size):
 
     torch.cuda.empty_cache()
     model_part = VisionTransformer(model_kvargs)
-    test_data = (
-        torch.randn((batch_size, 3, image_size, image_size)).cuda().to(torch.bfloat16)
-    )
+    test_data = torch.randn((batch_size, 3, image_size, image_size)).cuda().to(torch.bfloat16)
     # warm up
     torch.cuda.synchronize()
     for i in range(10):

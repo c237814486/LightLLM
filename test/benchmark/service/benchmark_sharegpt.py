@@ -70,10 +70,7 @@ def sample_requests(
     # Filter out the conversations with less than 2 turns.
     dataset = [data for data in dataset if len(data["conversations"]) >= 2]
     # Only keep the first two turns of each conversation.
-    dataset = [
-        (data["conversations"][0]["value"], data["conversations"][1]["value"])
-        for data in dataset
-    ]
+    dataset = [(data["conversations"][0]["value"], data["conversations"][1]["value"]) for data in dataset]
 
     print("read data set finish")
     # Tokenize the prompts and completions.
@@ -191,41 +188,23 @@ def main(args: argparse.Namespace):
     # Compute the latency statistics.
     avg_latency = np.mean([latency for _, _, latency in REQUEST_LATENCY])
     print(f"Average latency: {avg_latency:.2f} s")
-    avg_per_token_latency = np.mean(
-        [
-            latency / (prompt_len + output_len)
-            for prompt_len, output_len, latency in REQUEST_LATENCY
-        ]
-    )
+    avg_per_token_latency = np.mean([latency / (prompt_len + output_len) for prompt_len, output_len, latency in REQUEST_LATENCY])
     print(f"Average latency per token: {avg_per_token_latency:.2f} s")
-    avg_per_output_token_latency = np.mean(
-        [latency / output_len for _, output_len, latency in REQUEST_LATENCY]
-    )
+    avg_per_output_token_latency = np.mean([latency / output_len for _, output_len, latency in REQUEST_LATENCY])
     print("Average latency per output token: " f"{avg_per_output_token_latency:.2f} s")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Benchmark the online serving throughput."
-    )
-    parser.add_argument(
-        "--dataset", type=str, required=True, help="Path to the dataset."
-    )
-    parser.add_argument(
-        "--tokenizer", type=str, required=True, help="Name or path of the tokenizer."
-    )
+    parser = argparse.ArgumentParser(description="Benchmark the online serving throughput.")
+    parser.add_argument("--dataset", type=str, required=True, help="Path to the dataset.")
+    parser.add_argument("--tokenizer", type=str, required=True, help="Name or path of the tokenizer.")
     parser.add_argument(
         "--request-rate",
         type=float,
         default=float("inf"),
-        help="Number of requests per second. If this is inf, "
-        "then all the requests are sent at time 0. "
-        "Otherwise, we use Poisson process to synthesize "
-        "the request arrival times.",
+        help="Number of requests per second. If this is inf, " "then all the requests are sent at time 0. " "Otherwise, we use Poisson process to synthesize " "the request arrival times.",
     )
-    parser.add_argument(
-        "--num-prompts", type=int, default=1000, help="Number of prompts to process."
-    )
+    parser.add_argument("--num-prompts", type=int, default=1000, help="Number of prompts to process.")
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
     main(args)

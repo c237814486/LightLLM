@@ -19,9 +19,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 os.environ.setdefault("TYPEGUARD_DISABLE", "true")
 
 # 设置日志
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("launcher")
 
 
@@ -61,22 +59,14 @@ def prepare_tts_env(env: dict) -> dict:
 
     if os.path.exists(light_tts_path):
         current_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = (
-            f"{light_tts_path}:{current_pythonpath}"
-            if current_pythonpath
-            else light_tts_path
-        )
+        env["PYTHONPATH"] = f"{light_tts_path}:{current_pythonpath}" if current_pythonpath else light_tts_path
         logger.info(f"设置light_tts路径: {light_tts_path}")
 
     # 设置cosyvoice路径
     cosyvoice_path = os.path.join(base_dir, "cosyvoice")
     if os.path.exists(cosyvoice_path):
         current_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = (
-            f"{cosyvoice_path}:{current_pythonpath}"
-            if current_pythonpath
-            else cosyvoice_path
-        )
+        env["PYTHONPATH"] = f"{cosyvoice_path}:{current_pythonpath}" if current_pythonpath else cosyvoice_path
     env["PYTHONWARNINGS"] = "ignore::DeprecationWarning,ignore::FutureWarning"
     # 设置pretrained_models路径
     if getattr(sys, "frozen", False):
@@ -88,9 +78,7 @@ def prepare_tts_env(env: dict) -> dict:
 
         if os.path.exists(pretrained_models_path):
             env["COSYVOICE_PRETRAINED_MODELS"] = os.path.abspath(pretrained_models_path)
-            logger.info(
-                f"设置pretrained_models路径: {os.path.abspath(pretrained_models_path)}"
-            )
+            logger.info(f"设置pretrained_models路径: {os.path.abspath(pretrained_models_path)}")
 
         # 设置assets路径
         assets_path = os.path.join(base_dir, "assets")
@@ -108,11 +96,7 @@ def prepare_llm_env(env: dict) -> dict:
     lightllm_path = os.path.join(base_dir, "lightllm")
     if os.path.exists(lightllm_path):
         current_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = (
-            f"{lightllm_path}:{current_pythonpath}"
-            if current_pythonpath
-            else lightllm_path
-        )
+        env["PYTHONPATH"] = f"{lightllm_path}:{current_pythonpath}" if current_pythonpath else lightllm_path
         logger.info(f"设置lightllm路径: {lightllm_path}")
 
     # 配置lightllm_kernel路径
@@ -123,11 +107,7 @@ def prepare_llm_env(env: dict) -> dict:
     env["PYTHONWARNINGS"] = "ignore::DeprecationWarning,ignore::FutureWarning"
     if os.path.exists(kernel_pkg_dir):
         current_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = (
-            f"{kernel_pkg_dir}:{current_pythonpath}"
-            if current_pythonpath
-            else kernel_pkg_dir
-        )
+        env["PYTHONPATH"] = f"{kernel_pkg_dir}:{current_pythonpath}" if current_pythonpath else kernel_pkg_dir
 
         # 动态库搜索路径
         ld_paths = [
@@ -139,9 +119,7 @@ def prepare_llm_env(env: dict) -> dict:
         ld_old = env.get("LD_LIBRARY_PATH", "")
         ld_new_parts = [p for p in ld_paths if os.path.exists(p)]
         if ld_new_parts:
-            env["LD_LIBRARY_PATH"] = ":".join(
-                ld_new_parts + ([ld_old] if ld_old else [])
-            )
+            env["LD_LIBRARY_PATH"] = ":".join(ld_new_parts + ([ld_old] if ld_old else []))
 
     # LLM特定优化设置
     env.setdefault("TRITON_DISABLE_JIT", "0")
@@ -343,9 +321,7 @@ def launch_llm_service(args):
             ]
         )
     if args.enable_multimodal_audio:
-        server_args.extend(
-            ["--enable_multimodal_audio", "--audio_gpu_ids", args.audio_gpu_ids]
-        )
+        server_args.extend(["--enable_multimodal_audio", "--audio_gpu_ids", args.audio_gpu_ids])
 
     old_argv = list(sys.argv)
     sys.argv = server_args
@@ -394,31 +370,21 @@ def main():
     parser = argparse.ArgumentParser(description="统一服务启动器 - 支持TTS和LLM服务")
 
     # 服务选择
-    parser.add_argument(
-        "--service", choices=["tts", "llm"], help="选择要启动的服务类型"
-    )
+    parser.add_argument("--service", choices=["tts", "llm"], help="选择要启动的服务类型")
 
     # 通用参数
     parser.add_argument("--model_dir", type=str, required=True, help="模型目录路径")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="服务器主机地址")
-    parser.add_argument(
-        "--port", type=int, default=8080, help="服务器端口 (TTS默认8089, LLM默认8000)"
-    )
+    parser.add_argument("--port", type=int, default=8080, help="服务器端口 (TTS默认8089, LLM默认8000)")
 
     # TTS特定参数
-    parser.add_argument(
-        "--tts_mode", type=str, default="triton_flashdecoding", help="TTS推理模式"
-    )
+    parser.add_argument("--tts_mode", type=str, default="triton_flashdecoding", help="TTS推理模式")
     parser.add_argument("--bert_process_num", type=int, default=1, help="BERT进程数量")
-    parser.add_argument(
-        "--decode_process_num", type=int, default=1, help="解码进程数量"
-    )
+    parser.add_argument("--decode_process_num", type=int, default=1, help="解码进程数量")
     parser.add_argument("--encode_paral_num", type=int, default=50, help="编码并行数量")
     parser.add_argument("--gpt_paral_num", type=int, default=50, help="GPT并行数量")
     parser.add_argument("--decode_paral_num", type=int, default=1, help="解码并行数量")
-    parser.add_argument(
-        "--max_req_input_len", type=int, default=1024, help="解码并行数量"
-    )
+    parser.add_argument("--max_req_input_len", type=int, default=1024, help="解码并行数量")
 
     # LLM特定参数
     parser.add_argument(
@@ -433,59 +399,31 @@ def main():
         default="normal",
         help="LLM运行模式 (normal/prefill/decode等)",
     )
-    parser.add_argument(
-        "--data_type", type=str, default="bf16", help="数据类型 (bf16/fp16/fp8等)"
-    )
+    parser.add_argument("--data_type", type=str, default="bf16", help="数据类型 (bf16/fp16/fp8等)")
     parser.add_argument("--quant_type", type=str, help="量化类型")
-    parser.add_argument(
-        "--max_req_total_len", type=int, default=4000, help="最大请求总长度"
-    )
-    parser.add_argument(
-        "--max_total_token_num", type=int, default=4096, help="最大总token数"
-    )
+    parser.add_argument("--max_req_total_len", type=int, default=4000, help="最大请求总长度")
+    parser.add_argument("--max_total_token_num", type=int, default=4096, help="最大总token数")
     parser.add_argument("--cache_capacity", type=int, default=1000, help="缓存容量")
     parser.add_argument("--mem_fraction", type=float, default=0.85, help="内存使用比例")
     parser.add_argument("--tp", type=int, default=1, help="张量并行度")
     parser.add_argument("--nccl_port", type=int, default=29500, help="NCCL端口")
     # 多模态配置参数
-    parser.add_argument(
-        "--enable_multimodal", action="store_true", help="启用多模态支持"
-    )
-    parser.add_argument(
-        "--enable_multimodal_audio", action="store_true", help="启用多模态语音支持"
-    )
-    parser.add_argument(
-        "--visual_gpu_ids", type=str, default="0", help="视觉处理GPU ID"
-    )
+    parser.add_argument("--enable_multimodal", action="store_true", help="启用多模态支持")
+    parser.add_argument("--enable_multimodal_audio", action="store_true", help="启用多模态语音支持")
+    parser.add_argument("--visual_gpu_ids", type=str, default="0", help="视觉处理GPU ID")
     parser.add_argument("--audio_gpu_ids", type=str, default="0", help="音频处理GPU ID")
-    parser.add_argument(
-        "--visual_nccl_ports", type=int, default=29501, help="视觉NCCL端口"
-    )
-    parser.add_argument(
-        "--visual_infer_batch_size", type=int, default=8, help="视觉推理批次大小"
-    )
+    parser.add_argument("--visual_nccl_ports", type=int, default=29501, help="视觉NCCL端口")
+    parser.add_argument("--visual_infer_batch_size", type=int, default=8, help="视觉推理批次大小")
 
     # 其他配置参数
     parser.add_argument("--tokenizer_mode", type=str, default="auto", help="分词器模式")
     parser.add_argument("--trust_remote_code", action="store_true", help="信任远程代码")
-    parser.add_argument(
-        "--use_dynamic_prompt_cache", action="store_true", help="使用动态提示缓存"
-    )
-    parser.add_argument(
-        "--sampling_backend", type=str, default="triton_top_kp", help="采样后端"
-    )
-    parser.add_argument(
-        "--enable_concurrent_alloc", action="store_true", help="启用并发分配"
-    )
-    parser.add_argument(
-        "--graph_max_batch_size", type=int, default=4, help="图最大批次大小"
-    )
-    parser.add_argument(
-        "--graph_max_len_in_batch", type=int, default=1024, help="批次中图最大长度"
-    )
-    parser.add_argument(
-        "--chunked_prefill_size", type=int, default=1024, help="分块预填充大小"
-    )
+    parser.add_argument("--use_dynamic_prompt_cache", action="store_true", help="使用动态提示缓存")
+    parser.add_argument("--sampling_backend", type=str, default="triton_top_kp", help="采样后端")
+    parser.add_argument("--enable_concurrent_alloc", action="store_true", help="启用并发分配")
+    parser.add_argument("--graph_max_batch_size", type=int, default=4, help="图最大批次大小")
+    parser.add_argument("--graph_max_len_in_batch", type=int, default=1024, help="批次中图最大长度")
+    parser.add_argument("--chunked_prefill_size", type=int, default=1024, help="分块预填充大小")
 
     args = parser.parse_args()
     print("DEBUG: args.model_dir =", args.model_dir)

@@ -59,21 +59,12 @@ def get_model_config(model_name: str, tp_size: int):
         intermediate_size = config.intermediate_size
         shard_intermediate_size = 2 * intermediate_size // tp_size
 
-    vllm_version_num = (
-        vllm.__version_tuple__[0] * 100
-        + vllm.__version_tuple__[1] * 10
-        + vllm.__version_tuple__[2]
-    )
+    vllm_version_num = vllm.__version_tuple__[0] * 100 + vllm.__version_tuple__[1] * 10 + vllm.__version_tuple__[2]
     block_shape = None
-    if (
-        hasattr(config, "quantization_config")
-        and "weight_block_size" in config.quantization_config
-    ):
+    if hasattr(config, "quantization_config") and "weight_block_size" in config.quantization_config:
         block_shape = config.quantization_config["weight_block_size"]
         assert len(block_shape) == 2
-        assert (
-            vllm_version_num >= 66
-        ), "Block-wise quantized fp8 fused_moe is only supported for VLLM>=0.6.6.post1"
+        assert vllm_version_num >= 66, "Block-wise quantized fp8 fused_moe is only supported for VLLM>=0.6.6.post1"
 
     shape_configs = {
         "num_experts": E,
@@ -245,12 +236,8 @@ def benchmark(batch_size, provider, model_config, use_fp8=False):
 
     if use_fp8:
         init_dtype = dtype
-        w1 = torch.randn(
-            num_experts, shard_intermediate_size, hidden_size, dtype=init_dtype
-        )
-        w2 = torch.randn(
-            num_experts, hidden_size, shard_intermediate_size // 2, dtype=init_dtype
-        )
+        w1 = torch.randn(num_experts, shard_intermediate_size, hidden_size, dtype=init_dtype)
+        w2 = torch.randn(num_experts, hidden_size, shard_intermediate_size // 2, dtype=init_dtype)
         w1 = w1.to(torch.float8_e4m3fn)
         w2 = w2.to(torch.float8_e4m3fn)
 
@@ -265,30 +252,16 @@ def benchmark(batch_size, provider, model_config, use_fp8=False):
             n_tiles_w2 = (hidden_size + block_n - 1) // block_n
             k_tiles_w1 = (hidden_size + block_k - 1) // block_k
             k_tiles_w2 = (shard_intermediate_size // 2 + block_k - 1) // block_k
-            w1_scale = torch.rand(
-                (num_experts, n_tiles_w1, k_tiles_w1), dtype=torch.float32
-            )
-            w2_scale = torch.rand(
-                (num_experts, n_tiles_w2, k_tiles_w2), dtype=torch.float32
-            )
+            w1_scale = torch.rand((num_experts, n_tiles_w1, k_tiles_w1), dtype=torch.float32)
+            w2_scale = torch.rand((num_experts, n_tiles_w2, k_tiles_w2), dtype=torch.float32)
     else:
         w1 = torch.randn(num_experts, shard_intermediate_size, hidden_size, dtype=dtype)
-        w2 = torch.randn(
-            num_experts, hidden_size, shard_intermediate_size // 2, dtype=dtype
-        )
+        w2 = torch.randn(num_experts, hidden_size, shard_intermediate_size // 2, dtype=dtype)
 
     input_gating = torch.randn(num_tokens, num_experts, dtype=torch.float32)
 
     # Warmup
-    api_func = (
-        fused_moe_vllm_api
-        if provider == "vllm_fused_moe_triton"
-        else (
-            fused_moe_sglang_api
-            if provider == "lightllm_fused_moe_triton"
-            else fused_moe_lightllm_api
-        )
-    )
+    api_func = fused_moe_vllm_api if provider == "vllm_fused_moe_triton" else (fused_moe_sglang_api if provider == "lightllm_fused_moe_triton" else fused_moe_lightllm_api)
     for _ in range(10):
         api_func(
             x,
@@ -327,9 +300,7 @@ def benchmark(batch_size, provider, model_config, use_fp8=False):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model", type=str, default="mistralai/Mixtral-8x7B-Instruct-v0.1"
-    )
+    parser.add_argument("--model", type=str, default="mistralai/Mixtral-8x7B-Instruct-v0.1")
     parser.add_argument("--tp-size", type=int, default=8)
     parser.add_argument("--use-fp8", action="store_true")
     parser.add_argument(

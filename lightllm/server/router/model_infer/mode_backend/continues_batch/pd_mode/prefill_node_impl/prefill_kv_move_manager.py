@@ -47,14 +47,10 @@ class PrefillKVMoveManager:
         self.connect_id_to_trans_obj: Dict[str, KVTransConnectObj] = {}
 
         for port in self.args.pd_node_infer_rpyc_ports:
-            socket_path = (
-                f"/tmp/{get_unique_server_name()}_prefill_node_infer_rpyc_{port}"
-            )
+            socket_path = f"/tmp/{get_unique_server_name()}_prefill_node_infer_rpyc_{port}"
             from rpyc.utils.factory import unix_connect
 
-            con = retry(max_attempts=20, wait_time=2)(unix_connect)(
-                socket_path, config={"allow_pickle": True}
-            )
+            con = retry(max_attempts=20, wait_time=2)(unix_connect)(socket_path, config={"allow_pickle": True})
             self.infer_rpyc_objs.append(con.root)
             logger.info(f"rpyc connect to infer rpyc port: {port} ok")
         self.host_ip = get_hostname_ip()
@@ -65,12 +61,8 @@ class PrefillKVMoveManager:
 
         self.kv_trans_lock = threading.Lock()
         # 释放token的task队列
-        self.release_task_queue = TaskQueue(
-            lambda datas: datas[0:KV_MOVE_MAX_NUM], fail_func=None
-        )
-        self.release_tasks_thread = threading.Thread(
-            target=self.handle_release_task_loop, daemon=True
-        )
+        self.release_task_queue = TaskQueue(lambda datas: datas[0:KV_MOVE_MAX_NUM], fail_func=None)
+        self.release_tasks_thread = threading.Thread(target=self.handle_release_task_loop, daemon=True)
         self.release_tasks_thread.start()
 
         from .prefill_trans_obj import KVTransProcess
@@ -119,9 +111,7 @@ class PrefillKVMoveManager:
 
     def handle_release_task_loop(self):
         while True:
-            handle_list: List[KVMoveTask] = self.release_task_queue.get_tasks(
-                log_tag="release_task_queue"
-            )
+            handle_list: List[KVMoveTask] = self.release_task_queue.get_tasks(log_tag="release_task_queue")
             if len(handle_list) == 0:
                 time.sleep(0.01)
             else:
@@ -167,11 +157,7 @@ class PrefillKVMoveManager:
                 conn_end = (prefill_dp_index + 1) * self.dp_world_size
                 conns = self.infer_rpyc_objs[conn_start:conn_end]
                 for conn in conns:
-                    futures.append(
-                        rpyc.async_(conn.remove_req_refs_from_prompt_cache)(
-                            [task.group_request_id for task in _tasks]
-                        )
-                    )
+                    futures.append(rpyc.async_(conn.remove_req_refs_from_prompt_cache)([task.group_request_id for task in _tasks]))
             asyncio.run(self.wait_all_future_finish(futures))
         return
 
@@ -201,9 +187,7 @@ class PrefillKVMoveManager:
             trans_obj = self.connect_id_to_trans_obj.pop(connect_id, None)
             if trans_obj is not None:
                 trans_obj.set_has_error()
-                logger.error(
-                    f"remove tran obj decode_node_id {trans_obj.decode_node_id}"
-                )
+                logger.error(f"remove tran obj decode_node_id {trans_obj.decode_node_id}")
         return
 
     def __get_trans_obj(self, task: KVMoveTask):
@@ -248,9 +232,7 @@ def _init_env(args, info_queue: mp.Queue, mem_queues: List[mp.Queue], event: mp.
     graceful_registry(inspect.currentframe().f_code.co_name)
 
     manager = PrefillKVMoveManager(args, info_queue, mem_queues)
-    kv_trans_process_check = threading.Thread(
-        target=manager.check_trans_process_loop, daemon=True
-    )
+    kv_trans_process_check = threading.Thread(target=manager.check_trans_process_loop, daemon=True)
     kv_trans_process_check.start()
     event.set()
     # 进入主循环
@@ -258,9 +240,7 @@ def _init_env(args, info_queue: mp.Queue, mem_queues: List[mp.Queue], event: mp.
     return
 
 
-def start_prefill_kv_move_manager_process(
-    args, info_queue: mp.Queue, mem_queues: List[mp.Queue]
-):
+def start_prefill_kv_move_manager_process(args, info_queue: mp.Queue, mem_queues: List[mp.Queue]):
     event = mp.Event()
     proc = mp.Process(target=_init_env, args=(args, info_queue, mem_queues, event))
     proc.start()

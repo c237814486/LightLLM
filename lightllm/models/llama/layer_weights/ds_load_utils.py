@@ -16,12 +16,8 @@ def load_ds_weights(
     if weight_dict:
         return weight_dict
     files = os.listdir(weight_dir)
-    candidate_files = sorted(
-        list(filter(lambda x: x.endswith(".pt") and x.startswith("layer"), files))
-    )
-    assert (
-        len(candidate_files) != 0
-    ), "can only support pytorch tensor format for weights."
+    candidate_files = sorted(list(filter(lambda x: x.endswith(".pt") and x.startswith("layer"), files)))
+    assert len(candidate_files) != 0, "can only support pytorch tensor format for weights."
     if weight_dict:
         weights_all = weight_dict
     else:
@@ -43,13 +39,7 @@ def load_ds_weights(
                 if k not in weights_all:
                     weights_all[k] = v
                 else:
-                    if (
-                        "q_proj" in k
-                        or "k_proj" in k
-                        or "v_proj" in k
-                        or "gate_proj" in k
-                        or "up_proj" in k
-                    ):
+                    if "q_proj" in k or "k_proj" in k or "v_proj" in k or "gate_proj" in k or "up_proj" in k:
                         weights_all[k] = torch.cat([weights_all[k], v], dim=0)
                     elif "o_proj" in k or "down_proj" in k:
                         weights_all[k] = torch.cat([weights_all[k], v], dim=1)
@@ -66,6 +56,4 @@ def load_ds_weights(
 
 
 if __name__ == "__main__":
-    load_ds_weight(
-        "fp16", "/nvme/baishihao/llama7b", prefix="model.layers.", num_layer=32
-    )
+    load_ds_weight("fp16", "/nvme/baishihao/llama7b", prefix="model.layers.", num_layer=32)

@@ -26,9 +26,7 @@ def health_monitor(url, all_process_ids):
                 logger.info("Health check passed")
                 consecutive_failures = 0
             else:
-                raise Exception(
-                    f"Health check failed with status code: {response.status_code}"
-                )
+                raise Exception(f"Health check failed with status code: {response.status_code}")
         else:
             raise Exception("not all processes is alive")
     except asyncio.TimeoutError:

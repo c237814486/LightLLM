@@ -17,11 +17,7 @@ class Phi3TransformerLayerWeight(LlamaTransformerLayerWeight):
         if qkv_weight_name in weights:
             qkv_weight_ = weights[qkv_weight_name]
             n_embed = self.network_config_["hidden_size"]
-            kv_n_embed = (
-                n_embed
-                // self.network_config_["num_attention_heads"]
-                * self.network_config_["num_key_value_heads"]
-            )
+            kv_n_embed = n_embed // self.network_config_["num_attention_heads"] * self.network_config_["num_key_value_heads"]
             q_weight_ = qkv_weight_[:n_embed, :]
             k_weight_ = qkv_weight_[n_embed : n_embed + kv_n_embed, :]
             v_weight_ = qkv_weight_[n_embed + kv_n_embed : n_embed + 2 * kv_n_embed, :]

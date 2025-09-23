@@ -53,27 +53,16 @@ def _fwd_kernel_token_att1(
         q = tl.load(Q + off_q + start_mark)
         offs_n_new = cur_batch_start_index + offs_n
         k_loc = tl.load(
-            Req_to_tokens
-            + stride_req_to_tokens_b * cur_batch_req_id
-            + stride_req_to_tokens_s * offs_n_new,
+            Req_to_tokens + stride_req_to_tokens_b * cur_batch_req_id + stride_req_to_tokens_s * offs_n_new,
             mask=offs_n_new < cur_batch_end_index,
             other=0,
         )
-        off_k = (
-            k_loc[:, None] * stride_kbs
-            + cur_head * stride_kh
-            + offs_d[None, :] * stride_kd
-        )
-        k = tl.load(
-            K + off_k, mask=offs_n_new[:, None] < cur_batch_end_index, other=0.0
-        )
+        off_k = k_loc[:, None] * stride_kbs + cur_head * stride_kh + offs_d[None, :] * stride_kd
+        k = tl.load(K + off_k, mask=offs_n_new[:, None] < cur_batch_end_index, other=0.0)
         att_value = tl.sum(q[None, :] * k, 1)
         att_value *= sm_scale
         att_value -= alibi_m * (cur_batch_seq_len - 1 - offs_n)
-        off_o = (
-            cur_head * att_stride_h
-            + (cur_batch_in_all_start_index + offs_n) * att_stride_bs
-        )
+        off_o = cur_head * att_stride_h + (cur_batch_in_all_start_index + offs_n) * att_stride_bs
         tl.store(Att_Out + off_o, att_value, mask=offs_n_new < cur_batch_end_index)
     return
 
@@ -95,7 +84,7 @@ def token_att_fwd(
     Lq, Lk = q.shape[-1], k.shape[-1]
     assert Lq == Lk
     assert Lk in {16, 32, 64, 128}
-    sm_scale = 1.0 / (Lk**0.5)
+    sm_scale = 1.0 / (Lk ** 0.5)
 
     batch, head_num = B_req_idx.shape[0], q.shape[1]
 
@@ -138,12 +127,7 @@ def torch_att(xq, xk, bs, seqlen, num_head, head_dim):
     keys = xk
     xq = xq.transpose(1, 2)
     keys = keys.transpose(1, 2)
-    scores = (
-        (torch.matmul(xq, keys.transpose(2, 3)) / math.sqrt(head_dim))
-        .squeeze()
-        .transpose(0, 1)
-        .reshape(num_head, -1)
-    )
+    scores = (torch.matmul(xq, keys.transpose(2, 3)) / math.sqrt(head_dim)).squeeze().transpose(0, 1).reshape(num_head, -1)
     print("s  ", scores.shape)
     return scores
 

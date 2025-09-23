@@ -43,18 +43,10 @@ def test_decode_attentions(
     state.batch_size = q_shape[0]
     state.max_len_in_batch = test_seq_len
     state.req_manager = tmp_class()
-    state.req_manager.req_to_token_indexs = torch.zeros(
-        (state.batch_size, state.max_len_in_batch), dtype=torch.int32, device="cuda"
-    )
-    state.req_manager.req_to_token_indexs.view(-1)[:] = torch.arange(
-        0, state.batch_size * state.max_len_in_batch, step=1, dtype=torch.int32
-    ).cuda()
-    state.b_req_idx = torch.arange(
-        0, state.batch_size, step=1, dtype=torch.int32
-    ).cuda()
-    state.b_seq_len = torch.full(
-        (state.batch_size,), fill_value=test_seq_len, dtype=torch.int32
-    ).cuda()
+    state.req_manager.req_to_token_indexs = torch.zeros((state.batch_size, state.max_len_in_batch), dtype=torch.int32, device="cuda")
+    state.req_manager.req_to_token_indexs.view(-1)[:] = torch.arange(0, state.batch_size * state.max_len_in_batch, step=1, dtype=torch.int32).cuda()
+    state.b_req_idx = torch.arange(0, state.batch_size, step=1, dtype=torch.int32).cuda()
+    state.b_seq_len = torch.full((state.batch_size,), fill_value=test_seq_len, dtype=torch.int32).cuda()
 
     args = []
     q_head_dim = q_shape[2]
@@ -64,7 +56,7 @@ def test_decode_attentions(
     state.q_head_num = q_head_num
     state.q_head_dim = q_head_dim
     state.kv_head_num = kv_head_num
-    state.softmax_scale = 1 / (q_head_dim**0.5)
+    state.softmax_scale = 1 / (q_head_dim ** 0.5)
     state.total_token_num = state.batch_size * test_seq_len
 
     infer_state = state
@@ -134,10 +126,7 @@ def worker(
             dog.heartbeat()
             queue.put(cost_time)  # Put result in queue
     except Exception as ex:
-        logger.error(
-            str(ex)
-            + f" config {tuning_config} q_shape {q_shape} kv_shape {kv_shape} test_seq_len {test_seq_len} dtype {dtype}"
-        )
+        logger.error(str(ex) + f" config {tuning_config} q_shape {q_shape} kv_shape {kv_shape} test_seq_len {test_seq_len} dtype {dtype}")
         import sys
         import traceback
 

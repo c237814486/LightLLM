@@ -49,9 +49,7 @@ class BloomTpPartModel(TpPartBaseModel):
         return
 
     def _init_weights(self):
-        self.pre_post_weight = self.pre_and_post_weight_class(
-            self.data_type, network_config=self.config, mode=self.mode
-        )
+        self.pre_post_weight = self.pre_and_post_weight_class(self.data_type, network_config=self.config, mode=self.mode)
         self.trans_layers_weight = [
             self.transformer_weight_class(
                 i,

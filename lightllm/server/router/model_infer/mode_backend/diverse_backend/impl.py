@@ -25,9 +25,7 @@ class DiversehBackend(ChunkedPrefillBackend):
         self.prefill = self.beam_prefill
         self.classed_req_strict_prefill = True
 
-    def diverse_copy(
-        self, groups: List[InferReqGroup]
-    ) -> Tuple[List[int], List[InferReq]]:
+    def diverse_copy(self, groups: List[InferReqGroup]) -> Tuple[List[int], List[InferReq]]:
         batch_idx = []
         run_reqs = []
         for i in range(len(groups)):
@@ -43,16 +41,8 @@ class DiversehBackend(ChunkedPrefillBackend):
 
     def beam_prefill(self, event_pack: OverlapEventPack, prefill_reqs: List[InferReq]):
         # 第一阶段
-        group_reqs = [
-            g_infer_context.requests_mapping[req.req_id]
-            for req in prefill_reqs
-            if convert_sub_id_to_group_id(req.req_id) == req.req_id
-        ]
-        groups = [
-            g_infer_context.group_mapping[req.req_id]
-            for req in prefill_reqs
-            if convert_sub_id_to_group_id(req.req_id) == req.req_id
-        ]
+        group_reqs = [g_infer_context.requests_mapping[req.req_id] for req in prefill_reqs if convert_sub_id_to_group_id(req.req_id) == req.req_id]
+        groups = [g_infer_context.group_mapping[req.req_id] for req in prefill_reqs if convert_sub_id_to_group_id(req.req_id) == req.req_id]
 
         model_input, group_run_reqs = prepare_prefill_inputs(
             group_reqs,
@@ -69,15 +59,9 @@ class DiversehBackend(ChunkedPrefillBackend):
             b_req_idx = [req.req_idx for req in run_reqs]
             b_has_out = [model_input.b_prefill_has_output_cpu[i] for i in batch_idx]
 
-            batch_idx = g_pin_mem_manager.gen_from_list(
-                key="batch_idx_", data=batch_idx, dtype=torch.int64
-            ).cuda(non_blocking=True)
-            b_req_idx = g_pin_mem_manager.gen_from_list(
-                key="b_req_idx_", data=b_req_idx, dtype=torch.int32
-            ).cuda(non_blocking=True)
-            b_has_out = g_pin_mem_manager.gen_from_list(
-                key="b_has_out_", data=b_has_out, dtype=torch.bool
-            ).cuda(non_blocking=True)
+            batch_idx = g_pin_mem_manager.gen_from_list(key="batch_idx_", data=batch_idx, dtype=torch.int64).cuda(non_blocking=True)
+            b_req_idx = g_pin_mem_manager.gen_from_list(key="b_req_idx_", data=b_req_idx, dtype=torch.int32).cuda(non_blocking=True)
+            b_has_out = g_pin_mem_manager.gen_from_list(key="b_has_out_", data=b_has_out, dtype=torch.bool).cuda(non_blocking=True)
 
             logits = logits[batch_idx]
             b_mtp_index = model_input.b_mtp_index[batch_idx]
@@ -92,11 +76,9 @@ class DiversehBackend(ChunkedPrefillBackend):
                 b_has_out=b_has_out,
             )
 
-            next_token_ids_cpu, next_token_logprobs_cpu = (
-                self._async_copy_next_token_infos_to_pin_mem(
-                    next_token_ids=next_token_ids,
-                    next_token_logprobs=next_token_logprobs,
-                )
+            next_token_ids_cpu, next_token_logprobs_cpu = self._async_copy_next_token_infos_to_pin_mem(
+                next_token_ids=next_token_ids,
+                next_token_logprobs=next_token_logprobs,
             )
 
             sync_event = torch.cuda.Event()
@@ -104,9 +86,7 @@ class DiversehBackend(ChunkedPrefillBackend):
 
         # 第二阶段
         event_pack.notify_post_handle_and_wait_pre_post_handle()
-        update_packs = self._pre_post_handle(
-            run_reqs, is_chuncked_mode=not self.disable_chunked_prefill
-        )
+        update_packs = self._pre_post_handle(run_reqs, is_chuncked_mode=not self.disable_chunked_prefill)
 
         # 第三阶段
         event_pack.notify_forward_and_wait_post_handle()

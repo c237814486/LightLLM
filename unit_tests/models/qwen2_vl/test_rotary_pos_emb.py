@@ -14,9 +14,7 @@ def rotate_half(x):
     return torch.cat((-x2, x1), dim=-1)
 
 
-def apply_rotary_pos_emb_vision(
-    tensor: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor
-) -> torch.Tensor:
+def apply_rotary_pos_emb_vision(tensor: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
     orig_dtype = tensor.dtype
     tensor = tensor.float()
     cos = cos.unsqueeze(1).repeat(1, 1, 2).unsqueeze(0).float()

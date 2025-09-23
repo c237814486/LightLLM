@@ -19,9 +19,7 @@ class InferStateInfo:
         self.total_token_num: int = None
         self.b_req_idx: torch.Tensor = None
         self.b_start_loc: torch.Tensor = None
-        self.b_ready_cache_len: torch.Tensor = (
-            None  # only for prefill prompt cache used.
-        )
+        self.b_ready_cache_len: torch.Tensor = None  # only for prefill prompt cache used.
         self.b_seq_len: torch.Tensor = None
         # max_len_in_batch prefill 和 decode 阶段含义不同
         # prefill 阶段指每个req 输入token的长度（不包括已经cache的部分）最大值
@@ -69,15 +67,7 @@ class InferStateInfo:
 
     def init_some_extra_state(self, model, input_ids: torch.Tensor):
         if self.is_prefill:
-            (
-                self.b_q_seq_len,
-                self.b1_cu_q_seq_len,
-                self.b_kv_seq_len,
-                self.b1_cu_kv_seq_len,
-                self.position_ids,
-                self.max_q_seq_len,
-                self.max_kv_seq_len,
-            ) = gen_prefill_params(
+            (self.b_q_seq_len, self.b1_cu_q_seq_len, self.b_kv_seq_len, self.b1_cu_kv_seq_len, self.position_ids, self.max_q_seq_len, self.max_kv_seq_len,) = gen_prefill_params(
                 input_token_num=input_ids.shape[0],
                 b_ready_cache_len=self.b_ready_cache_len,
                 b_seq_len=self.b_seq_len,
@@ -115,12 +105,8 @@ class InferStateInfo:
                 multi_objs.append(obj)
 
         if multi_objs:
-            obj_start_ids = torch.tensor(
-                [e["token_id"] for e in multi_objs], dtype=torch.int64, device="cuda"
-            )
-            obj_token_lens = torch.tensor(
-                [e["token_num"] for e in multi_objs], dtype=torch.int64, device="cuda"
-            )
+            obj_start_ids = torch.tensor([e["token_id"] for e in multi_objs], dtype=torch.int64, device="cuda")
+            obj_token_lens = torch.tensor([e["token_num"] for e in multi_objs], dtype=torch.int64, device="cuda")
             marks = mark_multimodal_obj(
                 obj_start_token_ids=obj_start_ids,
                 obj_token_lens=obj_token_lens,

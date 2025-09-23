@@ -24,14 +24,7 @@ if torch.cuda.is_available():
 
 @pytest.mark.parametrize(
     "batch, seqlen, heads, nope_head, rope_head",
-    [
-        (a, b, c, d, e)
-        for a in [1, 16, 32, 128]
-        for b in [16, 32, 512, 2048]
-        for c in [16]
-        for d in [512]
-        for e in [64]
-    ],
+    [(a, b, c, d, e) for a in [1, 16, 32, 128] for b in [16, 32, 512, 2048] for c in [16] for d in [512] for e in [64]],
 )
 def test_gqa_flash_decoding_fp8(batch, seqlen, heads, nope_head, rope_head):
     Z, N_CTX, H, D_HEAD, ROPE_HEAD = batch, seqlen, heads, nope_head, rope_head
@@ -50,9 +43,7 @@ def test_gqa_flash_decoding_fp8(batch, seqlen, heads, nope_head, rope_head):
 
     b_seq_len[0] = N_CTX
     b_req_idx[0] = 0
-    req_to_token_indexs[0][:N_CTX] = torch.tensor(
-        np.arange(N_CTX), dtype=torch.int32
-    ).cuda()
+    req_to_token_indexs[0][:N_CTX] = torch.tensor(np.arange(N_CTX), dtype=torch.int32).cuda()
 
     o = torch.empty((Z, H, D_HEAD), dtype=dtype, device="cuda")
     o1 = torch.empty((Z, H, D_HEAD), dtype=dtype, device="cuda")

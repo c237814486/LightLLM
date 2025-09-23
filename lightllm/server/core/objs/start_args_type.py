@@ -14,9 +14,7 @@ class StartArgs:
     port: int = field(default=8000)
     zmq_mode: str = field(
         default="ipc:///tmp/",
-        metadata={
-            "help": "use socket mode or ipc mode, only can be set in ['tcp://', 'ipc:///tmp/']"
-        },
+        metadata={"help": "use socket mode or ipc mode, only can be set in ['tcp://', 'ipc:///tmp/']"},
     )
     pd_master_ip: str = field(default="127.0.0.1")
     pd_master_port: int = field(default=1212)
@@ -31,9 +29,7 @@ class StartArgs:
     mem_fraction: float = field(default=0.9)
     batch_max_tokens: Optional[int] = field(default=None)
     eos_id: List[int] = field(default_factory=list)
-    tool_call_parser: Optional[str] = field(
-        default=None, metadata={"choices": ["llama3", "qwen25", "mistral"]}
-    )
+    tool_call_parser: Optional[str] = field(default=None, metadata={"choices": ["llama3", "qwen25", "mistral"]})
     running_max_req_size: int = field(default=1000)
     tp: int = field(default=1)
     dp: int = field(default=1)
@@ -57,9 +53,7 @@ class StartArgs:
     disable_chunked_prefill: bool = field(default=False)
     diverse_mode: bool = field(default=False)
     token_healing_mode: bool = field(default=False)
-    output_constraint_mode: str = field(
-        default="none", metadata={"choices": ["none", "simple", "xgrammar"]}
-    )
+    output_constraint_mode: str = field(default="none", metadata={"choices": ["none", "simple", "xgrammar"]})
     first_token_constraint_mode: bool = field(default=False)
     enable_multimodal: bool = field(default=False)
     enable_tpsp_mix_mode: bool = field(default=False)
@@ -68,15 +62,11 @@ class StartArgs:
     cache_capacity: int = field(default=200)
     data_type: Optional[str] = field(
         default=None,
-        metadata={
-            "choices": ["fp16", "float16", "bf16", "bfloat16", "fp32", "float32"]
-        },
+        metadata={"choices": ["fp16", "float16", "bf16", "bfloat16", "fp32", "float32"]},
     )
     return_all_prompt_logprobs: bool = field(default=False)
     use_reward_model: bool = field(default=False)
-    long_truncation_mode: Optional[str] = field(
-        default=None, metadata={"choices": [None, "head", "center"]}
-    )
+    long_truncation_mode: Optional[str] = field(default=None, metadata={"choices": [None, "head", "center"]})
     use_tgi_api: bool = field(default=False)
     health_monitor: bool = field(default=False)
     metric_gateway: Optional[str] = field(default=None)
@@ -100,9 +90,7 @@ class StartArgs:
     vit_quant_cfg: Optional[str] = field(default=None)
     enable_flashinfer_prefill: bool = field(default=False)
     enable_flashinfer_decode: bool = field(default=False)
-    sampling_backend: str = field(
-        default="triton", metadata={"choices": ["triton", "sglang_kernel"]}
-    )
+    sampling_backend: str = field(default="triton", metadata={"choices": ["triton", "sglang_kernel"]})
     penalty_counter_mode: str = field(
         default="gpu_counter",
         metadata={"choices": ["cpu_counter", "pin_mem_counter", "gpu_counter"]},

@@ -45,9 +45,7 @@ class MetricServer(rpyc.Service):
     def exposed_counter_inc(self, name: str, label: str = None) -> None:
         return self.monitor.counter_inc(name, label)
 
-    def exposed_histogram_observe(
-        self, name: str, value: float, label: str = None
-    ) -> None:
+    def exposed_histogram_observe(self, name: str, value: float, label: str = None) -> None:
         return self.monitor.histogram_observe(name, value, label)
 
     def exposed_gauge_set(self, name: str, value: float) -> None:

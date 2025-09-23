@@ -54,17 +54,13 @@ def _fwd_kernel(
     for start_n in range(0, cur_att_seq_len, BLOCK_N):
         start_n = tl.multiple_of(start_n, BLOCK_N)  # check
         v_index = tl.load(
-            Req_to_tokens
-            + cur_batch_req_idx * stride_req_to_token_b
-            + (cur_cache_start_loc + start_n + offs_n) * stride_req_to_token_s,
+            Req_to_tokens + cur_batch_req_idx * stride_req_to_token_b + (cur_cache_start_loc + start_n + offs_n) * stride_req_to_token_s,
             mask=(start_n + offs_n) < cur_att_seq_len,
             other=other_kv_index,
         )  # [64]
 
         qk = tl.load(
-            Logics
-            + cur_head * stride_logic_h
-            + (cur_batch_start_loc + start_n + offs_n) * stride_logic_bs,
+            Logics + cur_head * stride_logic_h + (cur_batch_start_loc + start_n + offs_n) * stride_logic_bs,
             mask=(start_n + offs_n) < cur_att_seq_len,
             other=float("-inf"),
         )  # [64]
@@ -73,12 +69,8 @@ def _fwd_kernel(
         old_scale = tl.exp(e_max - n_e_max)
         p = tl.exp(qk - n_e_max)
         e_sum = e_sum * old_scale + tl.sum(p, 0)
-        v = tl.load(
-            v_ptrs + v_index[:, None] * stride_vbs
-        )  # [1, D] + [64, 1] = [64, D]
-        acc = acc * old_scale + tl.sum(
-            p[:, None] * v, 0
-        )  # [64, 1] * [64, D] = [64, D] -> [D]
+        v = tl.load(v_ptrs + v_index[:, None] * stride_vbs)  # [1, D] + [64, 1] = [64, D]
+        acc = acc * old_scale + tl.sum(p[:, None] * v, 0)  # [64, 1] * [64, D] = [64, D] -> [D]
         e_max = n_e_max
 
     acc = acc / e_sum

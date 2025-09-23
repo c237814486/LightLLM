@@ -30,9 +30,7 @@ class ViTPreLayerInfer:
         )
         batch_size, _, height, width = patch_embeds.shape
         patch_embeds = patch_embeds.flatten(2).transpose(1, 2)
-        class_embeds = layer_weight.class_embedding.expand(batch_size, 1, -1).to(
-            target_dtype
-        )
+        class_embeds = layer_weight.class_embedding.expand(batch_size, 1, -1).to(target_dtype)
         embeddings = torch.cat([class_embeds, patch_embeds], dim=1)
         position_embedding = torch.cat(
             [
@@ -53,14 +51,9 @@ class ViTPreLayerInfer:
             device=embeddings.device,
             dtype=target_dtype,
         )
-        split_indexes = np.linspace(
-            0, layer_weight.embed_dim, self.tp_world_size_ + 1, dtype=np.int64
-        )
+        split_indexes = np.linspace(0, layer_weight.embed_dim, self.tp_world_size_ + 1, dtype=np.int64)
         dist.all_gather(
-            [
-                gather_embedding[split_indexes[i] : split_indexes[i + 1], :, :]
-                for i in range(self.tp_world_size_)
-            ],
+            [gather_embedding[split_indexes[i] : split_indexes[i + 1], :, :] for i in range(self.tp_world_size_)],
             embeddings.permute(2, 0, 1).contiguous(),
             group=None,
             async_op=False,

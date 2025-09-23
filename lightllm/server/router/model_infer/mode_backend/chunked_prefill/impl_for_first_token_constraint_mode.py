@@ -21,20 +21,14 @@ class FirstTokenConstraintBackend(ChunkedPrefillBackend):
         # 使用该模式需要设置FIRST_ALLOWED_TOKENS 环境变量，格式为 "1,2" 或 "1,2,3"  等数字字符串
         assert first_allowed_tokens_strs is not None
         first_allowed_tokens_strs.split(",")
-        self.first_allowed_tokens = [
-            int(e.strip())
-            for e in first_allowed_tokens_strs.split(",")
-            if len(e.strip()) > 0
-        ]
+        self.first_allowed_tokens = [int(e.strip()) for e in first_allowed_tokens_strs.split(",") if len(e.strip()) > 0]
         logger.info(f"first_allowed_tokens : {self.first_allowed_tokens}")
         # check token_id < vocab_size
         assert all(e < self.model.vocab_size for e in self.first_allowed_tokens)
         self.fill_value = torch.tensor(-1000000.0)
         return
 
-    def _mask_first_gen_token_logits(
-        self, run_reqs: List[InferReq], logits: torch.Tensor
-    ):
+    def _mask_first_gen_token_logits(self, run_reqs: List[InferReq], logits: torch.Tensor):
         # 这个函数中的实现会造成全局同步，造成折叠失效，主要是
         # mask[i, self.first_allowed_tokens] 切片复制还有
         # 后续出现 .cpu() .cuda() 等操作也会造成异常的全局同步

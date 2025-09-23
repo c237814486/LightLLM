@@ -108,16 +108,10 @@ class DecodeNode(ChunkedPrefillBackend):
                     req_obj.shm_req.candetoken_out_len = req_obj.cur_output_len
 
                     req_id = req_obj.shm_req.request_id
-                    logger.error(
-                        f"req_id: {req_id} forced to finished, it not in g_success_kv_move_task_cache"
-                    )
+                    logger.error(f"req_id: {req_id} forced to finished, it not in g_success_kv_move_task_cache")
 
         if self.is_master_in_dp:
             with g_router_lock.obj:
-                self.shared_token_load.add_frozened_token_count(
-                    -remove_count, self.dp_rank_in_node
-                )
-                self.shared_token_load.add_estimated_peak_token_count(
-                    estimated_peak_token_count, self.dp_rank_in_node
-                )
+                self.shared_token_load.add_frozened_token_count(-remove_count, self.dp_rank_in_node)
+                self.shared_token_load.add_estimated_peak_token_count(estimated_peak_token_count, self.dp_rank_in_node)
         return

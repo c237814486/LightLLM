@@ -46,9 +46,7 @@ def embedding_kernel(
 
 
 @torch.no_grad()
-def embedding(
-    input_ids, weight: torch.Tensor, vob_start_id, vob_end_id, out: torch.Tensor
-):
+def embedding(input_ids, weight: torch.Tensor, vob_start_id, vob_end_id, out: torch.Tensor):
 
     BLOCK_N = 64
     BLOCK_NN = 1
@@ -135,13 +133,9 @@ if __name__ == "__main__":
                 t2 += time.time() - sta_time
 
                 if i == 0:
-                    max_diff = max(
-                        max_diff, torch.max(torch.abs(new_out - old_out)).item()
-                    )
+                    max_diff = max(max_diff, torch.max(torch.abs(new_out - old_out)).item())
                     t1 = 0
                     t2 = 0
 
         MFLOPS = int(DIM * N_CTX * TEST_COUNT / t1 / 1000 / 1000)
-        print(
-            f"TP={TP}, Diff={max_diff}, old_t:{t2:.5f}, new_t:{t1:.5f}, MFLOPS={MFLOPS}, SP={t2/t1:.5f}"
-        )
+        print(f"TP={TP}, Diff={max_diff}, old_t:{t2:.5f}, new_t:{t1:.5f}, MFLOPS={MFLOPS}, SP={t2/t1:.5f}")

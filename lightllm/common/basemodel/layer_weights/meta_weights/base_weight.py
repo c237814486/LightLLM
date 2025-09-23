@@ -28,9 +28,7 @@ class BaseWeightTpl(BaseWeight):
         tp_world_size: int = None,
         data_type: torch.dtype = None,
     ):
-        self.tp_world_size_ = (
-            tp_world_size if tp_world_size is not None else get_dp_world_size()
-        )
+        self.tp_world_size_ = tp_world_size if tp_world_size is not None else get_dp_world_size()
         self.tp_rank_ = tp_rank if tp_rank is not None else get_current_rank_in_dp()
         self.device_id_ = get_current_device_id()
         self.data_type_ = data_type

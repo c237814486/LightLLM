@@ -249,9 +249,7 @@ def run_forward_once(
     enable_overlap,
     enable_torch_profile=False,
 ):
-    test_data = np.vstack(
-        [np.random.randint(0, 50256, input_len) for _ in range(batch_size)]
-    )
+    test_data = np.vstack([np.random.randint(0, 50256, input_len) for _ in range(batch_size)])
     test_data = test_data.reshape(-1)
     test_data = torch.from_numpy(test_data).cuda()
     import torch.distributed as dist
@@ -305,10 +303,7 @@ def run_forward_once(
     torch.cuda.synchronize()
 
     if rank_id == 0:
-        print(
-            f"prefill time cost: {(time.time() - prefill_start_time) * 1000}, "
-            f"prefill throughput: {dp_size * batch_size * input_len / (time.time() - prefill_start_time)} tokens/s"
-        )
+        print(f"prefill time cost: {(time.time() - prefill_start_time) * 1000}, " f"prefill throughput: {dp_size * batch_size * input_len / (time.time() - prefill_start_time)} tokens/s")
 
     if enable_torch_profile:
         print("Profile Prefill")
@@ -336,9 +331,7 @@ def run_forward_once(
         step_start = time.time()
         total_token_num += batch_size
         b_seq_len += 1
-        mem_indexes = model_part.req_manager.mem_manager.alloc(
-            predict_ids.shape[0]
-        ).cuda()
+        mem_indexes = model_part.req_manager.mem_manager.alloc(predict_ids.shape[0]).cuda()
         max_len_in_batch = input_len + i + 1
         logits = decode_fn(
             model_part,
@@ -375,10 +368,7 @@ def run_forward_once(
         torch.cuda.synchronize()
         if i % 100 == 0 or i == output_len - 1:
             if rank_id == 0:
-                print(
-                    f"i: {i}, step cost time: {(time.time() - step_start) * 1000} ms, "
-                    f"throughput: {dp_size * batch_size / (time.time() - step_start)} tokens/s"
-                )
+                print(f"i: {i}, step cost time: {(time.time() - step_start) * 1000} ms, " f"throughput: {dp_size * batch_size / (time.time() - step_start)} tokens/s")
 
     model_part.mem_manager.free_all()
     model_part.req_manager.free_all()
@@ -386,9 +376,7 @@ def run_forward_once(
     torch.cuda.empty_cache()
 
 
-def tppart_model_infer(
-    args, model_kvargs, batch_size, input_len, output_len, ans_queue
-):
+def tppart_model_infer(args, model_kvargs, batch_size, input_len, output_len, ans_queue):
     args = get_env_start_args()
     import triton.profiler as proton
     import torch
@@ -415,9 +403,7 @@ def tppart_model_infer(
     dist.barrier()
 
     torch.cuda.empty_cache()
-    enable_overlap = (
-        args.enable_decode_microbatch_overlap or args.enable_prefill_microbatch_overlap
-    )
+    enable_overlap = args.enable_decode_microbatch_overlap or args.enable_prefill_microbatch_overlap
 
     model_part, _ = get_model(model_cfg, model_kvargs)
 

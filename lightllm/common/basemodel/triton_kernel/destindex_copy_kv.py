@@ -25,18 +25,8 @@ def _fwd_kernel_destindex_copy_kv(
 
     dest_index = tl.load(Dest_loc + cur_index).to(tl.int64)
 
-    k_ptrs = (
-        K
-        + cur_index * stride_k_bs
-        + stride_k_h * offs_h[:, None]
-        + stride_k_d * offs_d[None, :]
-    )
-    o_ptrs = (
-        Out
-        + dest_index * stride_o_bs
-        + stride_o_h * offs_h[:, None]
-        + stride_o_d * offs_d[None, :]
-    )
+    k_ptrs = K + cur_index * stride_k_bs + stride_k_h * offs_h[:, None] + stride_k_d * offs_d[None, :]
+    o_ptrs = Out + dest_index * stride_o_bs + stride_o_h * offs_h[:, None] + stride_o_d * offs_d[None, :]
 
     k = tl.load(k_ptrs, mask=offs_h[:, None] < head_num, other=0.0)
     tl.store(o_ptrs, k, mask=offs_h[:, None] < head_num)
@@ -97,24 +87,14 @@ def _fwd_kernel_destindex_copy_quantize_kv(
 
     dest_index = tl.load(Dest_loc + cur_index).to(tl.int64)
     src_data = tl.load(
-        K
-        + cur_index * stride_k_bs
-        + offs_h[:, None] * stride_k_h
-        + stride_k_d * offs_d[None, :],
+        K + cur_index * stride_k_bs + offs_h[:, None] * stride_k_h + stride_k_d * offs_d[None, :],
         mask=offs_h[:, None] < head_num,
         other=0.0,
     )
     abs_data = tl.abs(src_data)
-    data_scale = (tl.max(abs_data, axis=1) / 127.0).to(Out_scale.dtype.element_ty)[
-        :, None
-    ]
+    data_scale = (tl.max(abs_data, axis=1) / 127.0).to(Out_scale.dtype.element_ty)[:, None]
     q_src_data = (src_data / data_scale).to(tl.int8)
-    o_ptrs = (
-        Out
-        + dest_index * stride_o_bs
-        + stride_o_h * offs_h[:, None]
-        + stride_o_d * offs_d[None, :]
-    )
+    o_ptrs = Out + dest_index * stride_o_bs + stride_o_h * offs_h[:, None] + stride_o_d * offs_d[None, :]
     os_ptrs = Out_scale + dest_index * stride_os_bs + stride_os_h * offs_h[:, None]
     tl.store(o_ptrs, q_src_data, mask=offs_h[:, None] < head_num)
     tl.store(os_ptrs, data_scale, mask=offs_h[:, None] < head_num)
@@ -182,9 +162,7 @@ def test2():
     B, N_CTX, H, D = 32, 1024, 12, 128
     src = torch.randn((B * N_CTX, H, D), dtype=torch.float16).cuda()
     dest_loc = torch.arange(0, B * N_CTX, dtype=torch.int32).cuda()
-    value_dest = (
-        torch.randn((B * N_CTX, H, D), dtype=torch.float16).cuda().to(torch.int8)
-    )
+    value_dest = torch.randn((B * N_CTX, H, D), dtype=torch.float16).cuda().to(torch.int8)
     scale_dest = torch.randn((B * N_CTX, H, 1), dtype=torch.float16).cuda()
 
     for _ in range(10):

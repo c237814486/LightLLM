@@ -29,15 +29,10 @@ class Gemma3VisionModel:
         else:
             assert False, "only hf format model is supported for Gemma3"
 
-        self.patches_per_image = int(
-            config["vision_config"]["image_size"]
-            // config["vision_config"]["patch_size"]
-        )
+        self.patches_per_image = int(config["vision_config"]["image_size"] // config["vision_config"]["patch_size"])
         self.tokens_per_side = int(config["mm_tokens_per_image"] ** 0.5)
         self.kernel_size = self.patches_per_image // self.tokens_per_side
-        self.avg_pool = nn.AvgPool2d(
-            kernel_size=self.kernel_size, stride=self.kernel_size
-        )
+        self.avg_pool = nn.AvgPool2d(kernel_size=self.kernel_size, stride=self.kernel_size)
 
         self.vision_tower.requires_grad_(False)
         self.device = torch.device("cpu")
@@ -71,19 +66,13 @@ class Gemma3VisionModel:
                 d = safe_open(os.path.join(weight_dir, f), "pt", "cpu")
                 for k in d.keys():
                     if "multi_modal_projector.mm_input_projection_weight" in k:
-                        self.projector_weights[
-                            k.replace(
-                                "multi_modal_projector.mm_input_projection_weight",
-                                "model.mm_projector.linear",
-                            )
-                        ] = d.get_tensor(k).to(torch.bfloat16)
+                        self.projector_weights[k.replace("multi_modal_projector.mm_input_projection_weight", "model.mm_projector.linear",)] = d.get_tensor(
+                            k
+                        ).to(torch.bfloat16)
                     if "multi_modal_projector.mm_soft_emb_norm.weight" in k:
-                        self.projector_weights[
-                            k.replace(
-                                "multi_modal_projector.mm_soft_emb_norm.weight",
-                                "model.mm_projector.norm",
-                            )
-                        ] = d.get_tensor(k).to(torch.bfloat16)
+                        self.projector_weights[k.replace("multi_modal_projector.mm_soft_emb_norm.weight", "model.mm_projector.norm",)] = d.get_tensor(
+                            k
+                        ).to(torch.bfloat16)
 
     def cuda(self):
         self.vision_tower = self.vision_tower.cuda()
@@ -109,9 +98,7 @@ class Gemma3VisionModel:
         batch_size, _, seq_length = x.shape
 
         reshaped_vision_outputs = x.transpose(1, 2)
-        reshaped_vision_outputs = reshaped_vision_outputs.reshape(
-            batch_size, seq_length, self.patches_per_image, self.patches_per_image
-        )
+        reshaped_vision_outputs = reshaped_vision_outputs.reshape(batch_size, seq_length, self.patches_per_image, self.patches_per_image)
         reshaped_vision_outputs = reshaped_vision_outputs.contiguous()
 
         pooled_vision_outputs = self.avg_pool(reshaped_vision_outputs)
@@ -123,9 +110,7 @@ class Gemma3VisionModel:
             self.projector_weights["model.mm_projector.norm"],
         ).to(torch.bfloat16)
 
-        projected_vision_outputs = torch.matmul(
-            normed_vision_outputs, self.projector_weights["model.mm_projector.linear"]
-        )
+        projected_vision_outputs = torch.matmul(normed_vision_outputs, self.projector_weights["model.mm_projector.linear"])
 
         return projected_vision_outputs.type_as(x)
 
@@ -140,14 +125,10 @@ class Gemma3VisionModel:
                 uuids.append(img.uuid)
                 image_data = read_shm(get_shm_name_data(img.uuid))
                 image_data = Image.open(BytesIO(image_data))
-                t = self.image_processor.preprocess(image_data, return_tensors="pt")[
-                    "pixel_values"
-                ]
+                t = self.image_processor.preprocess(image_data, return_tensors="pt")["pixel_values"]
                 img_tensors.append(t)
             else:
-                raise Exception(
-                    "Unsupport input types: {} for {}".format(type(img), img)
-                )
+                raise Exception("Unsupport input types: {} for {}".format(type(img), img))
 
             cur_num = img_tensors[-1].shape[0]
             valid_ids.append([valid_id, valid_id + cur_num])

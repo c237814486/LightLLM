@@ -40,9 +40,7 @@ def smart_resize(
 ) -> tuple[int, int]:
 
     if max(height, width) / min(height, width) > MAX_RATIO:
-        raise ValueError(
-            f"absolute aspect ratio must be smaller than {MAX_RATIO}, got {max(height, width) / min(height, width)}"
-        )
+        raise ValueError(f"absolute aspect ratio must be smaller than {MAX_RATIO}, got {max(height, width) / min(height, width)}")
     h_bar = max(factor, round(height / factor) * factor)
     w_bar = max(factor, round(width / factor) * factor)
     if h_bar * w_bar > max_pixels:
@@ -56,9 +54,7 @@ def smart_resize(
     return h_bar, w_bar
 
 
-def resize_image(
-    image_file: Image.Image, size_factor: int = IMAGE_FACTOR
-) -> tuple[Image.Image, int, int]:
+def resize_image(image_file: Image.Image, size_factor: int = IMAGE_FACTOR) -> tuple[Image.Image, int, int]:
 
     image = image_file.convert("RGB")
     width, height = image.size
@@ -133,9 +129,7 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
             )
 
         if self.do_rescale:
-            image = self.rescale(
-                image, scale=self.rescale_factor, input_data_format=input_data_format
-            )
+            image = self.rescale(image, scale=self.rescale_factor, input_data_format=input_data_format)
 
         if self.do_normalize:
             image = self.normalize(
@@ -145,9 +139,7 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
                 input_data_format=input_data_format,
             )
 
-        image = to_channel_dimension_format(
-            image, self.data_format, input_channel_dim=input_data_format
-        )
+        image = to_channel_dimension_format(image, self.data_format, input_channel_dim=input_data_format)
 
         patches = np.array([image])
 

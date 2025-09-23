@@ -25,15 +25,11 @@ class BloomTransformerLayerInfer(TransformerLayerInferTpl):
     def __init__(self, layer_num, network_config, mode):
         super().__init__(layer_num, network_config, mode)
         self.eps_ = network_config["layer_norm_epsilon"]
-        self.tp_q_head_num_ = (
-            network_config["num_attention_heads"] // self.tp_world_size_
-        )
+        self.tp_q_head_num_ = network_config["num_attention_heads"] // self.tp_world_size_
         self.tp_k_head_num_ = self.tp_q_head_num_
         self.tp_v_head_num_ = self.tp_q_head_num_
         self.tp_o_head_num_ = self.tp_q_head_num_
-        self.head_dim_ = (
-            network_config["n_embed"] // network_config["num_attention_heads"]
-        )
+        self.head_dim_ = network_config["n_embed"] // network_config["num_attention_heads"]
         self.embed_dim_ = network_config["n_embed"]
         return
 
@@ -73,9 +69,7 @@ class BloomTransformerLayerInfer(TransformerLayerInferTpl):
         q = layer_weight.q_proj.mm(input.view(-1, self.embed_dim_))
         cache_kv = layer_weight.kv_proj.mm(
             input,
-            out=cache_kv.view(
-                -1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_
-            ),
+            out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),
         ).view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_), self.head_dim_)
         return q, cache_kv
 
@@ -135,9 +129,7 @@ class BloomTransformerLayerInfer(TransformerLayerInferTpl):
         infer_state: InferStateInfo,
         layer_weight: BloomTransformerLayerWeight,
     ) -> torch.Tensor:
-        o_tensor = layer_weight.o_proj.mm(
-            input.view(-1, self.tp_o_head_num_ * self.head_dim_)
-        )
+        o_tensor = layer_weight.o_proj.mm(input.view(-1, self.tp_o_head_num_ * self.head_dim_))
         return o_tensor
 
     def _ffn(

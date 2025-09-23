@@ -61,9 +61,7 @@ class MMWeightTpl(BaseWeightTpl):
             dtype = input_tensor.dtype
             device = input_tensor.device
             if use_custom_tensor_mananger:
-                out = g_cache_manager.alloc_tensor(
-                    shape, dtype, device=device, is_graph_out=False
-                )
+                out = g_cache_manager.alloc_tensor(shape, dtype, device=device, is_graph_out=False)
             else:
                 out = torch.empty(shape, dtype=dtype, device=device)
         if self.bias is None:
@@ -82,9 +80,7 @@ class MMWeightTpl(BaseWeightTpl):
     def _process_weight(self, weight) -> None:
         if self.quant_method is not None and not self.quantized_weight:
             # print("data type", self.data_type_, weight.device, weight.dtype)
-            self.weight = self.quant_method.quantize(
-                weight.to(self.data_type_).cuda(get_current_device_id())
-            )
+            self.weight = self.quant_method.quantize(weight.to(self.data_type_).cuda(get_current_device_id()))
             return
         # 让 k dim 更连续，大多数split k 算法的算子可能能更快
         self.weight = weight.cuda(get_current_device_id()).transpose(0, 1)
@@ -95,9 +91,7 @@ class MMWeightTpl(BaseWeightTpl):
             self._process_weight(weight)
 
         if self.bias_name in weights:
-            self.bias = self._slice_bias(weights[self.bias_name]).cuda(
-                get_current_device_id()
-            )
+            self.bias = self._slice_bias(weights[self.bias_name]).cuda(get_current_device_id())
         return
 
 
@@ -118,9 +112,7 @@ class MultiMMWeightTpl(MMWeightTpl):
         self.weights = [None] * len(self.weight_names)
         if self.bias_names is not None:
             self.biases = [None] * len(self.bias_names)
-            self.has_bias = (
-                all(b is not None for b in self.bias_names) and len(bias_names) > 0
-            )
+            self.has_bias = all(b is not None for b in self.bias_names) and len(bias_names) > 0
         else:
             self.biases = None
             self.has_bias = False
@@ -176,9 +168,7 @@ class BMMWeightTpl(MMWeightTpl):
             dtype = input_tensor.dtype
             device = input_tensor.device
             if use_custom_tensor_mananger:
-                out = g_cache_manager.alloc_tensor(
-                    shape, dtype, device=device, is_graph_out=False
-                )
+                out = g_cache_manager.alloc_tensor(shape, dtype, device=device, is_graph_out=False)
             else:
                 out = torch.empty(shape, dtype=dtype, device=device)
         if self.bias is None:
@@ -194,17 +184,13 @@ class MMWeight:
         quant_cfg = kwargs.pop("quant_cfg", None)
         layer_num_ = kwargs.pop("layer_num", None)
         name = kwargs.pop("name", None)
-        quant_method, quantized_weight = cls._get_quant_method(
-            quant_cfg, layer_num_, name
-        )
+        quant_method, quantized_weight = cls._get_quant_method(quant_cfg, layer_num_, name)
         kwargs["quant_method"] = quant_method
         mmcls = cls._get_mmcls(quant_method, quantized_weight)
         return mmcls(**kwargs)
 
     @classmethod
-    def _get_quant_method(
-        cls, quant_cfg: Quantcfg, layer_num_: int, name: str
-    ) -> QuantizationMethod:
+    def _get_quant_method(cls, quant_cfg: Quantcfg, layer_num_: int, name: str) -> QuantizationMethod:
         if quant_cfg is None:
             return None, False
         quant_method = quant_cfg.get_quant_method(layer_num_, name)
@@ -212,7 +198,5 @@ class MMWeight:
         return quant_method, quantized_weight
 
     @classmethod
-    def _get_mmcls(
-        cls, quant_method: QuantizationMethod
-    ) -> Optional[Union[MMWeightTpl, MultiMMWeightTpl, BMMWeightTpl]]:
+    def _get_mmcls(cls, quant_method: QuantizationMethod) -> Optional[Union[MMWeightTpl, MultiMMWeightTpl, BMMWeightTpl]]:
         return None

@@ -16,12 +16,7 @@ class KernelConfigs(ABC):
     @classmethod
     def get_config_file_name(cls, params: Dict[str, Any]) -> str:
         json_str = json.dumps(params, sort_keys=True)
-        json_str = (
-            json_str.replace(" ", "")
-            .replace("\n", "")
-            .replace('"', "")
-            .replace(":", "=")
-        )
+        json_str = json_str.replace(" ", "").replace("\n", "").replace('"', "").replace(":", "=")
         filename = json_str
         device_name = get_current_device_name().replace(" ", "_")
         return f"{filename}_{device_name}.json"
@@ -44,9 +39,7 @@ class KernelConfigs(ABC):
             with open(config_file_path, mode="r") as file:
                 return json.load(file)
         else:
-            logger.warning(
-                f"can not find config_path {config_file_path} kernel name {cls.kernel_name} use default kernel setting"
-            )
+            logger.warning(f"can not find config_path {config_file_path} kernel name {cls.kernel_name} use default kernel setting")
             return None
 
     @classmethod

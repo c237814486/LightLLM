@@ -35,9 +35,7 @@ def _kv_trans_kernel(
     while tid < token_num:
         input_token_idx = tl.load(input_token_idx_ptr + tid)
         output_token_idx = tl.load(output_token_idx_ptr + tid)
-        for block_idx in tl.range(
-            0, tl.cdiv(head_num_dim, BLOCK_SIZE), 1, num_stages=NUM_STAGES
-        ):
+        for block_idx in tl.range(0, tl.cdiv(head_num_dim, BLOCK_SIZE), 1, num_stages=NUM_STAGES):
             cur_offs = block_idx * BLOCK_SIZE + offs
             in_datas = tl.load(
                 input_ptr + input_stride_0 * input_token_idx + cur_offs,

@@ -48,9 +48,7 @@ def _gen_sampling_params_kernel(
     )
     tl.store(
         b_exponential_decay_length_penalty + offs,
-        tl.load(
-            req_to_exponential_decay_length_penalty + req_idx, mask=mask, other=0.0
-        ),
+        tl.load(req_to_exponential_decay_length_penalty + req_idx, mask=mask, other=0.0),
         mask=mask,
     )
     return
@@ -66,13 +64,9 @@ def gen_sampling_params(b_req_idx: torch.Tensor, req_sampling_params_manager):
     batch_size = b_req_idx.shape[0]
     b_presence_penalty = torch.empty((batch_size,), dtype=torch.float32, device="cuda")
     b_frequency_penalty = torch.empty((batch_size,), dtype=torch.float32, device="cuda")
-    b_repetition_penalty = torch.empty(
-        (batch_size,), dtype=torch.float32, device="cuda"
-    )
+    b_repetition_penalty = torch.empty((batch_size,), dtype=torch.float32, device="cuda")
     b_temperature = torch.empty((batch_size,), dtype=torch.float32, device="cuda")
-    b_exponential_decay_length_penalty = torch.empty(
-        (batch_size,), dtype=torch.float32, device="cuda"
-    )
+    b_exponential_decay_length_penalty = torch.empty((batch_size,), dtype=torch.float32, device="cuda")
 
     BLOCK = 256
 
@@ -115,9 +109,7 @@ def _token_id_counter_kernel(
     mask = offs < input_size
 
     token_ids = tl.load(prompt_ids_ptr + offs, mask=mask, other=0)
-    tl.atomic_add(
-        token_id_to_counter_ptr + token_ids, 1, mask=(token_ids < vocab_size) & mask
-    )
+    tl.atomic_add(token_id_to_counter_ptr + token_ids, 1, mask=(token_ids < vocab_size) & mask)
     return
 
 
@@ -161,17 +153,13 @@ def _token_id_counter_update_kernel(
     if HAS_MASK:
         mask = tl.load(mask_ptr + offs, mask=loc_mask, other=False)
         tl.atomic_add(
-            req_to_out_token_id_counter_ptr
-            + req_idx * counter_stride_m
-            + token_ids * counter_stride_n,
+            req_to_out_token_id_counter_ptr + req_idx * counter_stride_m + token_ids * counter_stride_n,
             1,
             mask=loc_mask & mask,
         )
     else:
         tl.atomic_add(
-            req_to_out_token_id_counter_ptr
-            + req_idx * counter_stride_m
-            + token_ids * counter_stride_n,
+            req_to_out_token_id_counter_ptr + req_idx * counter_stride_m + token_ids * counter_stride_n,
             1,
             mask=loc_mask,
         )

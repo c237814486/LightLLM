@@ -26,11 +26,7 @@ def send_and_receive_node_ip(args):
             local_ip = socket.gethostbyname(socket.gethostname())
             context = zmq.Context(2)
             comm_socket = context.socket(zmq.PUSH)
-            comm_socket.connect(
-                f"tcp://{args.nccl_host}:{args.multinode_httpmanager_port + args.node_rank + 100}"
-            )
-            logger.info(
-                f"connecting to {args.nccl_host}:{args.multinode_httpmanager_port + args.node_rank + 100}"
-            )
+            comm_socket.connect(f"tcp://{args.nccl_host}:{args.multinode_httpmanager_port + args.node_rank + 100}")
+            logger.info(f"connecting to {args.nccl_host}:{args.multinode_httpmanager_port + args.node_rank + 100}")
             comm_socket.send_pyobj(local_ip)
             comm_socket.close()

@@ -37,12 +37,8 @@ def _kv_trans_prefill_node_kernel(
         dp_index = tl.load(input_dp_idx_ptr + tid)
         input_token_idx = tl.load(input_token_idx_ptr + tid)
         output_token_idx = tl.load(output_token_idx_ptr + tid)
-        input_ptr = tl.load(input_mems_ptr + dp_index).to(
-            tl.pointer_type(output_ptr.dtype.element_ty)
-        )
-        for block_idx in tl.range(
-            0, tl.cdiv(head_num_dim, BLOCK_SIZE), 1, num_stages=NUM_STAGES
-        ):
+        input_ptr = tl.load(input_mems_ptr + dp_index).to(tl.pointer_type(output_ptr.dtype.element_ty))
+        for block_idx in tl.range(0, tl.cdiv(head_num_dim, BLOCK_SIZE), 1, num_stages=NUM_STAGES):
             cur_offs = block_idx * BLOCK_SIZE + offs
             in_datas = tl.load(
                 input_ptr + input_stride_0 * input_token_idx + cur_offs,
@@ -139,9 +135,7 @@ def _kv_trans_decode_node_kernel(
         dp_index = tl.load(output_token_dp_index_ptr + tid)
         input_token_idx = tl.load(input_token_idx_ptr + tid)
         output_token_idx = tl.load(output_token_idx_ptr + tid)
-        for block_idx in tl.range(
-            0, tl.cdiv(head_num_dim, BLOCK_SIZE), 1, num_stages=NUM_STAGES
-        ):
+        for block_idx in tl.range(0, tl.cdiv(head_num_dim, BLOCK_SIZE), 1, num_stages=NUM_STAGES):
             cur_offs = block_idx * BLOCK_SIZE + offs
             in_datas = tl.load(
                 input_ptr + input_stride_0 * input_token_idx + cur_offs,
@@ -152,9 +146,7 @@ def _kv_trans_decode_node_kernel(
                 (dp_index + 1) * CARD_NUM_PER_D,
                 num_stages=NUM_STAGES,
             ):
-                output_ptr = tl.load(output_mems_ptr + mem_index).to(
-                    tl.pointer_type(input_ptr.dtype.element_ty)
-                )
+                output_ptr = tl.load(output_mems_ptr + mem_index).to(tl.pointer_type(input_ptr.dtype.element_ty))
                 tl.store(
                     output_ptr + output_stride_0 * output_token_idx + cur_offs,
                     in_datas,

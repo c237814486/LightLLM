@@ -44,7 +44,5 @@ def test_repack_kv_index(batch, max_seq_len):
         req_to_token_indexs[b][:sl] = rand_idx[start : start + sl]
 
     repack_kv_ref(req_to_token_indexs, b_req_idx, b_seq_len, b_start_loc, ref)
-    repack_kv_index(
-        req_to_token_indexs, b_req_idx, b_seq_len, b_start_loc, MAX_SEQ_LEN, output
-    )
+    repack_kv_index(req_to_token_indexs, b_req_idx, b_seq_len, b_start_loc, MAX_SEQ_LEN, output)
     assert torch.allclose(output.float(), ref.float())

@@ -15,9 +15,7 @@ class ReturnPromptLogProbBackend(ChunkedPrefillBackend):
         self.prefill = self.return_all_prompt_logprobs_prefill
         return
 
-    def return_all_prompt_logprobs_prefill(
-        self, event_pack: OverlapEventPack, prefill_reqs: List[InferReq]
-    ):
+    def return_all_prompt_logprobs_prefill(self, event_pack: OverlapEventPack, prefill_reqs: List[InferReq]):
 
         # 在 return all_prompt_logprobs 的模式下，不能启用 dynamic prompt cache
         assert self.radix_cache is None
@@ -47,21 +45,12 @@ class ReturnPromptLogProbBackend(ChunkedPrefillBackend):
             req_obj: InferReq = req_obj
             cur_ids: torch.Tensor = input_ids[start_loc : start_loc + q_seq_len]
             cur_logits = prompt_all_logits[start_loc : start_loc + q_seq_len]
-            cur_logprobs = torch.log_softmax(cur_logits, dim=-1, dtype=torch.float)[
-                0:-1, :
-            ]
-            cur_logprobs = (
-                torch.gather(cur_logprobs, dim=1, index=cur_ids[1:].view(-1, 1))
-                .detach()
-                .cpu()
-                .numpy()
-            )
+            cur_logprobs = torch.log_softmax(cur_logits, dim=-1, dtype=torch.float)[0:-1, :]
+            cur_logprobs = torch.gather(cur_logprobs, dim=1, index=cur_ids[1:].view(-1, 1)).detach().cpu().numpy()
 
             if req_obj.shm_req.input_len > 1:
                 if self.is_master_in_dp:
-                    req_obj.shm_req.shm_logprobs.arr[1 : req_obj.shm_req.input_len] = (
-                        cur_logprobs.flatten()
-                    )
+                    req_obj.shm_req.shm_logprobs.arr[1 : req_obj.shm_req.input_len] = cur_logprobs.flatten()
 
         if self.prefill_mask_func is not None:
             self.prefill_mask_func(run_reqs, logits)
@@ -70,9 +59,7 @@ class ReturnPromptLogProbBackend(ChunkedPrefillBackend):
         next_token_ids = next_token_ids.detach().cpu().numpy()
         next_token_logprobs = torch.log(next_token_probs).detach().cpu().numpy()
 
-        update_packs = self._pre_post_handle(
-            run_reqs, is_chuncked_mode=not self.disable_chunked_prefill
-        )
+        update_packs = self._pre_post_handle(run_reqs, is_chuncked_mode=not self.disable_chunked_prefill)
         self._post_handle(
             run_reqs=run_reqs,
             next_token_ids=next_token_ids,

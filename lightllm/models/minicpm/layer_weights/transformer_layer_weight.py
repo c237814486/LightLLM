@@ -12,9 +12,7 @@ class MiniCPMTransformerLayerWeight(LlamaTransformerLayerWeight):
     def _parse_config(self):
         super()._parse_config()
         num_hidden_layers = self.network_config_["num_hidden_layers"]
-        scale_depth = self.network_config_.get(
-            "scale_depth", math.sqrt(num_hidden_layers)
-        )
+        scale_depth = self.network_config_.get("scale_depth", math.sqrt(num_hidden_layers))
         self.layer_scale = scale_depth / math.sqrt(num_hidden_layers)
 
     def load_hf_weights(self, weights):

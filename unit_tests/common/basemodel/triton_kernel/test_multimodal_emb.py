@@ -30,30 +30,13 @@ def test_multimodal_emb():
     image_token_size = 512
 
     text_weight = torch.randn((vob_size, D), device="cuda", dtype=torch.float16)
-    img_weight = torch.randn(
-        (image_size * image_token_size, D), device="cuda", dtype=torch.float16
-    )
-    img_token_lens = torch.full(
-        (image_size,), image_token_size, device="cuda", dtype=torch.long
-    )
-    img_start_token_ids = (
-        (
-            torch.arange(0, image_size * image_token_size, image_token_size)
-            + vob_size * 10
-        )
-        .cuda()
-        .long()
-    )
-    img_start_locs = (
-        torch.arange(0, image_size * image_token_size, image_token_size).cuda().long()
-    )
+    img_weight = torch.randn((image_size * image_token_size, D), device="cuda", dtype=torch.float16)
+    img_token_lens = torch.full((image_size,), image_token_size, device="cuda", dtype=torch.long)
+    img_start_token_ids = (torch.arange(0, image_size * image_token_size, image_token_size) + vob_size * 10).cuda().long()
+    img_start_locs = torch.arange(0, image_size * image_token_size, image_token_size).cuda().long()
 
     prompt_ids = torch.arange(0, S, 1).cuda().long()
-    prompt_ids[0 : image_size * image_token_size] = (
-        (vob_size * 10 + torch.arange(0, image_size * image_token_size, 1))
-        .cuda()
-        .long()
-    )
+    prompt_ids[0 : image_size * image_token_size] = (vob_size * 10 + torch.arange(0, image_size * image_token_size, 1)).cuda().long()
 
     out = torch.zeros((S, D), dtype=torch.float16, device="cuda")
     multimodal_emb(

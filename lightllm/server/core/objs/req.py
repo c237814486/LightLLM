@@ -149,9 +149,7 @@ class Req(ctypes.Structure):
 
         self.out_tokens_queue = CircularQueue()
         self.input_len = len(prompt_ids)
-        self.alloc_shm_numpy_len = (
-            self.input_len + self.sample_params.max_new_tokens + 1024
-        )  # + 1024 for safe
+        self.alloc_shm_numpy_len = self.input_len + self.sample_params.max_new_tokens + 1024  # + 1024 for safe
         self.create_logprobs_shm_array()
         self.create_prompt_ids_shm_array()
         self.chunked_prefill_size = chunked_prefill_size
@@ -168,36 +166,28 @@ class Req(ctypes.Structure):
     def create_prompt_ids_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_prompts_{self.index_in_shm_mem}"
-        self.shm_prompt_ids = ShmArray(
-            name, (self.alloc_shm_numpy_len,), dtype=np.int64
-        )
+        self.shm_prompt_ids = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.int64)
         self.shm_prompt_ids.create_shm()
         return
 
     def link_prompt_ids_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_prompts_{self.index_in_shm_mem}"
-        self.shm_prompt_ids = ShmArray(
-            name, (self.alloc_shm_numpy_len,), dtype=np.int64
-        )
+        self.shm_prompt_ids = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.int64)
         self.shm_prompt_ids.link_shm()
         return
 
     def create_logprobs_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_logprobs_{self.index_in_shm_mem}"
-        self.shm_logprobs = ShmArray(
-            name, (self.alloc_shm_numpy_len,), dtype=np.float32
-        )
+        self.shm_logprobs = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.float32)
         self.shm_logprobs.create_shm()
         return
 
     def link_logprobs_shm_array(self):
         service_uni_name = get_unique_server_name()
         name = f"{service_uni_name}_shm_logprobs_{self.index_in_shm_mem}"
-        self.shm_logprobs = ShmArray(
-            name, (self.alloc_shm_numpy_len,), dtype=np.float32
-        )
+        self.shm_logprobs = ShmArray(name, (self.alloc_shm_numpy_len,), dtype=np.float32)
         self.shm_logprobs.link_shm()
         return
 
@@ -231,12 +221,7 @@ class Req(ctypes.Structure):
         if self.is_aborted and can_released_mark and ref_count_ok:
             return True
 
-        if (
-            self.finish_status.is_finished()
-            and can_released_mark
-            and ref_count_ok
-            and self.out_tokens_queue.is_empty()
-        ):
+        if self.finish_status.is_finished() and can_released_mark and ref_count_ok and self.out_tokens_queue.is_empty():
             return True
 
         return False
@@ -263,9 +248,7 @@ class Req(ctypes.Structure):
         cur_ids = self.shm_prompt_ids.arr[0 : self.input_len]
         all_prompts = []
         for index in range(len(cur_ids) - 1):
-            tmp_dict = {
-                int(cur_ids[index + 1]): float(self.shm_logprobs.arr[index + 1])
-            }
+            tmp_dict = {int(cur_ids[index + 1]): float(self.shm_logprobs.arr[index + 1])}
             all_prompts.append([int(cur_ids[index]), tmp_dict])
 
         metadata["prompt_logprobs"] = all_prompts
@@ -306,20 +289,7 @@ class ChunkedPrefillReq(Req):
             )
 
         a_len = max(self.input_len + has_out_len + 1, self.shm_cur_kv_len + 1)
-        b_len = (
-            (
-                self.input_len
-                + has_out_len
-                - self.shm_cur_kv_len
-                + self.chunked_prefill_size
-                - 1
-            )
-            // self.chunked_prefill_size
-            * (max_waiting_token + 1)
-            + cur_max_new_token_len
-            - has_out_len
-            - 1
-        )
+        b_len = (self.input_len + has_out_len - self.shm_cur_kv_len + self.chunked_prefill_size - 1) // self.chunked_prefill_size * (max_waiting_token + 1) + cur_max_new_token_len - has_out_len - 1
         b_len = max(0, b_len) + ADDED_OUTPUT_LEN
 
         return (a_len, b_len)
@@ -352,11 +322,7 @@ class TokenHealingReq(ChunkedPrefillReq):
         for prefix_token_num in range(2, -1, -1):
             if self.input_len > prefix_token_num:
                 self.input_len -= prefix_token_num
-                self.prefix_token_ids.set_token_ids(
-                    self.shm_prompt_ids.arr[
-                        self.input_len : (self.input_len + prefix_token_num)
-                    ]
-                )
+                self.prefix_token_ids.set_token_ids(self.shm_prompt_ids.arr[self.input_len : (self.input_len + prefix_token_num)])
                 break
 
         # 因为原始的输出token数量，会被中间的前缀补全占用decode次数，
@@ -364,7 +330,5 @@ class TokenHealingReq(ChunkedPrefillReq):
         # 估计的生成token数据对应的生存周期可能会不准确,所以为了缓解调
         # 度带来的显存估计问题，对于生成token的长度 + 6来缓解可能的估计
         # 错误问题。
-        self.sample_params.max_new_tokens = (
-            self.sample_params.max_new_tokens + self.prefix_token_ids.size + 6
-        )
+        self.sample_params.max_new_tokens = self.sample_params.max_new_tokens + self.prefix_token_ids.size + 6
         return

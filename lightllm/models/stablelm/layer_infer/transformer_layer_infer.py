@@ -18,9 +18,7 @@ from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 class StablelmTransformerLayerInfer(LlamaTransformerLayerInfer):
     def __init__(self, layer_num, network_config, mode=[]):
         super().__init__(layer_num, network_config, mode)
-        self.partial_rotary_factor = self.network_config_.get(
-            "partial_rotary_factor", 1
-        )
+        self.partial_rotary_factor = self.network_config_.get("partial_rotary_factor", 1)
         return
 
     def _bind_norm(self):
@@ -38,9 +36,7 @@ class StablelmTransformerLayerInfer(LlamaTransformerLayerInfer):
         q = layer_weight.q_proj.mm(input.view(-1, self.embed_dim_))
         cache_kv = layer_weight.kv_proj.mm(
             input.view(-1, self.embed_dim_),
-            out=cache_kv.view(
-                -1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_
-            ),
+            out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),
         ).view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_), self.head_dim_)
         rotary_emb_fwd(
             q.view(-1, self.tp_q_head_num_, self.head_dim_),

@@ -8,9 +8,7 @@ from .httpserver.manager import HttpServerManager
 import ujson as json
 
 
-async def lightllm_get_score(
-    request: Request, httpserver_manager: HttpServerManager
-) -> Response:
+async def lightllm_get_score(request: Request, httpserver_manager: HttpServerManager) -> Response:
     request_dict = await request.json()
     prompt = request_dict.pop("chat")
     sample_params_dict = {"max_new_tokens": 1}
@@ -19,9 +17,7 @@ async def lightllm_get_score(
     sampling_params.verify()
     multimodal_params_dict = request_dict.get("multimodal_params", {})
     multimodal_params = MultimodalParams(**multimodal_params_dict)
-    results_generator = httpserver_manager.generate(
-        prompt, sampling_params, multimodal_params, request=request
-    )
+    results_generator = httpserver_manager.generate(prompt, sampling_params, multimodal_params, request=request)
 
     ret = {}
     # n === 1
@@ -33,9 +29,7 @@ async def lightllm_get_score(
     return Response(content=json.dumps(ret, ensure_ascii=False).encode("utf-8"))
 
 
-async def lightllm_generate(
-    request: Request, httpserver_manager: HttpServerManager
-) -> Response:
+async def lightllm_generate(request: Request, httpserver_manager: HttpServerManager) -> Response:
 
     request_dict = await request.json()
     prompt = request_dict.pop("inputs")
@@ -47,9 +41,7 @@ async def lightllm_generate(
     multimodal_params_dict = request_dict.get("multimodal_params", {})
     multimodal_params = MultimodalParams(**multimodal_params_dict)
 
-    results_generator = httpserver_manager.generate(
-        prompt, sampling_params, multimodal_params, request=request
-    )
+    results_generator = httpserver_manager.generate(prompt, sampling_params, multimodal_params, request=request)
 
     # Non-streaming case
     final_output_dict = collections.defaultdict(list)
@@ -85,9 +77,7 @@ async def lightllm_generate(
     sub_ids = list(final_output_dict.keys())[:n]
     final_output_list = ["".join(final_output_dict[sub_id]) for sub_id in sub_ids]
     count_output_tokens_list = [count_output_tokens_dict[sub_id] for sub_id in sub_ids]
-    finish_reson_list = [
-        finish_reason_dict[sub_id].get_finish_reason() for sub_id in sub_ids
-    ]
+    finish_reson_list = [finish_reason_dict[sub_id].get_finish_reason() for sub_id in sub_ids]
     tokens_list = [tokens_dict[sub_id] for sub_id in sub_ids]
     only_one = len(sub_ids) == 1
 
@@ -108,9 +98,7 @@ async def lightllm_generate(
     return Response(content=json.dumps(ret, ensure_ascii=False).encode("utf-8"))
 
 
-async def lightllm_generate_stream(
-    request: Request, httpserver_manager: HttpServerManager
-) -> Response:
+async def lightllm_generate_stream(request: Request, httpserver_manager: HttpServerManager) -> Response:
 
     request_dict = await request.json()
     prompt = request_dict.pop("inputs")
@@ -124,9 +112,7 @@ async def lightllm_generate_stream(
 
     multimodal_params_dict = request_dict.get("multimodal_params", {})
     multimodal_params = MultimodalParams(**multimodal_params_dict)
-    results_generator = httpserver_manager.generate(
-        prompt, sampling_params, multimodal_params, request=request
-    )
+    results_generator = httpserver_manager.generate(prompt, sampling_params, multimodal_params, request=request)
 
     # Streaming case
     async def stream_results() -> AsyncGenerator[bytes, None]:
@@ -146,11 +132,7 @@ async def lightllm_generate_stream(
                 "details": None,
             }
 
-            yield ("data:" + json.dumps(ret, ensure_ascii=False) + "\n\n").encode(
-                "utf-8"
-            )
+            yield ("data:" + json.dumps(ret, ensure_ascii=False) + "\n\n").encode("utf-8")
 
     background_tasks = BackgroundTasks()
-    return StreamingResponse(
-        stream_results(), media_type="text/event-stream", background=background_tasks
-    )
+    return StreamingResponse(stream_results(), media_type="text/event-stream", background=background_tasks)

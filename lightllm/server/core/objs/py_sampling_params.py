@@ -45,22 +45,16 @@ class SamplingParams:
         image_max_patch_num: int = -1,
         max_new_tokens: int = 16,
         min_new_tokens: int = 1,
-        stop_sequences: Optional[
-            Union[str, List[str], List[List[int]]]
-        ] = None,  # 停止句子条件
+        stop_sequences: Optional[Union[str, List[str], List[List[int]]]] = None,  # 停止句子条件
         skip_special_tokens: bool = True,  # whether to skip special tokens when decoding
         add_special_tokens: bool = True,  # whether to add special tokens when encoding
         add_spaces_between_special_tokens: bool = True,  # whether to add spaces between special tokens when decoding
         print_eos_token: bool = False,  # eos_id will be always ignored except the value is set to True
         # Whether to count input tokens for presence_penalty, frequency_penalty and repetition_penalty
         input_penalty: bool = DEFAULT_INPUT_PENALTY,
-        regular_constraint: Optional[
-            str
-        ] = None,  # Regular expressions constrain the output.
+        regular_constraint: Optional[str] = None,  # Regular expressions constrain the output.
         guided_grammar: Optional[str] = None,  # EBNF constrain the output.
-        guided_json: Optional[
-            Union[str, dict]
-        ] = None,  # JSON schema constrain the output.
+        guided_json: Optional[Union[str, dict]] = None,  # JSON schema constrain the output.
         # If provided, the engine will construct a logits,
         # processor which only retains scores for the given token ids. Defaults to None.
         # allowed_token_ids only can be used in "--output_constraint_mode outlines" started server.
@@ -74,39 +68,19 @@ class SamplingParams:
     ) -> None:
         self.best_of = best_of
         self.n = n
-        self.do_sample = (
-            do_sample if do_sample is not None else SamplingParams._do_sample
-        )
-        self.presence_penalty = (
-            presence_penalty
-            if presence_penalty is not None
-            else SamplingParams._presence_penalty
-        )
-        self.frequency_penalty = (
-            frequency_penalty
-            if frequency_penalty is not None
-            else SamplingParams._frequency_penalty
-        )
-        self.repetition_penalty = (
-            repetition_penalty
-            if repetition_penalty is not None
-            else SamplingParams._repetition_penalty
-        )
+        self.do_sample = do_sample if do_sample is not None else SamplingParams._do_sample
+        self.presence_penalty = presence_penalty if presence_penalty is not None else SamplingParams._presence_penalty
+        self.frequency_penalty = frequency_penalty if frequency_penalty is not None else SamplingParams._frequency_penalty
+        self.repetition_penalty = repetition_penalty if repetition_penalty is not None else SamplingParams._repetition_penalty
         self.exponential_decay_length_penalty = exponential_decay_length_penalty
-        self.temperature = (
-            temperature if temperature is not None else SamplingParams._temperature
-        )
+        self.temperature = temperature if temperature is not None else SamplingParams._temperature
         self.top_p = top_p if top_p is not None else SamplingParams._top_p
         self.top_k = top_k if top_k is not None else SamplingParams._top_k
         self.ignore_eos = ignore_eos
         self.image_max_patch_num = image_max_patch_num
         self.max_new_tokens = max_new_tokens
         self.min_new_tokens = min_new_tokens
-        self.stop_sequences = (
-            stop_sequences
-            if stop_sequences is not None
-            else SamplingParams._stop_sequences
-        )
+        self.stop_sequences = stop_sequences if stop_sequences is not None else SamplingParams._stop_sequences
         self.skip_special_tokens = skip_special_tokens
         self.add_special_tokens = add_special_tokens
         self.add_spaces_between_special_tokens = add_spaces_between_special_tokens
@@ -122,9 +96,7 @@ class SamplingParams:
             self.temperature = 1.0
             self.top_p = 1.0
             self.top_k = 1
-        if (
-            self.temperature >= 0.0 and self.temperature < _SAMPLING_EPS
-        ):  # temperature is too slow, change to greedy search
+        if self.temperature >= 0.0 and self.temperature < _SAMPLING_EPS:  # temperature is too slow, change to greedy search
             self.temperature = 1.0
             self.top_k = 1
         self.input_penalty = input_penalty
@@ -135,9 +107,7 @@ class SamplingParams:
     @classmethod
     def load_generation_cfg(cls, weight_dir):
         try:
-            generation_cfg = GenerationConfig.from_pretrained(
-                weight_dir, trust_remote_code=True
-            ).to_dict()
+            generation_cfg = GenerationConfig.from_pretrained(weight_dir, trust_remote_code=True).to_dict()
             cls._do_sample = generation_cfg.get("do_sample", False)
             cls._presence_penalty = generation_cfg.get("presence_penalty", 0.0)
             cls._frequency_penalty = generation_cfg.get("frequency_penalty", 0.0)
@@ -151,72 +121,46 @@ class SamplingParams:
 
     def verify(self):
         if self.best_of <= 0 or self.best_of > MAX_BEST_OF:
-            raise ValueError(
-                f"need 0 < best_of <= {MAX_BEST_OF}, but get {self.best_of}"
-            )
+            raise ValueError(f"need 0 < best_of <= {MAX_BEST_OF}, but get {self.best_of}")
         if self.n != self.best_of:
             raise ValueError("current only supported n == best_of")
         if self.n <= 0 or self.n > MAX_BEST_OF or self.n > self.best_of:
-            raise ValueError(
-                f"need 0 < n <= {MAX_BEST_OF}, n <= {self.best_of}, but get {self.n}"
-            )
+            raise ValueError(f"need 0 < n <= {MAX_BEST_OF}, n <= {self.best_of}, but get {self.n}")
         if self.presence_penalty < 0.0:
-            raise ValueError(
-                f"presence_penalty must >= 0.0, got {self.presence_penalty}"
-            )
+            raise ValueError(f"presence_penalty must >= 0.0, got {self.presence_penalty}")
         if self.frequency_penalty < 0.0:
-            raise ValueError(
-                f"frequency_penalty must >= 0.0, got {self.frequency_penalty}"
-            )
+            raise ValueError(f"frequency_penalty must >= 0.0, got {self.frequency_penalty}")
         if self.repetition_penalty < 1.0:
-            raise ValueError(
-                f"repetition_penalty must >= 1.0, got {self.repetition_penalty}"
-            )
+            raise ValueError(f"repetition_penalty must >= 1.0, got {self.repetition_penalty}")
         if self.temperature <= 0.0:
             raise ValueError(f"temperature must > 0.0, got {self.temperature}")
         if self.top_p <= 0.0 or self.top_p > 1.0:
             raise ValueError(f"top_p must in (0.0, 1.0], got {self.top_p}")
         if self.top_k < -1 or self.top_k == 0:
-            raise ValueError(
-                f"top_k must be -1 (disable), or at least 1, got {self.top_k}."
-            )
+            raise ValueError(f"top_k must be -1 (disable), or at least 1, got {self.top_k}.")
         if self.max_new_tokens < 1:
-            raise ValueError(
-                f"max_new_tokens must be at least 1 , got {self.max_new_tokens}."
-            )
+            raise ValueError(f"max_new_tokens must be at least 1 , got {self.max_new_tokens}.")
         if self.min_new_tokens < 1:
-            raise ValueError(
-                f"min_new_tokens must be at least 1 , got {self.min_new_tokens}."
-            )
+            raise ValueError(f"min_new_tokens must be at least 1 , got {self.min_new_tokens}.")
         if self.min_new_tokens > self.max_new_tokens:
-            raise ValueError(
-                f"min_new_tokens must <= max_new_tokens, but got min {self.min_new_tokens}, max {self.max_new_tokens}."
-            )
+            raise ValueError(f"min_new_tokens must <= max_new_tokens, but got min {self.min_new_tokens}, max {self.max_new_tokens}.")
 
         if len(self.exponential_decay_length_penalty) != 2:
             raise ValueError(
                 f"exponential_decay_length_penalty must be a tuple of (int, float), \
                 got {self.exponential_decay_length_penalty}."
             )
-        if (
-            not isinstance(self.exponential_decay_length_penalty[0], int)
-            or self.exponential_decay_length_penalty[0] < 0
-        ):
+        if not isinstance(self.exponential_decay_length_penalty[0], int) or self.exponential_decay_length_penalty[0] < 0:
             raise ValueError(
                 f"exponential_decay_length_penalty[0] must be a non-negative integer, \
                 got {self.exponential_decay_length_penalty[0]}."
             )
-        if (
-            not isinstance(self.exponential_decay_length_penalty[1], float)
-            or self.exponential_decay_length_penalty[1] < 1.0
-        ):
+        if not isinstance(self.exponential_decay_length_penalty[1], float) or self.exponential_decay_length_penalty[1] < 1.0:
             raise ValueError(
                 f"exponential_decay_length_penalty[1] must be a float >= 1.0, \
                 got {self.exponential_decay_length_penalty[1]}."
             )
-        if self.regular_constraint is not None and not isinstance(
-            self.regular_constraint, str
-        ):
+        if self.regular_constraint is not None and not isinstance(self.regular_constraint, str):
             raise ValueError(
                 f"regular_expression must be str type, \
                               but get {str(self.regular_constraint)}"
@@ -229,31 +173,16 @@ class SamplingParams:
 
                 interegular.parse_pattern(self.regular_constraint)
             except Exception as e:
-                raise ValueError(
-                    f"regular_expression '{self.regular_constraint}' has parse_pattern_error: {str(e)}"
-                )
+                raise ValueError(f"regular_expression '{self.regular_constraint}' has parse_pattern_error: {str(e)}")
 
-        if not (
-            self.group_request_id is None or isinstance(self.group_request_id, int)
-        ):
-            raise ValueError(
-                f"group_request_id must be None or int ,but get {self.group_request_id}"
-            )
+        if not (self.group_request_id is None or isinstance(self.group_request_id, int)):
+            raise ValueError(f"group_request_id must be None or int ,but get {self.group_request_id}")
 
-        if not (
-            self.move_kv_to_decode_node is None
-            or isinstance(self.move_kv_to_decode_node, dict)
-        ):
-            raise ValueError(
-                f"move_kv_to_decode_node must be None or dict, but get {self.move_kv_to_decode_node}"
-            )
+        if not (self.move_kv_to_decode_node is None or isinstance(self.move_kv_to_decode_node, dict)):
+            raise ValueError(f"move_kv_to_decode_node must be None or dict, but get {self.move_kv_to_decode_node}")
 
-        if not (
-            self.suggested_dp_index is None or isinstance(self.suggested_dp_index, int)
-        ):
-            raise ValueError(
-                f"suggested_dp_index must be None or int, but get {self.suggested_dp_index}"
-            )
+        if not (self.suggested_dp_index is None or isinstance(self.suggested_dp_index, int)):
+            raise ValueError(f"suggested_dp_index must be None or int, but get {self.suggested_dp_index}")
 
         self._verify_stop_sentences()
 
@@ -263,18 +192,10 @@ class SamplingParams:
 
     def _verify_allowed_token_ids(self):
         if self.allowed_token_ids is not None:
-            if (not isinstance(self.allowed_token_ids, list)) or (
-                not all(
-                    isinstance(token_id, int) for token_id in self.allowed_token_ids
-                )
-            ):
-                raise ValueError(
-                    f"allowed_token_ids need format List[int], but get {self.allowed_token_ids}"
-                )
+            if (not isinstance(self.allowed_token_ids, list)) or (not all(isinstance(token_id, int) for token_id in self.allowed_token_ids)):
+                raise ValueError(f"allowed_token_ids need format List[int], but get {self.allowed_token_ids}")
             if self.regular_constraint is not None:
-                raise ValueError(
-                    "allowed_token_ids and regular_constraint can not be used in same time"
-                )
+                raise ValueError("allowed_token_ids and regular_constraint can not be used in same time")
         return
 
     def _verify_stop_sentences(self):
@@ -282,21 +203,11 @@ class SamplingParams:
             if isinstance(self.stop_sequences, str):
                 return
             if isinstance(self.stop_sequences, list):
-                all_str = all(
-                    isinstance(stop_info, str) for stop_info in self.stop_sequences
-                )
-                all_int_list = all(
-                    (
-                        isinstance(stop_info, list) and isinstance(x, int)
-                        for x in stop_info
-                    )
-                    for stop_info in self.stop_sequences
-                )
+                all_str = all(isinstance(stop_info, str) for stop_info in self.stop_sequences)
+                all_int_list = all((isinstance(stop_info, list) and isinstance(x, int) for x in stop_info) for stop_info in self.stop_sequences)
                 if all_str or all_int_list:
                     return
-            raise ValueError(
-                "stop_sequences only support str, list[str], list[list[int]] type"
-            )
+            raise ValueError("stop_sequences only support str, list[str], list[list[int]] type")
 
     def stop_sentences_to_token_ids(self, tokenizer):
         if self.stop_sequences is None:

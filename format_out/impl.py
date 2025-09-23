@@ -19,9 +19,7 @@ class ChatSession:
     chat_his: str
     sampling_param: SamplingParams
     url: str = "http://localhost:8017/generate"
-    http_headers: dict = dataclasses.field(
-        default_factory=lambda: {"Content-Type": "application/json"}
-    )
+    http_headers: dict = dataclasses.field(default_factory=lambda: {"Content-Type": "application/json"})
     default_retry_count: int = 1
     disable_log: bool = False
 
@@ -33,9 +31,7 @@ class ChatSession:
         self.chat_his = self.chat_his[:-len]
         return
 
-    def generate(
-        self, regex: str = None, max_new_tokens=None, prefix_regex=None, retry_count=1
-    ):
+    def generate(self, regex: str = None, max_new_tokens=None, prefix_regex=None, retry_count=1):
         sampling_param = copy.copy(self.sampling_param)
         if max_new_tokens is not None:
             sampling_param.max_new_tokens = max_new_tokens
@@ -49,18 +45,14 @@ class ChatSession:
 
         for _ in range(retry_count):
             try:
-                response = requests.post(
-                    self.url, headers=self.http_headers, data=json.dumps(data)
-                )
+                response = requests.post(self.url, headers=self.http_headers, data=json.dumps(data))
                 if response.status_code == 200:
                     json_ans = response.json()
                     if not self.disable_log:
                         logger.info(f"gen get {str(json_ans)}")
                     return json_ans["generated_text"][0]
                 else:
-                    logger.warning(
-                        f"gen Error: {response.status_code}, {response.text[0:100]}"
-                    )
+                    logger.warning(f"gen Error: {response.status_code}, {response.text[0:100]}")
                     logger.info("retry gen")
             except:
                 pass
@@ -140,9 +132,7 @@ class ChatSession:
         # 当 ensure_ascii 为 true 时，如果 json_schema 包含中文，
         # 会导致，生成的新描述中，中文被转成了 \uxxxx 的格式。
         json_schema = json.dumps(json_schema, ensure_ascii=ensure_ascii)
-        regex_str = build_regex_from_schema(
-            json_schema, whitespace_pattern=whitespace_pattern
-        )
+        regex_str = build_regex_from_schema(json_schema, whitespace_pattern=whitespace_pattern)
 
         # 将正则表达式中用 \uxxxx 表达的中文，替换回中文字符，否则 outlines 依赖的 interegular
         # 无法正确解析这个正则表达式。

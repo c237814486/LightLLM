@@ -22,9 +22,7 @@ def load_func(
         weights = safe_open(os.path.join(weight_dir, file_), "pt", "cpu")
         weights = {k: weights.get_tensor(k) for k in weights.keys()}
     else:
-        weights = utils.PetrelHelper.load(
-            os.path.join(weight_dir, file_), map_location="cpu"
-        )
+        weights = utils.PetrelHelper.load(os.path.join(weight_dir, file_), map_location="cpu")
 
     if pre_post_layer is not None:
         pre_post_layer.load_hf_weights(weights)
@@ -62,9 +60,7 @@ def load_hf_weights(
     if len(candidate_files) == 0:
         use_safetensors = False
         candidate_files = list(filter(lambda x: x.endswith(".bin"), files))
-    assert (
-        len(candidate_files) != 0
-    ), "can only support pytorch tensor and safetensors format for weights."
+    assert len(candidate_files) != 0, "can only support pytorch tensor and safetensors format for weights."
     from functools import partial
     from multiprocessing.pool import ThreadPool as Pool
 

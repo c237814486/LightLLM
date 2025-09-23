@@ -16,18 +16,14 @@ class QwenPreAndPostLayerWeight(PreAndPostLayerWeight):
         if "transformer.wte.weight" in weights:
             self.wte_weight_ = self._cuda(
                 weights["transformer.wte.weight"][
-                    split_vob_size
-                    * self.tp_rank_ : split_vob_size
-                    * (self.tp_rank_ + 1),
+                    split_vob_size * self.tp_rank_ : split_vob_size * (self.tp_rank_ + 1),
                     :,
                 ]
             )
         if "lm_head.weight" in weights:
             self.lm_head_weight_ = self._cuda(
                 weights["lm_head.weight"][
-                    split_vob_size
-                    * self.tp_rank_ : split_vob_size
-                    * (self.tp_rank_ + 1),
+                    split_vob_size * self.tp_rank_ : split_vob_size * (self.tp_rank_ + 1),
                     :,
                 ]
             )

@@ -72,9 +72,7 @@ class w8a8QuantizationMethod(BaseQuantizationMethod):
         else:
             raise ValueError("vllm-quant Weights must be a tuple of length 2 or 3.")
 
-        x_q, x_scale, x_zp = vllm_ops.scaled_int8_quant(
-            input_tensor, scale=input_scale, azp=None, symmetric=True
-        )
+        x_q, x_scale, x_zp = vllm_ops.scaled_int8_quant(input_tensor, scale=input_scale, azp=None, symmetric=True)
         m = input_tensor.shape[0]
         n = qweight.shape[1]
         if out is None:
@@ -86,9 +84,7 @@ class w8a8QuantizationMethod(BaseQuantizationMethod):
                     is_graph_out=False,
                 )
             else:
-                out = torch.empty(
-                    (m, n), dtype=input_tensor.dtype, device=input_tensor.device
-                )
+                out = torch.empty((m, n), dtype=input_tensor.dtype, device=input_tensor.device)
         cutlass_scaled_mm(out, x_q, qweight, x_scale, weight_scale, bias)
         return out
 
@@ -113,9 +109,7 @@ class FP8w8a8QuantizationMethod(BaseQuantizationMethod):
         num_experts = weight.shape[0]
         qweights = []
         weight_scales = []
-        qweights = torch.empty_like(weight, dtype=torch.float8_e4m3fn).cuda(
-            self.device_id_
-        )
+        qweights = torch.empty_like(weight, dtype=torch.float8_e4m3fn).cuda(self.device_id_)
         for i in range(num_experts):
             qweight, weight_scale = scaled_fp8_quant(
                 weight[i].contiguous().cuda(self.device_id_),
@@ -136,9 +130,7 @@ class FP8w8a8QuantizationMethod(BaseQuantizationMethod):
         workspace=None,
         use_custom_tensor_mananger=True,
     ):
-        x_q, x_scale = scaled_fp8_quant(
-            input_tensor, scale=None, scale_ub=None, use_per_token_if_dynamic=True
-        )
+        x_q, x_scale = scaled_fp8_quant(input_tensor, scale=None, scale_ub=None, use_per_token_if_dynamic=True)
         m = input_tensor.shape[0]
         n = weights[0].shape[1]
         if out is None:
@@ -150,9 +142,7 @@ class FP8w8a8QuantizationMethod(BaseQuantizationMethod):
                     is_graph_out=False,
                 )
             else:
-                out = torch.empty(
-                    (m, n), dtype=input_tensor.dtype, device=input_tensor.device
-                )
+                out = torch.empty((m, n), dtype=input_tensor.dtype, device=input_tensor.device)
         cutlass_scaled_mm(out, x_q, weights[0], x_scale, weights[1], bias)
         return out
 
@@ -163,9 +153,7 @@ class FP8w8a8B128QuantizationMethod(BaseQuantizationMethod):
         super().__init__()
         self.block_size = 128
         self.weight_scale_suffix = "weight_scale_inv"
-        self.act_scale_suffix = (
-            None  # no support for static input tensor scale for ds model.
-        )
+        self.act_scale_suffix = None  # no support for static input tensor scale for ds model.
 
     def quantize(self, weight: torch.Tensor):
 
@@ -190,12 +178,8 @@ class FP8w8a8B128QuantizationMethod(BaseQuantizationMethod):
                 device=input_tensor.device,
                 is_graph_out=False,
             )
-            qinput_tensor = self.cache_manager.alloc_tensor(
-                (m, k), qweight.dtype, device=qweight.device, is_graph_out=False
-            )
-            per_token_group_quant_fp8(
-                input_tensor, self.block_size, qinput_tensor, input_scale
-            )
+            qinput_tensor = self.cache_manager.alloc_tensor((m, k), qweight.dtype, device=qweight.device, is_graph_out=False)
+            per_token_group_quant_fp8(input_tensor, self.block_size, qinput_tensor, input_scale)
         if out is None:
             if use_custom_tensor_mananger:
                 out = self.cache_manager.alloc_tensor(
@@ -205,9 +189,7 @@ class FP8w8a8B128QuantizationMethod(BaseQuantizationMethod):
                     is_graph_out=False,
                 )
             else:
-                out = torch.empty(
-                    (m, n), dtype=input_tensor.dtype, device=input_tensor.device
-                )
+                out = torch.empty((m, n), dtype=input_tensor.dtype, device=input_tensor.device)
         if n % 128 != 0:
             w8a8_block_fp8_matmul(
                 qinput_tensor,
@@ -220,7 +202,5 @@ class FP8w8a8B128QuantizationMethod(BaseQuantizationMethod):
             )
         else:
             input_scale = input_scale.t().contiguous().t()
-            cutlass_scaled_mm(
-                out, qinput_tensor, qweight, input_scale, weight_scale, bias
-            )
+            cutlass_scaled_mm(out, qinput_tensor, qweight, input_scale, weight_scale, bias)
         return out

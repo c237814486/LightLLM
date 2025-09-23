@@ -185,23 +185,14 @@ def main(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Benchmark the online serving throughput."
-    )
-    parser.add_argument(
-        "--dataset", type=str, required=True, help="Path to the dataset."
-    )
-    parser.add_argument(
-        "--tokenizer", type=str, required=True, help="Name or path of the tokenizer."
-    )
+    parser = argparse.ArgumentParser(description="Benchmark the online serving throughput.")
+    parser.add_argument("--dataset", type=str, required=True, help="Path to the dataset.")
+    parser.add_argument("--tokenizer", type=str, required=True, help="Name or path of the tokenizer.")
     parser.add_argument(
         "--request-rate",
         type=float,
         default=float("inf"),
-        help="Number of requests per second. If this is inf, "
-        "then all the requests are sent at time 0. "
-        "Otherwise, we use Poisson process to synthesize "
-        "the request arrival times.",
+        help="Number of requests per second. If this is inf, " "then all the requests are sent at time 0. " "Otherwise, we use Poisson process to synthesize " "the request arrival times.",
     )
     parser.add_argument("--port", type=int, default=8000, help="port number")
     parser.add_argument("--seed", type=int, default=0)

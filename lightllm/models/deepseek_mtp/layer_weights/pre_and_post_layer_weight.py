@@ -14,17 +14,13 @@ class Deepseek3MTPPreAndPostLayerWeight(LlamaPreAndPostLayerWeight):
 
     def load_hf_weights(self, weights):
         if "model.layers.0.eh_proj.weight" in weights:
-            self.eh_proj_weight_ = self._cuda(
-                weights["model.layers.0.eh_proj.weight"]
-            ).t()
+            self.eh_proj_weight_ = self._cuda(weights["model.layers.0.eh_proj.weight"]).t()
         if "model.layers.0.enorm.weight" in weights:
             self.enorm_weight_ = self._cuda(weights["model.layers.0.enorm.weight"])
         if "model.layers.0.hnorm.weight" in weights:
             self.hnorm_weight_ = self._cuda(weights["model.layers.0.hnorm.weight"])
         if "model.layers.0.shared_head.norm.weight" in weights:
-            self.final_norm_weight_ = self._cuda(
-                weights["model.layers.0.shared_head.norm.weight"]
-            )
+            self.final_norm_weight_ = self._cuda(weights["model.layers.0.shared_head.norm.weight"])
         return
 
     def verify_load(self):

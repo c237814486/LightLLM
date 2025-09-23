@@ -52,13 +52,9 @@ def _start_tcp_store_server(nccl_store_host, nccl_store_port):
 
         while True:
             keys_num = store.num_keys()
-            logger.info(
-                f"[Server] TCPStore start: {nccl_store_host}:{nccl_store_port} keys num: {keys_num}"
-            )
+            logger.info(f"[Server] TCPStore start: {nccl_store_host}:{nccl_store_port} keys num: {keys_num}")
             time.sleep(20)
 
     except Exception as e:
         logger.warning(str(e))
-        logger.info(
-            f"TCPStore server {nccl_store_host}:{nccl_store_port} start failed, retrying ..."
-        )
+        logger.info(f"TCPStore server {nccl_store_host}:{nccl_store_port} start failed, retrying ...")

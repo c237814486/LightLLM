@@ -27,9 +27,7 @@ def weight_quant_kernel(x_ptr, s_ptr, y_ptr, M, N, BLOCK_SIZE: tl.constexpr):
     tl.store(s_ptr + pid_m * n_blocks + pid_n, scale)
 
 
-def mm_weight_quant(
-    x: torch.Tensor, block_size: int = 128
-) -> tuple[torch.Tensor, torch.Tensor]:
+def mm_weight_quant(x: torch.Tensor, block_size: int = 128) -> tuple[torch.Tensor, torch.Tensor]:
     assert x.is_contiguous(), "Input tensor must be contiguous"
     M, N = x.size()
 
@@ -37,9 +35,7 @@ def mm_weight_quant(
 
     num_blocks_m = triton.cdiv(M, block_size)
     num_blocks_n = triton.cdiv(N, block_size)
-    s_scales = torch.empty(
-        (num_blocks_m, num_blocks_n), dtype=torch.float32, device=x.device
-    )
+    s_scales = torch.empty((num_blocks_m, num_blocks_n), dtype=torch.float32, device=x.device)
 
     grid = lambda meta: (
         triton.cdiv(M, meta["BLOCK_SIZE"]),
@@ -49,9 +45,7 @@ def mm_weight_quant(
     return y_quant, s_scales
 
 
-def weight_quant(
-    x: torch.Tensor, block_size: int = 128
-) -> tuple[torch.Tensor, torch.Tensor]:
+def weight_quant(x: torch.Tensor, block_size: int = 128) -> tuple[torch.Tensor, torch.Tensor]:
     assert x.is_contiguous(), "Input tensor must be contiguous"
     x = x.cuda(get_current_device_id())
     if x.dim() == 3:

@@ -58,13 +58,9 @@ class DPDAEdge:
 
 @dataclass
 class DPDAEdgeMap:
-    lookah_pop_to_edge: Dict[T, Dict[Tuple[int, ...], DPDAEdge]] = field(
-        default_factory=lambda: defaultdict(dict)
-    )
+    lookah_pop_to_edge: Dict[T, Dict[Tuple[int, ...], DPDAEdge]] = field(default_factory=lambda: defaultdict(dict))
     # pop_input_to_edge: Dict[Tuple[int, ...], Dict[T, DPDAEdge]] = field(default_factory=lambda: defaultdict(dict))
-    to_dest_edges: Dict[int, List[DPDAEdge]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
+    to_dest_edges: Dict[int, List[DPDAEdge]] = field(default_factory=lambda: defaultdict(list))
 
 
 @dataclass
@@ -75,30 +71,18 @@ class DPDA:
     direct_jump_node_id_to_dpda_edges: Dict[int, DPDAEdgeMap] = None
 
     def add_one_step_dpadge(self, dpda_edge: DPDAEdge):
-        self.one_step_node_id_to_dpda_edges[
-            dpda_edge.source_node_id
-        ].lookah_pop_to_edge[dpda_edge.lookah_input_t][dpda_edge.pop] = dpda_edge
-        self.one_step_node_id_to_dpda_edges[dpda_edge.source_node_id].to_dest_edges[
-            dpda_edge.dest_node_id
-        ].append(dpda_edge)
+        self.one_step_node_id_to_dpda_edges[dpda_edge.source_node_id].lookah_pop_to_edge[dpda_edge.lookah_input_t][dpda_edge.pop] = dpda_edge
+        self.one_step_node_id_to_dpda_edges[dpda_edge.source_node_id].to_dest_edges[dpda_edge.dest_node_id].append(dpda_edge)
 
     def add_none_jump_dpadge(self, dpda_edge: DPDAEdge):
-        self.none_jump_node_id_to_dpda_edges[
-            dpda_edge.source_node_id
-        ].lookah_pop_to_edge[dpda_edge.lookah_input_t][dpda_edge.pop] = dpda_edge
-        self.none_jump_node_id_to_dpda_edges[dpda_edge.source_node_id].to_dest_edges[
-            dpda_edge.dest_node_id
-        ].append(dpda_edge)
+        self.none_jump_node_id_to_dpda_edges[dpda_edge.source_node_id].lookah_pop_to_edge[dpda_edge.lookah_input_t][dpda_edge.pop] = dpda_edge
+        self.none_jump_node_id_to_dpda_edges[dpda_edge.source_node_id].to_dest_edges[dpda_edge.dest_node_id].append(dpda_edge)
         return
 
     def add_direct_jump_dpadge(self, dpda_edge: DPDAEdge):
         assert dpda_edge.input_t == dpda_edge.lookah_input_t
-        self.direct_jump_node_id_to_dpda_edges[
-            dpda_edge.source_node_id
-        ].lookah_pop_to_edge[dpda_edge.lookah_input_t][dpda_edge.pop] = dpda_edge
-        self.direct_jump_node_id_to_dpda_edges[dpda_edge.source_node_id].to_dest_edges[
-            dpda_edge.dest_node_id
-        ].append(dpda_edge)
+        self.direct_jump_node_id_to_dpda_edges[dpda_edge.source_node_id].lookah_pop_to_edge[dpda_edge.lookah_input_t][dpda_edge.pop] = dpda_edge
+        self.direct_jump_node_id_to_dpda_edges[dpda_edge.source_node_id].to_dest_edges[dpda_edge.dest_node_id].append(dpda_edge)
         return
 
     def __repr__(self) -> str:
@@ -142,14 +126,7 @@ class DPDA:
         for source_id, nt_or_t_to_edge in self.lr_graph.source_id_to_edge.items():
             for edge in nt_or_t_to_edge.values():
                 # 找到不是回旋的情况，进行添加
-                if (
-                    len(
-                        self.one_step_node_id_to_dpda_edges[source_id].to_dest_edges[
-                            edge.dest_id
-                        ]
-                    )
-                    == 0
-                ):
+                if len(self.one_step_node_id_to_dpda_edges[source_id].to_dest_edges[edge.dest_id]) == 0:
                     dpda_edge = DPDAEdge(
                         lookah_input_t=edge.transfer_input,
                         input_t=edge.transfer_input,
@@ -172,9 +149,7 @@ class DPDA:
         return
 
     def _get_direct_jump(self, node_id: int, input_t: T) -> List[DPDAEdge]:
-        tmp_ans_dict = self.direct_jump_node_id_to_dpda_edges[
-            node_id
-        ].lookah_pop_to_edge[input_t]
+        tmp_ans_dict = self.direct_jump_node_id_to_dpda_edges[node_id].lookah_pop_to_edge[input_t]
         if tmp_ans_dict:
             return tmp_ans_dict.values()
         # 递归求解
@@ -189,11 +164,7 @@ class DPDA:
             dest_node_id=node_id,
         )
         self._gen_direct_jump_rec(node_id, input_t, visit_set_state, cur_edge)
-        return (
-            self.direct_jump_node_id_to_dpda_edges[node_id]
-            .lookah_pop_to_edge[input_t]
-            .values()
-        )
+        return self.direct_jump_node_id_to_dpda_edges[node_id].lookah_pop_to_edge[input_t].values()
 
     def _gen_direct_jump_rec(
         self,
@@ -217,24 +188,14 @@ class DPDA:
             if merged_tmp_edge is None:  # 不合法的拼接
                 continue
 
-            tmp_graph_node = self.lr_graph.node_id_to_itemset[
-                merged_tmp_edge.dest_node_id
-            ]
-            if (
-                input_t in tmp_graph_node.t_to_item_la
-            ):  # 说明还可以进行回退, 可以进行规约
+            tmp_graph_node = self.lr_graph.node_id_to_itemset[merged_tmp_edge.dest_node_id]
+            if input_t in tmp_graph_node.t_to_item_la:  # 说明还可以进行回退, 可以进行规约
                 visit_set_state.add(none_jump_edge.dest_node_id)
-                self._gen_direct_jump_rec(
-                    tmp_graph_node.node_id, input_t, visit_set_state, merged_tmp_edge
-                )
+                self._gen_direct_jump_rec(tmp_graph_node.node_id, input_t, visit_set_state, merged_tmp_edge)
                 visit_set_state.remove(none_jump_edge.dest_node_id)
             else:
                 # 可以移进，进行边生成
-                for one_step_jump_edge in (
-                    self.one_step_node_id_to_dpda_edges[merged_tmp_edge.dest_node_id]
-                    .lookah_pop_to_edge[input_t]
-                    .values()
-                ):
+                for one_step_jump_edge in self.one_step_node_id_to_dpda_edges[merged_tmp_edge.dest_node_id].lookah_pop_to_edge[input_t].values():
                     ok_edge = self.merge_dpda_edge(merged_tmp_edge, one_step_jump_edge)
                     ok_edge.lookah_input_t = input_t
                     ok_edge.input_t = input_t
@@ -242,9 +203,7 @@ class DPDA:
         return
 
     def _get_none_jump(self, node_id: int, input_t: T) -> List[DPDAEdge]:
-        tmp_ans_dict = self.none_jump_node_id_to_dpda_edges[node_id].lookah_pop_to_edge[
-            input_t
-        ]
+        tmp_ans_dict = self.none_jump_node_id_to_dpda_edges[node_id].lookah_pop_to_edge[input_t]
         if tmp_ans_dict:
             return tmp_ans_dict.values()
         # 递归求解
@@ -263,11 +222,7 @@ class DPDA:
             visit_set_state,
         )
         assert len(pop_list) == 0
-        return (
-            self.none_jump_node_id_to_dpda_edges[node_id]
-            .lookah_pop_to_edge[input_t]
-            .values()
-        )
+        return self.none_jump_node_id_to_dpda_edges[node_id].lookah_pop_to_edge[input_t].values()
 
     def _gen_none_jump_rec(
         self,
@@ -285,9 +240,7 @@ class DPDA:
             pop_tuple = tuple(pop_list)
             pop_list.pop()
 
-            jump_to_node_id = self.lr_graph.source_id_to_edge[iter_node_id][
-                item_la.item.gen.nt
-            ].dest_id
+            jump_to_node_id = self.lr_graph.source_id_to_edge[iter_node_id][item_la.item.gen.nt].dest_id
             if jump_to_node_id in visit_set_state:  # 回退成环
                 return
 
@@ -300,9 +253,7 @@ class DPDA:
                 dest_node_id=iter_node_id,
             )
 
-            for edge in self.one_step_node_id_to_dpda_edges[iter_node_id].to_dest_edges[
-                jump_to_node_id
-            ]:
+            for edge in self.one_step_node_id_to_dpda_edges[iter_node_id].to_dest_edges[jump_to_node_id]:
                 assert isinstance(edge.input_t, NT)
                 none_jump_edge = self.merge_dpda_edge(fake_edge, edge)
                 none_jump_edge.lookah_input_t = input_t
@@ -332,18 +283,14 @@ class DPDA:
             push_size = len(first_edge.push)
             for i in range(push_size):
                 # print(first_edge, second_edge)
-                if (
-                    first_edge.push[i] != second_edge.pop[push_size - i - 1]
-                ):  # 可能会有多条回退路径，可能存在不匹配的回退路径，如果不匹配就返回None
+                if first_edge.push[i] != second_edge.pop[push_size - i - 1]:  # 可能会有多条回退路径，可能存在不匹配的回退路径，如果不匹配就返回None
                     return None
             left_count = len(second_edge.pop) - len(first_edge.push)
             if left_count != 0:
                 return DPDAEdge(
                     lookah_input_t=None,
                     input_t=None,
-                    pop=(
-                        first_edge.pop + second_edge.pop[-left_count:]
-                    ),  # [-0:] 不是截取尾巴上的个数
+                    pop=(first_edge.pop + second_edge.pop[-left_count:]),  # [-0:] 不是截取尾巴上的个数
                     push=second_edge.push,
                     dest_node_id=second_edge.dest_node_id,
                     source_node_id=first_edge.source_node_id,
@@ -383,9 +330,7 @@ class DPDA:
             visit_stack.append(cur_graph_id)
             visit_state_dict[cur_graph_id] = len(visit_stack)  # 记录位置
             for edge in self.lr_graph.source_id_to_edge[cur_graph_id].values():
-                self.dfs_to_find_circle(
-                    edge.dest_id, visit_stack, visit_state_dict, ans_circles
-                )
+                self.dfs_to_find_circle(edge.dest_id, visit_stack, visit_state_dict, ans_circles)
             visit_stack.pop()
             del visit_state_dict[cur_graph_id]
             return
@@ -449,9 +394,7 @@ class DPDA:
             state_list = [circle[-1], circle[-2]]
             visit_state = {circle[-1], circle[-2]}
             ans_list = []
-            self.find_back_from_circle_rec(
-                circle, state_list, visit_state, -2, ans_list
-            )
+            self.find_back_from_circle_rec(circle, state_list, visit_state, -2, ans_list)
 
             for path in ans_list:
                 # 将已经知道的DPDAEdge 进行添加
@@ -473,9 +416,7 @@ class DPDA:
             graph_node = self.lr_graph.node_id_to_itemset[circle[i]]
             node_and_edge_list.append(graph_node)
             dest_graph_node = self.lr_graph.node_id_to_itemset[circle[i + 1]]
-            edge = self.lr_graph.s_id_e_id_to_edge[graph_node.node_id][
-                dest_graph_node.node_id
-            ]
+            edge = self.lr_graph.s_id_e_id_to_edge[graph_node.node_id][dest_graph_node.node_id]
             node_and_edge_list.append(edge)
 
         for index in range(len(node_and_edge_list)):
@@ -521,20 +462,14 @@ class DPDA:
             iter_index = (iter_index - 1) % len(node_and_edge_list)
 
         # 到下一个节点
-        next_index = (cur_index - 2 * (len(item1.gen.gen_tuple) - 1)) % len(
-            node_and_edge_list
-        )
+        next_index = (cur_index - 2 * (len(item1.gen.gen_tuple) - 1)) % len(node_and_edge_list)
         next_node: ItemSet = node_and_edge_list[next_index]
 
         for n_item1, n_item2 in next_node.back_pair_list:
             if item1.gen != n_item2.gen:  # 连续关系匹配
                 continue
 
-            if (
-                next_node.node_id == origin_node_id
-                and left_edge_count == 0
-                and origin_item_tuple[1].gen == item1.gen
-            ):  # 成环结束条件
+            if next_node.node_id == origin_node_id and left_edge_count == 0 and origin_item_tuple[1].gen == item1.gen:  # 成环结束条件
                 return True
 
             is_ok = self.judge_back_loop_rec(
@@ -577,9 +512,7 @@ class DPDA:
             else:
                 state_list.append(edge.source_id)
                 visit_state.add(edge.source_id)
-                self.find_back_from_circle_rec(
-                    circle, state_list, visit_state, index - 1, ans_list
-                )
+                self.find_back_from_circle_rec(circle, state_list, visit_state, index - 1, ans_list)
                 visit_state.remove(edge.source_id)
                 state_list.pop()
         return
@@ -629,22 +562,16 @@ class DPDA:
         self.dfs_to_find_reached(0, visited_nodes)
         for node_id in range(len(self.lr_graph.origin_graph.graph_nodes)):
             if node_id not in visited_nodes:
-                self.one_step_node_id_to_dpda_edges[node_id] = (
-                    DPDAEdgeMap()
-                )  # 搞一个空的替换
+                self.one_step_node_id_to_dpda_edges[node_id] = DPDAEdgeMap()  # 搞一个空的替换
         return
 
     def dfs_to_find_reached(self, start_id: int, visited_nodes: Set[int]):
         if start_id not in visited_nodes:
             visited_nodes.add(start_id)
-            for input_t, pop_to_edges in self.one_step_node_id_to_dpda_edges[
-                start_id
-            ].lookah_pop_to_edge.items():
+            for input_t, pop_to_edges in self.one_step_node_id_to_dpda_edges[start_id].lookah_pop_to_edge.items():
                 for edge in pop_to_edges.values():
                     self.dfs_to_find_reached(edge.dest_node_id, visited_nodes)
-            for input_t, pop_to_edges in self.direct_jump_node_id_to_dpda_edges[
-                start_id
-            ].lookah_pop_to_edge.items():
+            for input_t, pop_to_edges in self.direct_jump_node_id_to_dpda_edges[start_id].lookah_pop_to_edge.items():
                 for edge in pop_to_edges.values():
                     self.dfs_to_find_reached(edge.dest_node_id, visited_nodes)
         else:
@@ -655,25 +582,17 @@ class DPDA:
         current_node_id = 0
         for t in input_str:
             t = T(t)
-            input_pop_edge1 = self.one_step_node_id_to_dpda_edges[
-                current_node_id
-            ].lookah_pop_to_edge
-            input_pop_edge2 = self.direct_jump_node_id_to_dpda_edges[
-                current_node_id
-            ].lookah_pop_to_edge
+            input_pop_edge1 = self.one_step_node_id_to_dpda_edges[current_node_id].lookah_pop_to_edge
+            input_pop_edge2 = self.direct_jump_node_id_to_dpda_edges[current_node_id].lookah_pop_to_edge
 
             if t not in input_pop_edge1 and t not in input_pop_edge2:
                 raise Exception("not accept")
 
             pop_edge = []
             if t in input_pop_edge1:
-                pop_edge.extend(
-                    [(pop, edge) for pop, edge in input_pop_edge1[t].items()]
-                )
+                pop_edge.extend([(pop, edge) for pop, edge in input_pop_edge1[t].items()])
             elif t in input_pop_edge2:
-                pop_edge.extend(
-                    [(pop, edge) for pop, edge in input_pop_edge2[t].items()]
-                )
+                pop_edge.extend([(pop, edge) for pop, edge in input_pop_edge2[t].items()])
             else:
                 assert False, "can not to here"
 

@@ -28,25 +28,17 @@ def _sp_pad_kernel(
     cur_index = tl.program_id(0)
     offs_d = tl.arange(0, BLOCK_SIZE)
 
-    for dest_index in tl.range(
-        dest_token_start_index + cur_index, dest_token_end_index, grid_num, num_stages=2
-    ):
+    for dest_index in tl.range(dest_token_start_index + cur_index, dest_token_end_index, grid_num, num_stages=2):
         source_index = dest_index % source_token_num
         in_ptr = input_ptr + source_index * input_stride_0 + offs_d
-        out_ptr = (
-            output_ptr
-            + (dest_index - dest_token_start_index) * output_stride_0
-            + offs_d
-        )
+        out_ptr = output_ptr + (dest_index - dest_token_start_index) * output_stride_0 + offs_d
         in_data = tl.load(in_ptr, mask=offs_d < hidden_dim, other=0.0)
         tl.store(out_ptr, in_data, mask=offs_d < hidden_dim)
     return
 
 
 @torch.no_grad()
-def sp_pad_copy(
-    in_tensor: torch.Tensor, sp_rank_id: int, sp_world_size: int, alloc_func=torch.empty
-):
+def sp_pad_copy(in_tensor: torch.Tensor, sp_rank_id: int, sp_world_size: int, alloc_func=torch.empty):
     assert in_tensor.is_contiguous()
     assert len(in_tensor.shape) == 2
     in_token_num, hidden_dim = in_tensor.shape
@@ -57,12 +49,8 @@ def sp_pad_copy(
         end = start + split_size
         return in_tensor[start:end, :]
 
-    out_token_num = (
-        triton.cdiv(in_token_num, sp_world_size) * sp_world_size // sp_world_size
-    )
-    out_tensor = alloc_func(
-        (out_token_num, hidden_dim), dtype=in_tensor.dtype, device=in_tensor.device
-    )
+    out_token_num = triton.cdiv(in_token_num, sp_world_size) * sp_world_size // sp_world_size
+    out_tensor = alloc_func((out_token_num, hidden_dim), dtype=in_tensor.dtype, device=in_tensor.device)
     out_token_start_index = out_token_num * sp_rank_id
     out_token_end_index = out_token_num * (sp_rank_id + 1)
     grid_num = max(64, triton.cdiv(out_token_num, 64))

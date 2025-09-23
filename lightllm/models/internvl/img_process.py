@@ -46,9 +46,7 @@ def dynamic_preprocess(image, min_num=1, max_num=6, image_size=448, use_thumbnai
     Optionally add a thumbnail version of the image.
     """
     original_width, original_height = image.size
-    target_aspect_ratio = find_closest_aspect_ratio(
-        original_width, original_height, min_num, max_num, image_size
-    )
+    target_aspect_ratio = find_closest_aspect_ratio(original_width, original_height, min_num, max_num, image_size)
     target_width = image_size * target_aspect_ratio[0]
     target_height = image_size * target_aspect_ratio[1]
     blocks = target_aspect_ratio[0] * target_aspect_ratio[1]
@@ -72,16 +70,12 @@ def dynamic_preprocess(image, min_num=1, max_num=6, image_size=448, use_thumbnai
     return processed_images
 
 
-def get_image_patch(
-    orign_width, orign_height, min_num=1, max_num=6, image_size=448, use_thumbnail=True
-):
+def get_image_patch(orign_width, orign_height, min_num=1, max_num=6, image_size=448, use_thumbnail=True):
     """
     Calculate the number of image patches based on the closest aspect ratio
     and the given width and height of the original image.
     """
-    target_aspect_ratio = find_closest_aspect_ratio(
-        orign_width, orign_height, min_num, max_num, image_size
-    )
+    target_aspect_ratio = find_closest_aspect_ratio(orign_width, orign_height, min_num, max_num, image_size)
     blocks = target_aspect_ratio[0] * target_aspect_ratio[1]
     if use_thumbnail and blocks != 1:
         blocks += 1
@@ -104,9 +98,7 @@ def load_image(image_file, input_size=448, max_num=6):
             T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
         ]
     )
-    images = dynamic_preprocess(
-        image, image_size=input_size, use_thumbnail=True, max_num=max_num
-    )
+    images = dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
     pixel_values = [transform(image) for image in images]
     pixel_values = torch.stack(pixel_values)
     return pixel_values

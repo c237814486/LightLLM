@@ -36,15 +36,9 @@ class DeTokenizationManager:
         self.recv_from_router.bind(f"{args.zmq_mode}127.0.0.1:{detokenization_port}")
 
         self.pub_to_httpserver = context.socket(zmq.PUB)
-        self.pub_to_httpserver.bind(
-            f"{args.zmq_mode}127.0.0.1:{detokenization_pub_port}"
-        )
-        logger.info(
-            f"pub_to_httpserver sendhwm {self.pub_to_httpserver.getsockopt(zmq.SNDHWM)}"
-        )
-        self.tokenizer = get_tokenizer(
-            model_weightdir, tokenizor_mode, trust_remote_code=trust_remote_code
-        )
+        self.pub_to_httpserver.bind(f"{args.zmq_mode}127.0.0.1:{detokenization_pub_port}")
+        logger.info(f"pub_to_httpserver sendhwm {self.pub_to_httpserver.getsockopt(zmq.SNDHWM)}")
+        self.tokenizer = get_tokenizer(model_weightdir, tokenizor_mode, trust_remote_code=trust_remote_code)
         self.all_special_ids = set(self.tokenizer.all_special_ids)
         self.req_id_to_out: Dict[int, DecodeReq] = {}
         self.eos_id = eos_id
@@ -53,9 +47,7 @@ class DeTokenizationManager:
         self.shm_req_manager = ShmReqManager()
 
     def _init_get_token_id_to_token_str(self):
-        self.token_id_to_token = {
-            token_id: token for token, token_id in self.tokenizer.get_vocab().items()
-        }
+        self.token_id_to_token = {token_id: token for token, token_id in self.tokenizer.get_vocab().items()}
         return
 
     def _add_new_group_req_index(self, recv_obj: GroupReqIndexes):
@@ -64,10 +56,7 @@ class DeTokenizationManager:
             req.link_prompt_ids_shm_array()
             req.link_logprobs_shm_array()
 
-            logger.info(
-                f"detokenization recv req id {req.request_id} "
-                f"cost time {time.time() - recv_obj.time_mark} s"
-            )
+            logger.info(f"detokenization recv req id {req.request_id} " f"cost time {time.time() - recv_obj.time_mark} s")
 
             # p d 分离模式，decode节点的解码需要做一些特殊的修复。
             decode_req = DecodeReq(req, self.is_pd_decode_mode)
@@ -75,9 +64,7 @@ class DeTokenizationManager:
                 decode_req = decode_mode_fix(decode_req, self.tokenizer, self.eos_id)
             # token_healing mode 的特殊初始化
             if self.args.token_healing_mode:
-                decode_req.init_token_healing_prefix_str(
-                    self.token_id_to_token, self.tokenizer
-                )
+                decode_req.init_token_healing_prefix_str(self.token_id_to_token, self.tokenizer)
 
             self.req_id_to_out[req.request_id] = decode_req
         return
@@ -89,9 +76,7 @@ class DeTokenizationManager:
                 try:
                     # 一次最多从 zmq 中取 recv_max_count 个请求，防止 zmq 队列中请求数量过多导致阻塞了主循环。
                     for _ in range(recv_max_count):
-                        recv_obj: GroupReqIndexes = self.recv_from_router.recv_pyobj(
-                            zmq.NOBLOCK
-                        )
+                        recv_obj: GroupReqIndexes = self.recv_from_router.recv_pyobj(zmq.NOBLOCK)
                         assert isinstance(recv_obj, GroupReqIndexes)
                         self._add_new_group_req_index(recv_obj=recv_obj)
 
@@ -141,12 +126,8 @@ class DeTokenizationManager:
                         decode_req.prefix_str = decode_req.prefix_str[len(new_text) :]
                         new_text = ""
                     else:
-                        logger.error(
-                            f"error token healing state, prefix_str {decode_req.prefix_str} new_text {new_text}"
-                        )
-                decode_req.req.out_tokens_queue.push(
-                    new_text, src_index, special, count_output_tokens
-                )
+                        logger.error(f"error token healing state, prefix_str {decode_req.prefix_str} new_text {new_text}")
+                decode_req.req.out_tokens_queue.push(new_text, src_index, special, count_output_tokens)
 
             if decode_req.need_detoken():
                 exist_need_detoken = True
@@ -173,9 +154,7 @@ class DeTokenizationManager:
         return
 
 
-def start_detokenization_process(
-    args, detokenization_port, detokenization_pub_port, pipe_writer
-):
+def start_detokenization_process(args, detokenization_port, detokenization_pub_port, pipe_writer):
     # 注册graceful 退出的处理
     graceful_registry(inspect.currentframe().f_code.co_name)
 

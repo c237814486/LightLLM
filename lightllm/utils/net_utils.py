@@ -45,9 +45,7 @@ def find_available_port(start_port, end_port):
 
 def get_hostname_ip():
     try:
-        result = subprocess.run(
-            ["hostname", "-i"], capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(["hostname", "-i"], capture_output=True, text=True, check=True)
         # 兼容 hostname -i 命令输出多个 ip 的情况
         result = result.stdout.strip().split(" ")[0]
         logger.info(f"get hostname ip {result}")
@@ -68,10 +66,7 @@ def is_valid_ipv6_address(address: str) -> bool:
 class PortLocker:
     def __init__(self, ports):
         self.ports = ports
-        self.sockets = [
-            socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            for _ in range(len(self.ports))
-        ]
+        self.sockets = [socket.socket(socket.AF_INET, socket.SOCK_STREAM) for _ in range(len(self.ports))]
         for _socket in self.sockets:
             _socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 

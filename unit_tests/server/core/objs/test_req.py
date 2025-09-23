@@ -11,9 +11,7 @@ from lightllm.server.core.objs.req import (
 @pytest.fixture
 def req():
     req_instance = Req()
-    req_instance.init(
-        1, [1, 2, 3], {"max_new_tokens": 1}, None, chunked_prefill_size=128
-    )
+    req_instance.init(1, [1, 2, 3], {"max_new_tokens": 1}, None, chunked_prefill_size=128)
     return req_instance
 
 

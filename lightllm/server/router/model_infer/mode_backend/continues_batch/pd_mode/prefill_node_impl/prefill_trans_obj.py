@@ -104,17 +104,11 @@ class KVTransConnectObj:
             get_func=self._get_request_tasks,
             fail_func=self.manager.put_to_release_task_queue,
         )
-        self.request_thread = threading.Thread(
-            target=self.request_kv_trans_loop, daemon=True
-        )
+        self.request_thread = threading.Thread(target=self.request_kv_trans_loop, daemon=True)
         self.request_thread.start()
 
-        self.ready_kv_trans_task_queue = TaskQueue(
-            lambda datas: datas[0:1], self.manager.put_to_release_task_queue
-        )
-        self.kv_trans_thread = threading.Thread(
-            target=self.kv_trans_handle_loop, daemon=True
-        )
+        self.ready_kv_trans_task_queue = TaskQueue(lambda datas: datas[0:1], self.manager.put_to_release_task_queue)
+        self.kv_trans_thread = threading.Thread(target=self.kv_trans_handle_loop, daemon=True)
         self.kv_trans_thread.start()
 
         logger.info(f"create KVTransConnectObj success: {self.to_log_info()}")
@@ -128,10 +122,7 @@ class KVTransConnectObj:
         ans_list = []
         token_num = 0
         for task in datas:
-            if (
-                token_num + len(task.prefill_token_indexes)
-                <= self.max_kv_trans_token_num
-            ):
+            if token_num + len(task.prefill_token_indexes) <= self.max_kv_trans_token_num:
                 ans_list.append(task)
                 token_num += len(task.prefill_token_indexes)
             else:
@@ -145,9 +136,7 @@ class KVTransConnectObj:
         func_name = self.request_kv_trans_loop.__name__
 
         while not self.has_error:
-            move_tasks: List[KVMoveTask] = self.request_kv_trans_task_queue.get_tasks(
-                log_tag="request_kv_trans_task_queue"
-            )
+            move_tasks: List[KVMoveTask] = self.request_kv_trans_task_queue.get_tasks(log_tag="request_kv_trans_task_queue")
             if len(move_tasks) == 0:
                 self.timer_check_status(raise_exception=False)
                 time.sleep(0.01)
@@ -156,26 +145,18 @@ class KVTransConnectObj:
                 self.timer_check_status(raise_exception=True)
                 for move_task in move_tasks:
                     move_task.connect_id = self.connect_id
-                    logger.info(
-                        f"{func_name} get task {move_task.to_prefill_log_info()} "
-                        f"queue time {move_task.get_cost_time()} s "
-                    )
+                    logger.info(f"{func_name} get task {move_task.to_prefill_log_info()} " f"queue time {move_task.get_cost_time()} s ")
 
                 trans_move_tasks = [copy.copy(move_task) for move_task in move_tasks]
                 for trans_move_task in trans_move_tasks:
                     trans_move_task.prefill_token_indexes = None
 
                 mark_start = time.time()
-                move_kv_lens = self.rpyc_conn.root.request_data_transfer(
-                    trans_move_tasks
-                )
+                move_kv_lens = self.rpyc_conn.root.request_data_transfer(trans_move_tasks)
                 move_kv_lens = obtain(move_kv_lens)
                 request_data_transfer_cost_time = time.time() - mark_start
 
-                logger.info(
-                    f"{func_name} request_data_transfer ok, {move_tasks[0].to_prefill_log_info()}"
-                    f" cost time: {request_data_transfer_cost_time} s"
-                )
+                logger.info(f"{func_name} request_data_transfer ok, {move_tasks[0].to_prefill_log_info()}" f" cost time: {request_data_transfer_cost_time} s")
 
                 ok_trans_list = []
                 for i, move_task in enumerate(move_tasks.copy()):
@@ -184,9 +165,7 @@ class KVTransConnectObj:
                         ok_trans_list.append(move_task)
                         move_tasks.remove(move_task)
                     else:
-                        logger.info(
-                            f"prefill node kv move task req_id: {move_task.id()} not send, decode is busy"
-                        )
+                        logger.info(f"prefill node kv move task req_id: {move_task.id()} not send, decode is busy")
 
                 if ok_trans_list:
                     self.ready_kv_trans_task_queue.put(
@@ -212,36 +191,25 @@ class KVTransConnectObj:
     def _transfer_kv(self, move_tasks: List[KVMoveTask]):
         with self.kv_trans_process.device_lock:
             clear_queue(self.kv_trans_process.task_out_queue)
-            kv_move_group = KVMoveTaskGroup(
-                tasks=move_tasks.copy(), connect_id=self.connect_id
-            )
+            kv_move_group = KVMoveTaskGroup(tasks=move_tasks.copy(), connect_id=self.connect_id)
             self.kv_trans_process.task_in_queue.put(kv_move_group, timeout=10)
             assert self.kv_trans_process.task_out_queue.get(timeout=60) == "ok"
             self.manager.put_to_release_task_queue(move_tasks)
 
-            logger.info(
-                f"_transfer_kv data ok, req_id: {move_tasks[0].id()}"
-                f" cost total time: {move_tasks[0].get_cost_time()} s"
-            )
+            logger.info(f"_transfer_kv data ok, req_id: {move_tasks[0].id()}" f" cost total time: {move_tasks[0].get_cost_time()} s")
             move_tasks.clear()
 
     def kv_trans_handle_loop(self):
         func_name = self.kv_trans_handle_loop.__name__
         while not self.has_error:
-            move_tasks: List[List[KVMoveTask]] = (
-                self.ready_kv_trans_task_queue.get_tasks(
-                    log_tag="ready_kv_trans_task_queue"
-                )
-            )
+            move_tasks: List[List[KVMoveTask]] = self.ready_kv_trans_task_queue.get_tasks(log_tag="ready_kv_trans_task_queue")
             if len(move_tasks) == 0:
                 self.timer_check_status(raise_exception=False)
                 time.sleep(0.01)
                 continue
 
             if len(move_tasks) != 1:
-                logger.error(
-                    f"error get kv trans move_tasks, must be 1, get {len(move_tasks)}"
-                )
+                logger.error(f"error get kv trans move_tasks, must be 1, get {len(move_tasks)}")
                 assert len(move_tasks) == 1
 
             move_tasks: List[KVMoveTask] = move_tasks[0]
@@ -249,10 +217,7 @@ class KVTransConnectObj:
             try:
                 self.timer_check_status(raise_exception=True)
                 for move_task in move_tasks:
-                    logger.info(
-                        f"{func_name} get task {move_task.to_prefill_log_info()} to start kv move"
-                        f"queue time {move_task.get_cost_time()} s "
-                    )
+                    logger.info(f"{func_name} get task {move_task.to_prefill_log_info()} to start kv move" f"queue time {move_task.get_cost_time()} s ")
 
                 if not kv_trans_use_p2p():
                     with self.manager.kv_trans_lock:
@@ -373,9 +338,7 @@ class KVTransProcess:
         self.device_lock = threading.Lock()
         self.task_in_queue = mp.Queue()
         self.task_out_queue = mp.Queue()
-        self.kv_trans_port = find_available_port(
-            manager.args.pd_p_allowed_port_min, manager.args.pd_p_allowed_port_max
-        )
+        self.kv_trans_port = find_available_port(manager.args.pd_p_allowed_port_min, manager.args.pd_p_allowed_port_max)
 
         try:
             from .prefill_trans_process import start_prefill_trans_process
