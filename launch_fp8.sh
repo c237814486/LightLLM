@@ -1,13 +1,17 @@
 export PYTHONPATH="/mnt/afs/yangdeyu/dependency/lightllm-dev:$PYTHONPATH"
 set -x
 # ./dist/llm_tts_server/llm_tts_server \
-python -m lightllm.server.api_server \
+source activate /mnt/afs/yangdeyu/conda_env/llava_4090
+export PATH="/mnt/afs/yangdeyu/conda_env/llava_4090/bin:$PATH"
+which gunicorn
+
+/usr/bin/env /mnt/afs/yangdeyu/conda_env/llava_4090/bin/python -m lightllm.server.api_server \
     --run_mode normal \
-    --model_dir /mnt/afs/lijiayi1/code/game_video/test/20250813_beebee \
-    --max_req_total_len 4000 \
-    --max_total_token_num 4096 \
-    --cache_capacity 12000 \
-    --mode ppl_int8kv_flashdecoding \
+    --model_dir /mnt/afs/lijiayi1/code/game_video/test/20250921_beebee_audio_4node \
+    --max_req_total_len 8192 \
+    --max_total_token_num 16000 \
+    --cache_capacity 15000 \
+    --mode triton_flashdecoding \
     --data_type bf16 \
     --port 18003 \
     --tokenizer_mode auto \
@@ -23,10 +27,11 @@ python -m lightllm.server.api_server \
     --sampling_backend triton_top_kp \
     --enable_concurrent_alloc \
     --enable_multimodal \
+    --enable_multimodal_audio \
     --graph_max_batch_size 4 \
-    --graph_max_len_in_batch 1024 \
-    --visual_gpu_ids 0 \
-    --audio_gpu_ids 0 \
-    --chunked_prefill_size 1024 \
+    --graph_max_len_in_batch 4096 \
+    --visual_gpu_ids 1 \
+    --audio_gpu_ids 1 \
+    --chunked_prefill_size 4096 \
     # --service llm \
 
