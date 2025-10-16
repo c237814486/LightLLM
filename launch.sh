@@ -1,8 +1,8 @@
 export PYTHONPATH="/mnt/afs/yangdeyu/dependency/lightllm-dev:$PYTHONPATH"
 
-/usr/bin/env /mnt/afs/yangdeyu/conda_env/llava/bin/python -m lightllm.server.api_server \
+python -m lightllm.server.api_server \
     --run_mode normal \
-    --model_dir /mnt/afs/lijiayi1/code/game_video/test/20250813_beebee \
+    --model_dir /mnt/afs/lijiayi1/code/game_video/test/20250921_beebee_audio_4node \
     --max_req_total_len 8192 \
     --max_total_token_num 120000 \
     --cache_capacity 12000 \
