@@ -9,7 +9,7 @@ which gunicorn
     --run_mode normal \
     --model_dir /mnt/afs/lijiayi1/code/game_video/test/20250921_beebee_audio_4node \
     --max_req_total_len 8192 \
-    --max_total_token_num 16000 \
+    --max_total_token_num 10000 \
     --cache_capacity 15000 \
     --mode triton_gqa_flashdecoding \
     --data_type bf16 \
@@ -27,11 +27,12 @@ which gunicorn
     --enable_concurrent_alloc \
     --enable_multimodal \
     --enable_multimodal_audio \
-    --graph_max_batch_size 2 \
+    --graph_max_batch_size 4 \
     --graph_max_len_in_batch 4096 \
     --visual_gpu_ids 1 \
     --audio_gpu_ids 1 \
     --chunked_prefill_size 4096 \
     --quant_type vllm-fp8w8a8 \
+    --quant_cfg /mnt/afs/yangdeyu/dependency/lightllm-dev/test/advanced_config/mixed_quantization/llavaomni-mix-down.yaml
     # --service llm \
 

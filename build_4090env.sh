@@ -5,7 +5,7 @@ cd /mnt/afs/yangdeyu/dependency/lightllm-dev
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 cd /mnt/afs/yangdeyu/dependency/LightKernel
 pip install -v .
-pip install numexpr transformers==4.51.1 av imageio
+pip install numexpr transformers==4.51.1 av imageio pypinyin orjson setproctitle
 pip install /mnt/afs/yangdeyu/dependency/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 cd /mnt/afs/yangdeyu/dependency/lightllm-cosyvoice-old/lightllm-cosyvoice
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
