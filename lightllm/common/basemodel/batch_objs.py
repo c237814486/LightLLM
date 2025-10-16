@@ -10,13 +10,21 @@ class ModelInput:
     batch_size: int
     total_token_num: int
     max_len_in_batch: int
-    input_ids: torch.Tensor
-    b_req_idx: torch.Tensor
-    b_mtp_index: torch.Tensor
-    b_seq_len: torch.Tensor
+    # 在 decode 阶段， 常规模式下， max_q_seq_len 必定是 1，
+    # 在 mtp 模式下，max_q_seq_len 统计的是一个请求考虑了 mtp 步数的
+    # 最大长度，实际值是 max([(1 + req.mtp_step) for req in reqs])
+    max_q_seq_len: int
+    max_kv_seq_len: int
+    max_cache_len: int = None
+    prefix_total_token_num: int = None
+    input_ids: torch.Tensor = None
+    b_req_idx: torch.Tensor = None
+    b_mtp_index: torch.Tensor = None
+    b_seq_len: torch.Tensor = None
     mem_indexes: torch.Tensor = None
     is_prefill: bool = False
     b_ready_cache_len: torch.Tensor = None
+    b_prefill_start_loc: torch.Tensor = None
     multimodal_params: list = field(default_factory=list)
 
     # cpu 变量
@@ -42,6 +50,8 @@ class ModelInput:
         self.b_mtp_index = self.b_mtp_index.cuda(non_blocking=True)
         if self.b_ready_cache_len is not None:
             self.b_ready_cache_len = self.b_ready_cache_len.cuda(non_blocking=True)
+        if self.b_prefill_start_loc is not None:
+            self.b_prefill_start_loc = self.b_prefill_start_loc.cuda(non_blocking=True)
 
 
 @dataclass

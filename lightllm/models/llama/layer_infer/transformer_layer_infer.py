@@ -26,7 +26,7 @@ from lightllm.models.llama.triton_kernel.token_attention_nopad_reduceV import (
 )
 from lightllm.models.llama.triton_kernel.rmsnorm import rmsnorm_forward
 from lightllm.models.llama.triton_kernel.rotary_emb import rotary_emb_fwd
-from lightllm.models.llama.triton_kernel.silu_and_mul import silu_and_mul_fwd
+from lightllm.common.fused_moe.moe_silu_and_mul import silu_and_mul_fwd
 
 from lightllm.models.llama.infer_struct import LlamaInferStateInfo
 from lightllm.models.llama.flashattention_infer_struct import FlashAttentionStateInfo
@@ -214,14 +214,9 @@ class LlamaTransformerLayerInfer(TransformerLayerInferTpl):
         rmsnorm_forward(input, weight=layer_weight.ffn_norm_weight_.weight, eps=self.eps_, out=out)
         return out
 
-    def _get_qkv(
-        self,
-        input,
-        cache_kv,
-        infer_state: LlamaInferStateInfo,
-        layer_weight: LlamaTransformerLayerWeight,
-    ) -> torch.Tensor:
+    def _get_qkv(self, input, infer_state: LlamaInferStateInfo, layer_weight: LlamaTransformerLayerWeight) -> torch.Tensor:
         q = layer_weight.q_proj.mm(input)
+        cache_kv = self._pre_cache_kv(infer_state=infer_state, layer_weight=layer_weight)
         cache_kv = layer_weight.kv_proj.mm(
             input,
             out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),
@@ -235,13 +230,7 @@ class LlamaTransformerLayerInfer(TransformerLayerInferTpl):
         )
         return q, cache_kv
 
-    def _tpsp_get_qkv(
-        self,
-        input,
-        cache_kv,
-        infer_state: LlamaInferStateInfo,
-        layer_weight: LlamaTransformerLayerWeight,
-    ) -> torch.Tensor:
+    def _tpsp_get_qkv(self, input, infer_state: LlamaInferStateInfo, layer_weight: LlamaTransformerLayerWeight) -> torch.Tensor:
         if self.tp_world_size_ > 1:
             sp_token_num, hidden_dim = input.shape
             gather_input = self.alloc_tensor(
@@ -253,6 +242,7 @@ class LlamaTransformerLayerInfer(TransformerLayerInferTpl):
             input = gather_input[0 : len(infer_state.position_cos), :]
 
         q = layer_weight.q_proj.mm(input)
+        cache_kv = self._pre_cache_kv(infer_state=infer_state, layer_weight=layer_weight)
         cache_kv = layer_weight.kv_proj.mm(
             input,
             out=cache_kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_) * self.head_dim_),

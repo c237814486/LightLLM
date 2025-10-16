@@ -95,18 +95,13 @@ class Gemma3TransformerLayerInfer(LlamaTransformerLayerInfer):
         self._pre_feedforward_layernorm = partial(Gemma3TransformerLayerInfer._pre_feedforward_layernorm, self)
         self._post_feedforward_layernorm = partial(Gemma3TransformerLayerInfer._post_feedforward_layernorm, self)
 
-    def _get_qkv(
-        self,
-        input,
-        cache_kv,
-        infer_state: LlamaInferStateInfo,
-        layer_weight: Gemma3TransformerLayerWeight,
-    ) -> torch.Tensor:
+    def _get_qkv(self, input, infer_state: LlamaInferStateInfo, layer_weight: Gemma3TransformerLayerWeight) -> torch.Tensor:
         q = layer_weight.q_proj.mm(input)
         # kv = layer_weight.kv_proj.mm(input)
         # kv = kv.view(-1, (self.tp_k_head_num_ + self.tp_v_head_num_), self.head_dim_)
         k = layer_weight.k_proj.mm(input)
         v = layer_weight.v_proj.mm(input)
+        cache_kv = self._pre_cache_kv(infer_state=infer_state, layer_weight=layer_weight)
         cache_kv[:, 0 : self.tp_k_head_num_, :] = k.view(-1, self.tp_k_head_num_, self.head_dim_)
         cache_kv[:, self.tp_k_head_num_ :, :] = v.view(-1, self.tp_v_head_num_, self.head_dim_)
 
@@ -152,8 +147,7 @@ class Gemma3TransformerLayerInfer(LlamaTransformerLayerInfer):
     def context_forward(self, input_embdings, infer_state: InferStateInfo, layer_weight):
         input_embdings = input_embdings.to(torch.bfloat16)
         input1 = self._att_norm(input_embdings.view(-1, self.embed_dim_).float(), infer_state, layer_weight).to(torch.bfloat16)
-        cache_kv = self._pre_cache_kv(infer_state, layer_weight)
-        q, cache_kv = self._get_qkv(input1, cache_kv, infer_state, layer_weight)
+        q, cache_kv = self._get_qkv(input1, infer_state, layer_weight)
         input1 = None
         self._post_cache_kv(cache_kv, infer_state, layer_weight)
         o = self._context_attention_kernel(q, cache_kv, infer_state, layer_weight)
@@ -182,8 +176,7 @@ class Gemma3TransformerLayerInfer(LlamaTransformerLayerInfer):
     def token_forward(self, input_embdings, infer_state: InferStateInfo, layer_weight):
         input_embdings = input_embdings.to(torch.bfloat16)
         input1 = self._att_norm(input_embdings.view(-1, self.embed_dim_).float(), infer_state, layer_weight).to(torch.bfloat16)
-        cache_kv = self._pre_cache_kv(infer_state, layer_weight)
-        q, cache_kv = self._get_qkv(input1, cache_kv, infer_state, layer_weight)
+        q, cache_kv = self._get_qkv(input1, infer_state, layer_weight)
         input1 = None
         self._post_cache_kv(cache_kv, infer_state, layer_weight)
         o = self._token_attention_kernel(q, infer_state, layer_weight)

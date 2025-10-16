@@ -155,6 +155,7 @@ class ReqSamplingParamsManager:
                     prompt_ids=prompt_ids,
                     out_token_id_counter=self.req_to_out_token_id_counter[req.req_idx],
                 )
+                torch.cuda.current_stream().synchronize()
 
         return
 

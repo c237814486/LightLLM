@@ -16,6 +16,7 @@ def sample(logits: torch.Tensor, reqs: List[InferReq], eos_id: List[int] = [2]):
         b_top_ks,
         b_length_penalty_param,
         b_mask_eos_reqs,
+        is_all_greedy,
     ) = _get_post_sample_tensors(reqs)
     eos_ids = torch.tensor(eos_id, dtype=torch.int32, device="cpu", pin_memory=True).cuda(non_blocking=True)
 
@@ -138,6 +139,8 @@ def _get_post_sample_tensors(reqs: List[InferReq]):
     top_ks: List[int] = []
     length_penalty_param: List[int] = []
     mask_eos_reqs: List[bool] = []
+    is_all_greedy = True
+
     for i, req_obj in enumerate(reqs):
         sample_param = req_obj.sampling_param
         shm_param = sample_param.shm_param
@@ -148,7 +151,10 @@ def _get_post_sample_tensors(reqs: List[InferReq]):
 
         temperatures.append(shm_param.temperature)
         top_ps.append(shm_param.top_p)
-        top_ks.append(shm_param.top_k)
+        top_k_val = shm_param.top_k
+        top_ks.append(top_k_val)
+        if top_k_val > 1:
+            is_all_greedy = False
         req_idxes.append(req_obj.req_idx)
 
     req_idxes_cpu = torch.tensor(req_idxes, dtype=torch.int32, device="cpu", pin_memory=True)
@@ -165,4 +171,5 @@ def _get_post_sample_tensors(reqs: List[InferReq]):
         top_ks_cpu.cuda(non_blocking=True),
         length_penalty_param_cpu.cuda(non_blocking=True),
         mask_eos_reqs_cpu.cuda(non_blocking=True),
+        is_all_greedy,
     )

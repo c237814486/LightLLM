@@ -69,11 +69,8 @@ async def health_check(args, httpserver_manager: HttpServerManager, request: Req
 
     health_obj.begin_check()
     try:
-        request_dict = {
-            "inputs": "你好！",
-            "parameters": {"do_sample": True, "temperature": 0.8, "max_new_tokens": 2},
-        }
-        if args.run_mode == "prefill":
+        request_dict = {"inputs": "你好！", "parameters": {"do_sample": True, "temperature": 0.8, "max_new_tokens": 2}}
+        if args.run_mode in ["prefill", "nixl_prefill"]:
             request_dict["parameters"]["max_new_tokens"] = 1
         prompt = request_dict.pop("inputs")
         sample_params_dict = request_dict["parameters"]

@@ -9,10 +9,11 @@ from lightllm.common.basemodel.batch_objs import ModelInput
 def prepare_prefill_inputs(req_objs: List[InferReq], is_chuncked_mode: bool, is_multimodal: bool = False) -> Tuple[ModelInput, List[InferReq]]:
     run_reqs = []
     total_token_num = 0
-    max_len_in_batch = 0
+    prefix_total_token_num = 0
     input_ids = []
     b_req_idx = []
     b_seq_len = []
+    b_q_seq_len = []
     batch_multimodal_params = []
     b_ready_cache_len = []
     b_mtp_index = []
@@ -36,19 +37,26 @@ def prepare_prefill_inputs(req_objs: List[InferReq], is_chuncked_mode: bool, is_
         input_id = input_token_ids[req.cur_kv_len :]
 
         b_seq_len.append(seq_len)
+        b_q_seq_len.append(input_token_len)
         input_ids.append(input_id)
         total_token_num += seq_len
-        max_len_in_batch = max(max_len_in_batch, input_token_len)
+        prefix_total_token_num += req.cur_kv_len
         b_ready_cache_len.append(req.cur_kv_len)
         b_mtp_index.append(0)
 
-    input_ids = np.concatenate(input_ids, dtype=np.int64)
+    max_kv_seq_len = max(b_seq_len)
+    max_cache_len = max(b_ready_cache_len)
+    max_len_in_batch = max(b_q_seq_len)
+    max_q_seq_len = max(b_q_seq_len)
 
+    input_ids = np.concatenate(input_ids, dtype=np.int64)
     input_ids = torch.tensor(input_ids, dtype=torch.int64, device="cpu")
     b_req_idx = torch.tensor(b_req_idx, dtype=torch.int32, device="cpu")
     b_seq_len = torch.tensor(b_seq_len, dtype=torch.int32, device="cpu")
     b_mtp_index = torch.tensor(b_mtp_index, dtype=torch.int32, device="cpu")
     b_ready_cache_len = torch.tensor(b_ready_cache_len, dtype=torch.int32, device="cpu")
+    b_q_seq_len = torch.tensor(b_q_seq_len, dtype=torch.int32, device="cpu")
+    b_prefill_start_loc = b_q_seq_len.cumsum(dim=0, dtype=torch.int32) - b_q_seq_len
 
     # dynamic prompt cache 准备 token
     g_infer_state_lock.acquire()
@@ -61,14 +69,19 @@ def prepare_prefill_inputs(req_objs: List[InferReq], is_chuncked_mode: bool, is_
         batch_size=b_seq_len.shape[0],
         total_token_num=total_token_num,
         max_len_in_batch=max_len_in_batch,
+        max_q_seq_len=max_q_seq_len,
+        max_kv_seq_len=max_kv_seq_len,
+        max_cache_len=max_cache_len,
         input_ids=input_ids,
         mem_indexes_cpu=mem_indexes,
         b_req_idx=b_req_idx,
         b_mtp_index=b_mtp_index,
         b_seq_len=b_seq_len,
         b_ready_cache_len=b_ready_cache_len,
+        b_prefill_start_loc=b_prefill_start_loc,
         is_prefill=True,
         b_prefill_has_output_cpu=b_prefill_has_output,
+        prefix_total_token_num=prefix_total_token_num,
     )
     if is_multimodal:
         model_input.multimodal_params = batch_multimodal_params
@@ -85,11 +98,12 @@ def prepare_decode_inputs(
     b_req_idx = []
     b_mtp_index = []
     b_seq_len = []
+    b_q_seq_len = []
     for req in req_objs:
         run_reqs.append(req)
         b_req_idx.append(req.req_idx)
         seq_len = req.get_cur_total_len()
-        assert req.cur_kv_len == seq_len - 1
+        assert req.cur_kv_len == seq_len - 1, f"{req.cur_kv_len} {seq_len}"
         b_seq_len.append(seq_len)
         total_token_num += seq_len
         max_len_in_batch = max(max_len_in_batch, seq_len)
@@ -103,6 +117,10 @@ def prepare_decode_inputs(
             total_token_num += seq_len
             max_len_in_batch = max(max_len_in_batch, seq_len)
             b_mtp_index.append(step + 1)
+        b_q_seq_len.append(req.mtp_step + 1)
+
+    max_kv_seq_len = max(b_seq_len)
+    max_q_seq_len = max(b_q_seq_len)
 
     b_req_idx = torch.tensor(b_req_idx, dtype=torch.int32, device="cpu")
     b_seq_len = torch.tensor(b_seq_len, dtype=torch.int32, device="cpu")
@@ -119,6 +137,8 @@ def prepare_decode_inputs(
         batch_size=b_seq_len.shape[0],
         total_token_num=total_token_num,
         max_len_in_batch=max_len_in_batch,
+        max_q_seq_len=max_q_seq_len,
+        max_kv_seq_len=max_kv_seq_len,
         input_ids=None,
         mem_indexes_cpu=mem_indexes,
         b_req_idx=b_req_idx,
