@@ -4,6 +4,7 @@ set -x
 # source activate /mnt/afs/yangdeyu/conda_env/llava_4090
 export PATH="/root/miniconda3/envs/llava/bin:$PATH"
 which gunicorn
+export RMSNORM_WARPS=4
 
 /usr/bin/env /root/miniconda3/envs/llava/bin/python -m lightllm.server.api_server \
     --run_mode normal \
@@ -29,10 +30,10 @@ which gunicorn
     --enable_multimodal_audio \
     --graph_max_batch_size 4 \
     --graph_max_len_in_batch 4096 \
-    --visual_gpu_ids 1 \
-    --audio_gpu_ids 1 \
+    --visual_gpu_ids 0 \
+    --audio_gpu_ids 0 \
     --chunked_prefill_size 4096 \
-    --quant_type vllm-fp8w8a8 \
-    --quant_cfg /mnt/afs/yangdeyu/dependency/lightllm-dev/test/advanced_config/mixed_quantization/llavaomni-mix-down.yaml
+    # --quant_type vllm-fp8w8a8 \
+    # --quant_cfg /mnt/afs/yangdeyu/dependency/lightllm-dev/test/advanced_config/mixed_quantization/llavaomni-mix-down.yaml
     # --service llm \
 
