@@ -1,0 +1,21 @@
+# ==========================================================
+# 1. 设置 PYTHONPATH 环境变量 
+# ==========================================================
+$projectRoot = "D:\LeapFaith\LightLLM"
+$env:PYTHONPATH = "$projectRoot;$env:PYTHONPATH"
+$env:CUDA_VISIBLE_DEVICES = "0"
+$env:USE_LIBUV = "0"
+
+Write-Host "Setting PYTHONPATH: $env:PYTHONPATH"
+
+# ==========================================================
+# 2. 运行 Python 命令
+# PowerShell 可以使用反引号 ` 进行命令换行
+# ==========================================================
+python -m lightllm.server.api_server `
+    --zmq_mode "tcp://" `
+    --sampling_backend triton_top_pk `
+    --model_dir D:\LeapFaith\models\Qwen2.5-VL-3B-Instruct `
+    --host 0.0.0.0 `
+    --port 10083 `
+    --max_req_total_len 4096

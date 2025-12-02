@@ -1,12 +1,24 @@
 import time
-import uvloop
 import asyncio
 import torch
 import pickle
 import inspect
 import setproctitle
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+# import uvloop
+# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import sys
+UVICORN_LOOP_CONFIG = "asyncio" 
+try:
+    if sys.platform != 'win32':
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        UVICORN_LOOP_CONFIG = "uvloop"
+    else:
+        pass 
+except ImportError:
+    pass
+
 import zmq
 import zmq.asyncio
 import torch.multiprocessing as mp

@@ -19,7 +19,6 @@
 import asyncio
 import collections
 import time
-import uvloop
 import requests
 import base64
 import os
@@ -27,7 +26,20 @@ from io import BytesIO
 import pickle
 import setproctitle
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+# import uvloop
+# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import sys
+UVICORN_LOOP_CONFIG = "asyncio" 
+try:
+    if sys.platform != 'win32':
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        UVICORN_LOOP_CONFIG = "uvloop"
+    else:
+        pass 
+except ImportError:
+    pass
+
 import ujson as json
 from http import HTTPStatus
 import uuid

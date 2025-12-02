@@ -22,7 +22,8 @@ class ShmArray:
 
     def link_shm(self):
         self.shm = create_or_link_shm(self.name, self.dest_size, force_mode="link")
-        assert self.shm.size == self.dest_size
+        # [Windows兼容] 允许实际内存大于申请内存（因为Page对齐）
+        assert self.shm.size >= self.dest_size
         self.arr = np.ndarray(self.shape, dtype=self.dtype, buffer=self.shm.buf)
         return
 

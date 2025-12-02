@@ -18,7 +18,7 @@ setup(
     python_requires=">=3.9.16",
     install_requires=[
         "pyzmq",
-        "uvloop",
+        # "uvloop",
         "transformers",
         "einops",
         "packaging",

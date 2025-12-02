@@ -3,6 +3,7 @@ import os
 import shutil
 import time
 import threading
+import platform  # [Windows兼容修改] 用于判断操作系统
 from lightllm.server.core.objs.req import ChunkedPrefillReq, TokenHealingReq
 from lightllm.server.multimodal_params import ImageItem
 from lightllm.server.tokenizer import get_tokenizer
@@ -30,6 +31,14 @@ def _check_shm_size(args):
     ENDC = "\033[0m"
     shm_size = _get_system_shm_size_gb()
     required_size = _get_recommended_shm_size_gb(args)
+    
+    # [Windows兼容修改] 增加一点容错，如果获取失败返回0，但我们不想在Windows报错
+    if shm_size == 0 and platform.system() == "Windows":
+        # Windows获取失败通常意味着没有权限或API调用错误，
+        # 但Windows不像Docker那样有硬限制，通常可以认为足够，跳过检查
+        logger.warning("Could not determine Windows memory size, skipping SHM check.")
+        return 9999, required_size, True
+
     if shm_size < required_size:
         logger.warning(f"{RED}Available shm size {shm_size:.2f}G is less than required_size {required_size:.2f}G{ENDC}")
         return shm_size, required_size, False
@@ -42,13 +51,19 @@ def _start_shm_size_warning_thread(shm_size, required_shm_size):
         RED = "\033[91m"
         ENDC = "\033[0m"
         while True:
-            logger.warning(
+            # [Windows兼容修改] 修改提示语，去除 Docker 特定命令的绝对性
+            msg = (
                 f"{RED}Insufficient shared memory (SHM) available."
                 f"Required: {required_shm_size:.2f}G, Available: {shm_size:.2f}G.\n"
-                "If running in Docker, you can increase SHM size with the `--shm-size` flag, "
-                f"like so: `docker run --shm-size=30g [your_image]`{ENDC}",
             )
-            time.sleep(120)  # 每 120 秒打印一次警告日志
+            if platform.system() != "Windows":
+                msg += "If running in Docker, you can increase SHM size with the `--shm-size` flag."
+            else:
+                msg += "Please ensure your Windows Paging File or RAM is sufficient."
+            
+            msg += f"{ENDC}"
+            logger.warning(msg)
+            time.sleep(120)
 
     shm_warning_thread = threading.Thread(
         target=_periodic_shm_warning,
@@ -63,9 +78,16 @@ def _start_shm_size_warning_thread(shm_size, required_shm_size):
 
 def _get_system_shm_size_gb():
     """
-    获取 /dev/shm 的总大小(以GB为单位)。
+    获取系统可用的共享内存大小(以GB为单位)。
+    Linux: 获取 /dev/shm 大小
+    Windows: 获取物理内存总大小 (作为近似值，因为Windows共享内存由分页文件支持)
     """
     try:
+        # [Windows兼容修改] Windows 分支处理
+        if platform.system() == "Windows":
+            return _get_windows_memory_gb()
+
+        # Linux 原有逻辑
         shm_path = "/dev/shm"
         if not os.path.exists(shm_path):
             logger.error(f"{shm_path} not exist, this may indicate a system or Docker configuration anomaly.")
@@ -76,8 +98,43 @@ def _get_system_shm_size_gb():
         total_gb = total_bytes / (1024 ** 3)
         return total_gb
     except Exception as e:
-        logger.error(f"Error getting /dev/shm size: {e}")
+        logger.error(f"Error getting shm size: {e}")
         return 0
+
+def _get_windows_memory_gb():
+    """
+    [Windows新增] 获取 Windows 总物理内存
+    """
+    try:
+        # 方法1: 使用 ctypes 调用 GlobalMemoryStatusEx (无第三方依赖)
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+        
+        # 返回总物理内存 (GB)
+        # 也可以返回 ullTotalPageFile，那个是物理内存+虚拟内存页文件的上限，更接近"共享内存上限"
+        # 这里为了保守起见，返回物理内存
+        return stat.ullTotalPhys / (1024 ** 3)
+    except Exception:
+        # 如果 ctypes 失败，尝试 psutil (如果用户安装了的话)
+        try:
+            import psutil
+            return psutil.virtual_memory().total / (1024 ** 3)
+        except ImportError:
+            return 0
 
 
 def _get_recommended_shm_size_gb(args, max_image_resolution=(1288, 728), dtype_size=2):

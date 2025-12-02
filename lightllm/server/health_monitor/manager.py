@@ -1,9 +1,21 @@
 import sys
-import uvloop
 import asyncio
 import setproctitle
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+# import uvloop
+# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import sys
+UVICORN_LOOP_CONFIG = "asyncio" 
+try:
+    if sys.platform != 'win32':
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        UVICORN_LOOP_CONFIG = "uvloop"
+    else:
+        pass 
+except ImportError:
+    pass
+
 import os
 import inspect
 import requests

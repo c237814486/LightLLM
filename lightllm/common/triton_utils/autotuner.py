@@ -111,7 +111,7 @@ class Autotuner:
             "autotune_kernel_configs",
             get_triton_version(),
             get_current_device_name(),
-            self.kernel_name,
+            self.kernel_name.replace(":", "-"),
         )
         os.makedirs(self.cache_dir, exist_ok=True)
         self.fn = fn

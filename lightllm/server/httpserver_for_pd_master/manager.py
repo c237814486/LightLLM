@@ -1,12 +1,24 @@
 import sys
 import asyncio
-import uvloop
 import time
 import datetime
 import ujson as json
 import pickle
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+# import uvloop
+# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import sys
+UVICORN_LOOP_CONFIG = "asyncio" 
+try:
+    if sys.platform != 'win32':
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        UVICORN_LOOP_CONFIG = "uvloop"
+    else:
+        pass 
+except ImportError:
+    pass
+
 from typing import Union, List, Tuple, Dict, Optional
 from lightllm.server.core.objs import FinishStatus
 from ..pd_io_struct import PD_Client_Obj, UpKVStatus, NixlUpKVStatus, ObjType, NodeRole, NIXLDecodeNodeInfo

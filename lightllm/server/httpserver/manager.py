@@ -2,7 +2,6 @@ import sys
 import zmq
 import zmq.asyncio
 import asyncio
-import uvloop
 import rpyc
 import time
 import copy
@@ -12,7 +11,20 @@ import pickle
 from frozendict import frozendict
 import concurrent.futures
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+# import uvloop
+# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import sys
+UVICORN_LOOP_CONFIG = "asyncio" 
+try:
+    if sys.platform != 'win32':
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        UVICORN_LOOP_CONFIG = "uvloop"
+    else:
+        pass 
+except ImportError:
+    pass
+
 from typing import Union, List, Tuple, Dict, Optional
 from websockets import ClientConnection
 from fastapi import Request

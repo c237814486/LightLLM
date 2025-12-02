@@ -2,6 +2,9 @@ import torch.distributed as dist
 import os
 import torch
 import requests
+import sys # 引入 sys 用于判断平台
+
+
 
 # 规范 rank 的含义，在 llm 推理的相关代码中下述的 rank 的含义如下：
 # global_rank 全局 rank 序列id， 如两节点 8卡，会存在 0 - 15 16个global_rank
@@ -55,6 +58,10 @@ def get_environ(environ_name):
 
 
 def init_vision_distributed_env(kvargs):
+    # 防止重复初始化
+    if dist.is_initialized():
+        return
+
     tp_world_size = kvargs["vit_tp"]
     dp_size = 1
     tp_rank_id = kvargs["tp_rank_id"]
@@ -65,20 +72,34 @@ def init_vision_distributed_env(kvargs):
     device_id = visual_gpu_ids[kvargs["vit_rank_id"]]
     set_current_device_id(device_id)
     torch.cuda.set_device(device_id)
+    
+    # Windows 强制使用 gloo
+    my_backend = "gloo" if sys.platform == 'win32' else "nccl"
+    
     dist.init_process_group(
-        "nccl",
+        backend = my_backend,
         init_method=f'tcp://127.0.0.1:{kvargs["visual_nccl_port"]}',
         rank=kvargs["tp_rank_id"],
         world_size=tp_world_size,
-        device_id=torch.device(f"cuda:{device_id}"),
+        # Windows Gloo 不需要 device_id，填了可能报错，故注释掉或根据情况保留
+        # device_id=torch.device(f"cuda:{device_id}"),
     )
+    
     # warmup nccl communicator
-    _a = torch.zeros([1]).to(f"cuda:{device_id}")
+    if sys.platform == 'win32':
+        _a = torch.zeros([1]) # CPU tensor for Gloo
+    else:
+        _a = torch.zeros([1]).to(f"cuda:{device_id}")
+        
     dist.all_reduce(_a)
     del _a
 
 
 def init_distributed_env(kvargs):
+    # 防止重复初始化 (解决 "trying to initialize ... twice" 错误)
+    if dist.is_initialized():
+        return
+
     assert kvargs["world_size"] % kvargs["args"].nnodes == 0, "world_size should be divided by nnodes"
     node_world_size = kvargs["world_size"] // kvargs["args"].nnodes
 
@@ -99,15 +120,24 @@ def init_distributed_env(kvargs):
     device_id = kvargs["rank_id"] % get_node_world_size()
     set_current_device_id(device_id)
     torch.cuda.set_device(device_id)
+    
+    # Windows 强制使用 gloo
+    my_backend = "gloo" if sys.platform == 'win32' else "nccl"
+
     dist.init_process_group(
-        "nccl",
+        backend=my_backend,
         init_method=f'tcp://{kvargs["nccl_host"]}:{kvargs["nccl_port"]}',
         rank=kvargs["rank_id"],
         world_size=kvargs["world_size"],
-        device_id=torch.device(f"cuda:{device_id}"),
+        # device_id=torch.device(f"cuda:{device_id}"),
     )
+    
     # warmup nccl communicator
-    _a = torch.zeros([1]).to(f"cuda:{device_id}")
+    if sys.platform == 'win32':
+        _a = torch.zeros([1]) # CPU tensor
+    else:
+        _a = torch.zeros([1]).to(f"cuda:{device_id}")
+        
     dist.all_reduce(_a)
     del _a
 
@@ -129,9 +159,6 @@ def get_global_world_size():
 
 
 def set_dp_size(dp_size: int):
-    """
-    total dp num
-    """
     set_environ("LIGHTLLM_DP_SIZE", dp_size)
 
 
@@ -196,6 +223,11 @@ def get_node_world_size():
 
 
 def create_new_group_for_current_dp(backend):
+    # === 关键修改：劫持 backend 参数 ===
+    if sys.platform == 'win32':
+        backend = "gloo"
+    # ================================
+
     ans_group = None
     for iter_dp_rank in range(get_dp_size()):
         ranks = list(i + iter_dp_rank * get_dp_world_size() for i in range(get_dp_world_size()))
@@ -206,6 +238,11 @@ def create_new_group_for_current_dp(backend):
 
 
 def create_new_group_for_current_node(backend):
+    # === 关键修改：劫持 backend 参数 ===
+    if sys.platform == 'win32':
+        backend = "gloo"
+    # ================================
+
     from lightllm.utils.envs_utils import get_env_start_args
 
     args = get_env_start_args()

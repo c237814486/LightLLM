@@ -1,9 +1,11 @@
 import os
 import sys
+import platform
 import time
 import uuid
 import subprocess
 import signal
+import tempfile
 from lightllm.utils.net_utils import alloc_can_use_network_port, PortLocker
 from lightllm.utils.start_utils import process_manager, kill_recursive
 from lightllm.server.metrics.manager import start_metric_manager
@@ -26,30 +28,84 @@ from lightllm.utils.shm_size_check import check_recommended_shm_size
 
 logger = init_logger(__name__)
 
+# [Windows兼容] 判断当前系统
+IS_WINDOWS = platform.system() == "Windows"
+
+
+def _get_http_server_command(host, port, workers, app_path, timeout, keep_alive, preload=False):
+    """
+    根据操作系统生成 HTTP Server 启动命令。
+    Windows -> Uvicorn
+    Linux   -> Gunicorn
+    """
+    if IS_WINDOWS:
+        # Windows 下使用 python -m uvicorn 启动
+        # 注意: uvicorn 没有直接对应 gunicorn timeout 的参数，这里仅设置 keep-alive
+        cmd = [
+            sys.executable, "-m", "uvicorn",
+            app_path,
+            "--host", str(host),
+            "--port", str(port),
+            "--workers", str(workers),
+            "--log-level", "info",
+            "--timeout-keep-alive", str(keep_alive),
+        ]
+        return cmd
+    else:
+        # Linux 下保持原有逻辑
+        cmd = [
+            "gunicorn",
+            "--workers", str(workers),
+            "--worker-class", "uvicorn.workers.UvicornWorker",
+            "--bind", f"{host}:{port}",
+            "--log-level", "info",
+            "--access-logfile", "-",
+            "--error-logfile", "-",
+            app_path,
+            "--timeout", str(timeout),
+            "--keep-alive", str(keep_alive),
+        ]
+        if preload:
+            cmd.append("--preload")
+        return cmd
+
 
 def setup_signal_handlers(http_server_process, process_manager):
     def signal_handler(sig, frame):
+        # [Windows兼容] 信号处理适配
+        sig_name = "SIGINT" if sig == signal.SIGINT else "SIGTERM"
+        
         if sig == signal.SIGINT:
-            logger.info("Received SIGINT (Ctrl+C), forcing immediate exit...")
+            logger.info(f"Received {sig_name} (Ctrl+C), forcing immediate exit...")
             if http_server_process:
                 kill_recursive(http_server_process)
 
             process_manager.terminate_all_processes()
             logger.info("All processes have been forcefully terminated.")
             sys.exit(0)
+            
         elif sig == signal.SIGTERM:
-            logger.info("Received SIGTERM, shutting down gracefully...")
-            if http_server_process and http_server_process.poll() is None:
-                http_server_process.send_signal(signal.SIGTERM)
+            logger.info(f"Received {sig_name}, shutting down gracefully...")
+            
+            if http_server_process:
+                # [Windows兼容] Windows 不支持 send_signal(SIGTERM)
+                if IS_WINDOWS:
+                    http_server_process.terminate()
+                else:
+                    if http_server_process.poll() is None:
+                        http_server_process.send_signal(signal.SIGTERM)
 
                 start_time = time.time()
-                while (time.time() - start_time) < 60:
+                # 缩短等待时间，防止 Windows 僵死
+                wait_time = 30 if IS_WINDOWS else 60
+                
+                while (time.time() - start_time) < wait_time:
                     if not is_process_active(http_server_process.pid):
                         logger.info("httpserver exit")
                         break
                     time.sleep(1)
 
-                if time.time() - start_time < 60:
+                if time.time() - start_time < wait_time:
                     logger.info("HTTP server has exited gracefully")
                 else:
                     logger.warning("HTTP server did not exit in time, killing it...")
@@ -59,11 +115,12 @@ def setup_signal_handlers(http_server_process, process_manager):
             logger.info("All processes have been terminated gracefully.")
             sys.exit(0)
 
-    signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     logger.info(f"start process pid {os.getpid()}")
-    logger.info(f"http server pid {http_server_process.pid}")
+    if http_server_process:
+        logger.info(f"http server pid {http_server_process.pid}")
     return
 
 
@@ -81,13 +138,24 @@ def normal_or_p_d_start(args):
     if args.run_mode not in ["normal", "prefill", "decode", "nixl_prefill", "nixl_decode"]:
         return
 
-    assert args.zmq_mode in ["tcp://", "ipc:///tmp/"]
-    # 确保单机上多实列不冲突
+    # [Windows兼容] ZMQ 路径处理
+    # 如果用户没有指定 tcp:// 且是 ipc:///tmp/ (默认值)，在 Windows 下需要修改路径
     if args.zmq_mode == "ipc:///tmp/":
-        zmq_mode = f"{args.zmq_mode}_{get_unique_server_name()}_"
-        args.zmq_mode = None  # args 的参数不能直接设置，只能先设置None，再设置才能成功
+        if IS_WINDOWS:
+            # Windows 不支持 /tmp/，改用系统临时目录
+            # 注意: Windows 下 ZMQ IPC 路径兼容性较差，如果可能请尽量使用 --zmq_mode tcp://
+            win_tmp = tempfile.gettempdir().replace("\\", "/")
+            zmq_mode = f"ipc://{win_tmp}/{get_unique_server_name()}_"
+            logger.warning(f"Windows detected: changing IPC path to {zmq_mode}")
+        else:
+            zmq_mode = f"{args.zmq_mode}_{get_unique_server_name()}_"
+            
+        args.zmq_mode = None
         args.zmq_mode = zmq_mode
         logger.info(f"zmq mode head: {args.zmq_mode}")
+    else:
+        # 如果用户手动指定了 tcp:// 或其他 ipc 路径，保持原样
+        pass
 
     logger.info(f"use tgi api: {args.use_tgi_api}")
 
@@ -317,27 +385,15 @@ def normal_or_p_d_start(args):
         ],
     )
 
-    # 启动 gunicorn
-    command = [
-        "gunicorn",
-        "--workers",
-        f"{args.httpserver_workers}",
-        "--worker-class",
-        "uvicorn.workers.UvicornWorker",
-        "--bind",
-        f"{args.host}:{args.port}",
-        "--log-level",
-        "info",
-        "--access-logfile",
-        "-",
-        "--error-logfile",
-        "-",
-        "lightllm.server.api_http:app",
-        "--timeout",
-        f"{get_lightllm_gunicorn_time_out_seconds()}",
-        "--keep-alive",
-        f"{get_lightllm_gunicorn_keep_alive()}",
-    ]
+    # [Windows兼容] 启动 HTTP Server
+    command = _get_http_server_command(
+        host=args.host,
+        port=args.port,
+        workers=args.httpserver_workers,
+        app_path="lightllm.server.api_http:app",
+        timeout=get_lightllm_gunicorn_time_out_seconds(),
+        keep_alive=get_lightllm_gunicorn_keep_alive()
+    )
 
     # 启动子进程
     http_server_process = subprocess.Popen(command)
@@ -386,27 +442,16 @@ def pd_master_start(args):
         start_args=[(metric_port, args)],
     )
 
-    command = [
-        "gunicorn",
-        "--workers",
-        "1",
-        "--worker-class",
-        "uvicorn.workers.UvicornWorker",
-        "--bind",
-        f"{args.host}:{args.port}",
-        "--log-level",
-        "info",
-        "--access-logfile",
-        "-",
-        "--error-logfile",
-        "-",
-        "--preload",
-        "lightllm.server.api_http:app",
-        "--timeout",
-        f"{get_lightllm_gunicorn_time_out_seconds()}",
-        "--keep-alive",
-        f"{get_lightllm_gunicorn_keep_alive()}",
-    ]
+    # [Windows兼容] 启动 HTTP Server
+    command = _get_http_server_command(
+        host=args.host,
+        port=args.port,
+        workers=1,
+        app_path="lightllm.server.api_http:app",
+        timeout=get_lightllm_gunicorn_time_out_seconds(),
+        keep_alive=get_lightllm_gunicorn_keep_alive(),
+        preload=True # Windows 上会被自动忽略
+    )
 
     http_server_process = subprocess.Popen(command)
 
@@ -428,27 +473,16 @@ def config_server_start(args):
 
     set_env_start_args(args)
 
-    command = [
-        "gunicorn",
-        "--workers",
-        "1",
-        "--worker-class",
-        "uvicorn.workers.UvicornWorker",
-        "--bind",
-        f"{args.config_server_host}:{args.config_server_port}",
-        "--log-level",
-        "info",
-        "--access-logfile",
-        "-",
-        "--error-logfile",
-        "-",
-        "--preload",
-        "lightllm.server.config_server.api_http:app",
-        "--timeout",
-        f"{get_lightllm_gunicorn_time_out_seconds()}",
-        "--keep-alive",
-        f"{get_lightllm_gunicorn_keep_alive()}",
-    ]
+    # [Windows兼容] 启动 Config Server
+    command = _get_http_server_command(
+        host=args.config_server_host,
+        port=args.config_server_port,
+        workers=1,
+        app_path="lightllm.server.config_server.api_http:app",
+        timeout=get_lightllm_gunicorn_time_out_seconds(),
+        keep_alive=get_lightllm_gunicorn_keep_alive(),
+        preload=True
+    )
 
     http_server_process = subprocess.Popen(command)
     setup_signal_handlers(http_server_process, process_manager)

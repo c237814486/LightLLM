@@ -2,13 +2,25 @@ import pickle
 import zmq
 import zmq.asyncio
 import asyncio
-import uvloop
 import rpyc
 import inspect
 import setproctitle
 from typing import List
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+# import uvloop
+# asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import sys
+UVICORN_LOOP_CONFIG = "asyncio" 
+try:
+    if sys.platform != 'win32':
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        UVICORN_LOOP_CONFIG = "uvloop"
+    else:
+        pass 
+except ImportError:
+    pass
+
 from lightllm.utils.log_utils import init_logger
 from lightllm.server.core.objs.io_objs.group_req import GroupReqIndexes
 from lightllm.server.core.objs.shm_req_manager import ShmReqManager

@@ -28,7 +28,7 @@ def bytes2tensor(b):
 def create_shm(name, data):
     try:
         data_size = len(data)
-        shared_memory = shm.SharedMemory(name=name, create=True, size=data_size)
+        shared_memory = shm.SharedMemory(name=name, create=True, size=int(data_size))
         mem_view = shared_memory.buf
         mem_view[:data_size] = data
     except FileExistsError:
