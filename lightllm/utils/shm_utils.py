@@ -2,6 +2,7 @@ from multiprocessing import shared_memory
 from filelock import FileLock
 from lightllm.utils.log_utils import init_logger
 import os
+import sys
 import tempfile
 import platform
 import time
@@ -45,54 +46,46 @@ def create_or_link_shm(name, expected_size, force_mode=None):
 
 def _force_create_shm(name, expected_size):
     """
-    强制创建新的共享内存。
-    Windows 极速版：如果原名被占用或处于删除等待状态，直接改名创建，不等待。
+    创建共享内存。
+    Linux: 强制清理旧的同名共享内存，并创建新的。
+    Windows: 尝试连接现有的，如果尺寸满足则复用；如果不存在则创建；如果尺寸不足则报错。
     """
-    gc.collect()  # 主动 GC
-
-    # --- 阶段 1: 尝试复用现有的 (Inspection & Reuse) ---
-    try:
-        existing_shm = shared_memory.SharedMemory(name=name, create=False)
-        # 如果尺寸足够大，直接复用
-        if existing_shm.size >= int(expected_size):
-            return existing_shm
-        
-        # 尺寸太小，尝试销毁（Windows上这步是“尽力而为”）
-        existing_shm.close()
+    
+    # === Linux / Non-Windows 逻辑 (保持原样) ===
+    if sys.platform != 'win32':
         try:
+            existing_shm = shared_memory.SharedMemory(name=name)
+            existing_shm.close()
             existing_shm.unlink()
         except:
-            pass 
-    except FileNotFoundError:
-        pass
-    except Exception as e:
-        logger.warning(f"Error checking existing SHM {name}: {e}")
+            pass
 
-    # --- 阶段 2: 尝试创建 (Create or Rename) ---
-    
-    # 尝试 1:以此名字创建
-    try:
+        # 创建新的共享内存
         shm = shared_memory.SharedMemory(name=name, create=True, size=int(expected_size))
         return shm
-    except Exception:
-        # 忽略具体错误（无论是 FileExistsError 还是 PermissionError）
-        # 只要原名创建失败，说明被占用了
-        pass
 
-    # 尝试 2: 原名被占用，生成唯一新名字
-    # 格式: 原名_随机UUID前8位
-    new_name = f"{name}_{uuid.uuid4().hex[:8]}"
-    
-    logger.warning(f"SHM name '{name}' is zombie/locked. Renaming to '{new_name}'")
-    
-    # 直接以新名字创建，如果这次还失败，那就是系统资源问题了，抛出异常
-    try:
-        shm = shared_memory.SharedMemory(name=new_name, create=True, size=int(expected_size))
-        return shm
-    except Exception as e:
-        error_msg = f"Failed to create renamed shared memory {new_name}. Error: {e}"
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
+    # === Windows 逻辑 ===
+    else:
+        try:
+            # 1. 尝试连接现有的共享内存
+            shm = shared_memory.SharedMemory(name=name)
+            
+            # 2. 如果存在，检查尺寸是否满足要求
+            if shm.size >= expected_size:
+                return shm
+            else:
+                # 尺寸不满足，关闭连接并报错
+                current_size = shm.size
+                shm.close()
+                raise ValueError(
+                    f"Shared memory '{name}' exists but size ({current_size}) "
+                    f"is smaller than expected ({expected_size})."
+                )
+                
+        except FileNotFoundError:
+            # 3. 如果不存在 (FileNotFoundError)，则创建新的
+            shm = shared_memory.SharedMemory(name=name, create=True, size=int(expected_size))
+            return shm
 
 
 def _force_link_shm(name, expected_size):

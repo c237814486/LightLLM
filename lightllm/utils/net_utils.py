@@ -1,3 +1,4 @@
+import sys
 import socket
 import subprocess
 import ipaddress
@@ -8,12 +9,38 @@ logger = init_logger(__name__)
 
 
 def alloc_can_use_network_port(num=3, used_nccl_ports=None, from_port_num=1000):
+    # 防御性代码：防止原始代码中 used_nccl_ports 为 None 导致 "argument of type 'NoneType' is not iterable" 错误
+    if used_nccl_ports is None:
+        used_nccl_ports = []
+
     port_list = []
     for port in range(from_port_num, from_port_num + 1000):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            result = s.connect_ex(("localhost", port))
+            # ==========================================
+            # 差异化处理逻辑
+            # ==========================================
+            if sys.platform == 'win32':
+                # Windows: 
+                # 1. 使用 "127.0.0.1" 绕过 DNS 解析和 IPv6 尝试
+                # 2. 设置 0.1秒 超时，防止被防火墙或特定端口状态卡住
+                host = "127.0.0.1"
+                s.settimeout(0.1)
+            else:
+                # Linux: 
+                # 保持原逻辑不变，使用 "localhost" 且使用默认 socket 行为
+                host = "localhost"
+            
+            try:
+                result = s.connect_ex((host, port))
+            except:
+                # Windows设置超时后可能会抛出异常，这里捕获并视为连接失败（即端口可用）
+                # result != 0 代表连接不成功，意味着端口空闲
+                result = -1 
+
+            # result != 0 意味着 connect 没成功（端口没人用），即我们可用
             if result != 0 and port not in used_nccl_ports:
                 port_list.append(port)
+            
             if len(port_list) > num * 30:
                 break
 

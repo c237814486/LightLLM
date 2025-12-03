@@ -99,6 +99,8 @@ websockets
 partial-json-parser
 tornado
 interegular
+rich
+numexpr
 
 # 手动扩大 Windows 的虚拟内存。
 # 按 Win + S，搜索 “查看高级系统设置” 并打开。
