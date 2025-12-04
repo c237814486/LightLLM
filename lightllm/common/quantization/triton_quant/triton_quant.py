@@ -17,11 +17,9 @@ class TritonBaseQuantizationMethod(QuantizationMethod):
         self.cache_manager = g_cache_manager
 
     def quantize(self, weight: torch.Tensor):
-        """ """
         pass
 
     def apply(self, input_tensor, weights, bias=None, out=None, workspace=None):
-        """ """
         pass
 
 
@@ -33,7 +31,6 @@ class TritonFP8w8a8QuantizationMethod(TritonBaseQuantizationMethod):
         self.block_size = 128
 
     def quantize(self, weight: torch.Tensor):
-        # TODO block-wise quant kernel
         pass
 
     def apply(

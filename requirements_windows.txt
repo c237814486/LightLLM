@@ -67,6 +67,7 @@ toolz==1.0.0
 torch==2.5.1
 torchvision==0.20.1
 torchaudio==2.5.1
+torchao==0.8.0
 tqdm==4.65.0
 transformers==4.51.3
 triton-windows==3.1.0.post17

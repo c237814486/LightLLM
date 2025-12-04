@@ -15,7 +15,7 @@ Write-Host "Setting PYTHONPATH: $env:PYTHONPATH"
 python -m lightllm.server.api_server `
     --zmq_mode "tcp://" `
     --sampling_backend triton_top_pk `
-    --model_dir D:\LeapFaith\models\Qwen2.5-VL-3B-Instruct `
+    --model_dir "D:\LeapFaith\models\Qwen2.5-VL-3B-Instruct" `
     --enable_multimodal `
     --host 0.0.0.0 `
     --port 10083 `
@@ -23,4 +23,5 @@ python -m lightllm.server.api_server `
     --chunked_prefill_size 2048 `
     --max_req_total_len 4080 `
     --max_total_token_num 4096 `
-    --mem_fraction 0.95
+    --mem_fraction 0.95 `
+    --quant_type "ao-fp8w8a16"

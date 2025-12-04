@@ -7,7 +7,7 @@ import torch.nn.functional as F
 try:
     HAS_TORCH_AO = True
     from torchao.dtypes import to_affine_quantized_intx, AffineQuantizedTensor
-    from torchao.dtypes import TensorCoreTiledLayoutType
+    # from torchao.dtypes import TensorCoreTiledLayoutType
     from torchao.quantization.quant_primitives import MappingType, ZeroPointDomain
     from torchao.quantization import (
         int4_weight_only,

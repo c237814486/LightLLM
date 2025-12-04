@@ -45,7 +45,7 @@ response = requests.post(url, json={
             "content": [
                 {
                     "type": "text", 
-                    "text": "详细描述图片内容，并指出左下角文字撰写的图片来源"
+                    "text": "非常非常详细的描述图片内容，并指出左下角文字撰写的图片来源"
                 },
                 {
                     "type": "image_url", 
@@ -63,6 +63,6 @@ response = requests.post(url, json={
         }
     ],
     "max_tokens": 2048, 
-    "temperature": 0.1
+    "temperature": 0.7
 })
 print(response.json()["choices"][0]["message"]["content"])
